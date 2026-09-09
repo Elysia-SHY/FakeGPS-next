@@ -53,7 +53,18 @@ class SimulationViewModel @Inject constructor(
         stateRepo.updateRealPhysicalLocation(latitude, longitude)
     }
 
-    fun startPointMock(context: Context, latitude: Double, longitude: Double) {
+    fun startPointMock(context: Context, latitude: Double, longitude: Double): Boolean {
+        val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
+        if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
+            when (issue) {
+                com.mockrun.app.util.PermissionIssueType.LOCATION_PERMISSION_MISSING ->
+                    stateRepo.onError("缺少精确定位权限，请先授予权限")
+                com.mockrun.app.util.PermissionIssueType.MOCK_LOCATION_APP_NOT_SET ->
+                    stateRepo.onError("请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
+                else -> {}
+            }
+            return false
+        }
         if (!com.mockrun.app.location.KeepAliveHelper.isBatteryOptimized(context)) {
             com.mockrun.app.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
         }
@@ -76,6 +87,7 @@ class SimulationViewModel @Inject constructor(
             }
             ContextCompat.startForegroundService(context, intent)
         }
+        return true
     }
 
     fun stopPointMock(context: Context) {
@@ -95,7 +107,18 @@ class SimulationViewModel @Inject constructor(
         context.startService(intent)
     }
 
-    fun startSimulation(context: Context, route: Route, speedKmh: Float) {
+    fun startSimulation(context: Context, route: Route, speedKmh: Float): Boolean {
+        val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
+        if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
+            when (issue) {
+                com.mockrun.app.util.PermissionIssueType.LOCATION_PERMISSION_MISSING ->
+                    stateRepo.onError("缺少精确定位权限，请先授予权限")
+                com.mockrun.app.util.PermissionIssueType.MOCK_LOCATION_APP_NOT_SET ->
+                    stateRepo.onError("请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
+                else -> {}
+            }
+            return false
+        }
         if (!com.mockrun.app.location.KeepAliveHelper.isBatteryOptimized(context)) {
             com.mockrun.app.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
         }
@@ -105,6 +128,7 @@ class SimulationViewModel @Inject constructor(
             putExtra(MockLocationService.EXTRA_SPEED, speedKmh)
         }
         ContextCompat.startForegroundService(context, intent)
+        return true
     }
 
     fun pauseSimulation(context: Context) {

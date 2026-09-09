@@ -36,6 +36,9 @@ import com.mockrun.app.ui.screen.tabs.LocationControlPanel
 import com.mockrun.app.ui.screen.tabs.RouteBottomPanel
 import com.mockrun.app.ui.screen.tabs.RouteConfigDialog
 import com.mockrun.app.ui.screen.tabs.RouteStage
+import com.mockrun.app.ui.components.PermissionGuideDialog
+import com.mockrun.app.util.PermissionHelper
+import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.ui.theme.LiquidGlassDefaults
 import com.mockrun.app.ui.theme.liquidGlass
 import androidx.compose.ui.Alignment
@@ -447,6 +450,16 @@ fun MapScreen(
     var showSearchDialog by remember { mutableStateOf(false) }
     var showRoadRouteDialog by remember { mutableStateOf(false) }
     var isContinuousDrawMode by remember { mutableStateOf(false) }
+    var permissionIssueDialogType by remember { mutableStateOf<PermissionIssueType?>(null) }
+
+    val ensurePermissionAndStart: (() -> Unit) -> Unit = { onPermitted ->
+        val issue = PermissionHelper.checkPrimaryPermissions(context)
+        if (issue != PermissionIssueType.NONE) {
+            permissionIssueDialogType = issue
+        } else {
+            onPermitted()
+        }
+    }
     val continuousDrawRef = rememberUpdatedState(isContinuousDrawMode)
     val isPointMockActiveRef = rememberUpdatedState(isPointMockActive)
     val isJoystickRunningRef = rememberUpdatedState(isJoystickRunning)
@@ -1048,8 +1061,10 @@ fun MapScreen(
                     },
                     onClearSearch = { mapViewModel.clearSearch() },
                     onStartMock = {
-                        simulationViewModel.startPointMock(context, activeCoord.first, activeCoord.second)
-                        Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                        ensurePermissionAndStart {
+                            simulationViewModel.startPointMock(context, activeCoord.first, activeCoord.second)
+                            Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onStopMock = {
                         simulationViewModel.stopPointMock(context)
@@ -1135,13 +1150,15 @@ fun MapScreen(
                         showSaveDialog = true
                     },
                     onStartSimulation = {
-                        val route = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
-                            name = "规划路线 (${drawnWaypoints.size}点)",
-                            waypoints = drawnWaypoints
-                        )
-                        simulationViewModel.startSimulation(context, route, selectedSpeed)
-                        routeStage = RouteStage.RUNNING
-                        Toast.makeText(context, "路线模拟已开启！", Toast.LENGTH_SHORT).show()
+                        ensurePermissionAndStart {
+                            val route = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
+                                name = "规划路线 (${drawnWaypoints.size}点)",
+                                waypoints = drawnWaypoints
+                            )
+                            simulationViewModel.startSimulation(context, route, selectedSpeed)
+                            routeStage = RouteStage.RUNNING
+                            Toast.makeText(context, "路线模拟已开启！", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onPauseSimulation = {
                         simulationViewModel.pauseSimulation(context)
@@ -1232,16 +1249,18 @@ fun MapScreen(
                 showSearchDialog = false
             },
             onDirectMock = { lat, lon ->
-                simulationViewModel.startPointMock(context, lat, lon)
-                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(lat, lon) else lat to lon
-                mapViewRef?.controller?.apply {
-                    setZoom(16.5)
-                    animateTo(GeoPoint(tLat, tLon))
+                ensurePermissionAndStart {
+                    simulationViewModel.startPointMock(context, lat, lon)
+                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                    val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(lat, lon) else lat to lon
+                    mapViewRef?.controller?.apply {
+                        setZoom(16.5)
+                        animateTo(GeoPoint(tLat, tLon))
+                    }
+                    centerAimingCoord = lat to lon
+                    showSearchDialog = false
+                    Toast.makeText(context, "已开启即时虚拟定位！", Toast.LENGTH_SHORT).show()
                 }
-                centerAimingCoord = lat to lon
-                showSearchDialog = false
-                Toast.makeText(context, "已开启即时虚拟定位！", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -1262,6 +1281,13 @@ fun MapScreen(
                     animateTo(GeoPoint(tLat, tLon))
                 }
             }
+        )
+    }
+
+    permissionIssueDialogType?.let { issue ->
+        PermissionGuideDialog(
+            issueType = issue,
+            onDismissRequest = { permissionIssueDialogType = null }
         )
     }
 }

@@ -45,6 +45,9 @@ import com.mockrun.app.location.CoordinateConverter
 import com.mockrun.app.location.FloatingJoystickService
 import com.mockrun.app.location.KeepAliveHelper
 import com.mockrun.app.location.RootSuBridge
+import com.mockrun.app.ui.components.PermissionGuideDialog
+import com.mockrun.app.util.PermissionHelper
+import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import kotlinx.coroutines.launch
@@ -67,6 +70,7 @@ fun LocationMockScreen(
 
     var joystickSizeDp by remember { mutableFloatStateOf(140f) }
     var realLocationCoord by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var permissionIssueDialogType by remember { mutableStateOf<PermissionIssueType?>(null) }
 
     LaunchedEffect(Unit) {
         realLocationCoord = CoordinateConverter.getRealDeviceLocation(context)
@@ -318,9 +322,14 @@ fun LocationMockScreen(
                             }
                             Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
                         } else {
-                            simulationViewModel.startPointMock(context, activeLat, activeLon)
-                            simulationViewModel.updateSelectedTarget(activeLat, activeLon)
-                            Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                            val issue = PermissionHelper.checkPrimaryPermissions(context)
+                            if (issue != PermissionIssueType.NONE) {
+                                permissionIssueDialogType = issue
+                            } else {
+                                simulationViewModel.startPointMock(context, activeLat, activeLon)
+                                simulationViewModel.updateSelectedTarget(activeLat, activeLon)
+                                Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 )
@@ -942,6 +951,13 @@ fun LocationMockScreen(
             },
             shape = RoundedCornerShape(14.dp),
             containerColor = Color.White
+        )
+    }
+
+    permissionIssueDialogType?.let { issue ->
+        PermissionGuideDialog(
+            issueType = issue,
+            onDismissRequest = { permissionIssueDialogType = null }
         )
     }
 }
