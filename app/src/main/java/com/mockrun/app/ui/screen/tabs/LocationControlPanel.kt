@@ -210,42 +210,123 @@ fun LocationControlPanel(
                 }
             }
 
-            // High-Visibility Master Capsule Button: Start / Stop Mocking
-            Surface(
-                modifier = Modifier
-                    .height(52.dp)
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(26.dp),
-                        elevation = 8.dp,
-                        containerColor = if (isMockActive) IosColors.SystemRed.copy(0.9f) else IosColors.SystemBlue.copy(0.95f)
-                    )
-                    .clickable {
-                        if (isMockActive) onStopMock() else onStartMock()
-                    },
-                shape = RoundedCornerShape(26.dp),
-                color = Color.Transparent
-            ) {
+            // High-Visibility Master Capsule Buttons
+            if (isMockActive) {
+                // Dual Capsule when active: [ 移动到此 ] & [ 停止模拟 ]
                 Row(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(horizontal = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    modifier = Modifier.height(52.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (isMockActive) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (isMockActive) "停止模拟" else "开启定位",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .liquidGlass(
+                                isLiquidGlass = isLiquidGlass,
+                                shape = RoundedCornerShape(26.dp),
+                                elevation = 8.dp,
+                                containerColor = IosColors.SystemBlue.copy(0.92f)
+                            )
+                            .clickable { onStartMock() },
+                        shape = RoundedCornerShape(26.dp),
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "移动到此",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .liquidGlass(
+                                isLiquidGlass = isLiquidGlass,
+                                shape = RoundedCornerShape(26.dp),
+                                elevation = 8.dp,
+                                containerColor = IosColors.SystemRed.copy(0.92f)
+                            )
+                            .clickable { onStopMock() },
+                        shape = RoundedCornerShape(26.dp),
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "停止模拟",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .height(52.dp)
+                        .liquidGlass(
+                            isLiquidGlass = isLiquidGlass,
+                            shape = RoundedCornerShape(26.dp),
+                            elevation = 8.dp,
+                            containerColor = IosColors.SystemBlue.copy(0.95f)
+                        )
+                        .clickable { onStartMock() },
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 22.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "开启定位",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.5.sp
+                        )
+                    }
                 }
             }
         }

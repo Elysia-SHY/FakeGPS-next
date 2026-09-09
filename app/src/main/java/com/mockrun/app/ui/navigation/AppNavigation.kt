@@ -3,6 +3,7 @@ package com.mockrun.app.ui.navigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Navigation
@@ -20,6 +21,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
 import com.mockrun.app.ui.components.FloatingTabItem
+import com.mockrun.app.ui.screen.AboutScreen
 import com.mockrun.app.ui.screen.LocationMockScreen
 import com.mockrun.app.ui.screen.MapScreen
 import com.mockrun.app.ui.screen.MapTab
@@ -33,6 +35,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object Location : Screen("location", "定位", Icons.Default.Place)
     object Route : Screen("route", "路线", Icons.Default.Navigation)
     object Features : Screen("features", "功能", Icons.Default.Build)
+    object About : Screen("about", "关于", Icons.Default.Info)
     object Library : Screen("library", "路线库", Icons.Default.Menu)
 
     // Backward-compatibility aliases
@@ -60,7 +63,7 @@ fun AppNavigation(
             FloatingTabItem(Screen.Location.route, Screen.Location.title, Screen.Location.icon),
             FloatingTabItem(Screen.Route.route, Screen.Route.title, Screen.Route.icon),
             FloatingTabItem(Screen.Features.route, Screen.Features.title, Screen.Features.icon),
-            FloatingTabItem(Screen.Library.route, Screen.Library.title, Screen.Library.icon)
+            FloatingTabItem(Screen.About.route, Screen.About.title, Screen.About.icon)
         )
     }
 
@@ -78,7 +81,7 @@ fun AppNavigation(
                         simulationViewModel = simulationViewModel,
                         initialTab = MapTab.LOCATION,
                         isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = 80.dp,
+                        bottomBarPadding = 76.dp,
                         onNavigateToLibrary = {
                             navController.navigate(Screen.Library.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -98,7 +101,7 @@ fun AppNavigation(
                         simulationViewModel = simulationViewModel,
                         initialTab = MapTab.ROUTE,
                         isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = 80.dp,
+                        bottomBarPadding = 76.dp,
                         onNavigateToLibrary = {
                             navController.navigate(Screen.Library.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -127,7 +130,20 @@ fun AppNavigation(
                     )
                 }
 
-                // 4. Saved Route Library
+                // 4. About App Screen (With GitHub link, liquid glass secondary setting, credits)
+                composable(Screen.About.route) {
+                    AboutScreen(
+                        isLiquidGlass = isLiquidGlassEnabled,
+                        onToggleLiquidGlass = { enabled ->
+                            isLiquidGlassEnabled = enabled
+                        },
+                        onNavigateToLibrary = {
+                            navController.navigate(Screen.Library.route)
+                        }
+                    )
+                }
+
+                // 5. Saved Route Library
                 composable(Screen.Library.route) {
                     RouteLibraryScreen(
                         mapViewModel = mapViewModel,
@@ -145,7 +161,7 @@ fun AppNavigation(
             }
 
             // =================================================================
-            // LocationSpoofer Style Floating Bottom Bar with Liquid Glass Switch
+            // LocationSpoofer Style Floating Bottom Bar (Clean Tabs, Sliding Indicator)
             // =================================================================
             AndroidFloatingBottomBar(
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -160,9 +176,6 @@ fun AppNavigation(
                         launchSingleTop = true
                         restoreState = true
                     }
-                },
-                onToggleLiquidGlass = { enabled ->
-                    isLiquidGlassEnabled = enabled
                 }
             )
         }

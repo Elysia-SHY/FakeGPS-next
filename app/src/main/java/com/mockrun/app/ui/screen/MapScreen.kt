@@ -30,6 +30,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.mockrun.app.ui.screen.tabs.LocationControlPanel
 import com.mockrun.app.ui.screen.tabs.RouteBottomPanel
 import com.mockrun.app.ui.screen.tabs.RouteConfigDialog
@@ -424,11 +426,17 @@ fun MapScreen(
     var routeNameInput by remember { mutableStateOf("") }
     var currentMapType by remember { mutableStateOf(MapSourceType.AUTONAVI_VECTOR) }
     var showMapTypeMenu by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var updateCenterJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
-    var selectedTapPoint by remember {
-        mutableStateOf(selectedTargetLocation?.let { it.latitude to it.longitude })
-    }
     var userRealLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var centerAimingCoord by remember {
+        mutableStateOf(
+            pointMockLocation?.let { it.latitude to it.longitude }
+                ?: selectedTargetLocation?.let { it.latitude to it.longitude }
+                ?: (39.9042 to 116.4074)
+        )
+    }
     var currentAddressText by remember { mutableStateOf("正在获取当前地址...") }
     var currentZoom by remember { mutableDoubleStateOf(16.0) }
 
@@ -447,35 +455,14 @@ fun MapScreen(
         CoordinateConverter.requestFreshLocation(context) { lat, lon ->
             userRealLocation = lat to lon
             simulationViewModel.updateRealPhysicalLocation(lat, lon)
-        }
-    }
-
-    LaunchedEffect(selectedTargetLocation) {
-        selectedTargetLocation?.let { target ->
-            selectedTapPoint = target.latitude to target.longitude
-            val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-            val (dispLat, dispLon) = if (isGcjMap) {
-                CoordinateConverter.wgs84ToGcj02(target.latitude, target.longitude)
-            } else {
-                target.latitude to target.longitude
-            }
-            mapViewRef?.controller?.apply {
-                setZoom(16.5)
-                animateTo(GeoPoint(dispLat, dispLon))
+            if (pointMockLocation == null && selectedTargetLocation == null) {
+                centerAimingCoord = lat to lon
             }
         }
     }
 
-    // Active location priority: point mock > joystick > route runner > selected tap > real physical
-    val realLocation = remember(context) { CoordinateConverter.getRealDeviceLocation(context) }
-    val activeCoord = pointMockLocation?.let { it.latitude to it.longitude }
-        ?: joystickLocation?.let { it.latitude to it.longitude }
-        ?: simState.currentWayPoint?.let { it.latitude to it.longitude }
-        ?: selectedTapPoint
-        ?: userRealLocation
-        ?: realPhysicalLocation?.let { it.latitude to it.longitude }
-        ?: realLocation
-        ?: (39.9042 to 116.4074)
+    // Active Aiming Coordinate: directly anchored to center crosshair
+    val activeCoord = centerAimingCoord
 
     LaunchedEffect(activeCoord) {
         currentAddressText = AddressResolver.resolveAddress(context, activeCoord.first, activeCoord.second)
@@ -498,9 +485,20 @@ fun MapScreen(
                     MapView(ctx).apply {
                         setTileSource(AutoNaviVectorTileSource)
                         setMultiTouchControls(true)
+                        isClickable = true
+                        isFocusable = true
                         zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
                         controller.setZoom(16.0)
                         currentZoom = 16.0
+
+                        // Center on initial aiming coordinate
+                        val initCoord = centerAimingCoord
+                        val (initLat, initLon) = if (currentMapType != MapSourceType.OPEN_STREET_MAP) {
+                            CoordinateConverter.wgs84ToGcj02(initCoord.first, initCoord.second)
+                        } else {
+                            initCoord
+                        }
+                        controller.setCenter(GeoPoint(initLat, initLon))
 
                         addMapListener(object : MapListener {
                             override fun onZoom(event: ZoomEvent?): Boolean {
@@ -508,28 +506,23 @@ fun MapScreen(
                                 return true
                             }
                             override fun onScroll(event: ScrollEvent?): Boolean {
-                                mapViewRef?.mapCenter?.let { centerGeo ->
-                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                    val (wgsLat, wgsLon) = if (isGcjMap) {
-                                        CoordinateConverter.gcj02ToWgs84(centerGeo.latitude, centerGeo.longitude)
-                                    } else {
-                                        centerGeo.latitude to centerGeo.longitude
+                                updateCenterJob?.cancel()
+                                updateCenterJob = coroutineScope.launch {
+                                    delay(120)
+                                    mapViewRef?.mapCenter?.let { centerGeo ->
+                                        val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                        val (wgsLat, wgsLon) = if (isGcjMap) {
+                                            CoordinateConverter.gcj02ToWgs84(centerGeo.latitude, centerGeo.longitude)
+                                        } else {
+                                            centerGeo.latitude to centerGeo.longitude
+                                        }
+                                        centerAimingCoord = wgsLat to wgsLon
+                                        simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
                                     }
-                                    selectedTapPoint = wgsLat to wgsLon
-                                    simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
                                 }
                                 return false
                             }
                         })
-
-                        // Center on user's real physical location by default (converted to GCJ-02)
-                        val real = CoordinateConverter.getRealDeviceLocation(ctx)
-                        val (initLat, initLon) = if (real != null) {
-                            CoordinateConverter.wgs84ToGcj02(real.first, real.second)
-                        } else {
-                            39.9042 to 116.4074
-                        }
-                        controller.setCenter(GeoPoint(initLat, initLon))
 
                         val receiver = object : MapEventsReceiver {
                             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
@@ -540,15 +533,11 @@ fun MapScreen(
                                         CoordinateConverter.gcj02ToWgs84(it.latitude, it.longitude)
                                     }
                                     if (continuousDrawRef.value) {
-                                        // 连续连点模式：直接追加航点，零弹窗、零 Toast，像第 1 版一样点哪连哪！
                                         mapViewModel.addWaypoint(wgsLat, wgsLon)
                                     } else {
-                                        selectedTapPoint = wgsLat to wgsLon
+                                        mapViewRef?.controller?.animateTo(it)
+                                        centerAimingCoord = wgsLat to wgsLon
                                         simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
-
-                                        if (isPointMockActiveRef.value || isJoystickRunningRef.value) {
-                                            simulationViewModel.startPointMock(context, wgsLat, wgsLon)
-                                        }
                                     }
                                 }
                                 return true
@@ -636,26 +625,11 @@ fun MapScreen(
                         mapView.overlays.add(pMarker)
                     }
 
-                    // Selected Tap Location Marker (Apple Signature Red Teardrop Pin)
-                    selectedTapPoint?.let { (tLat, tLon) ->
-                        val (dispLat, dispLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(tLat, tLon)
-                        } else {
-                            tLat to tLon
-                        }
-                        val selectMarker = Marker(mapView).apply {
-                            position = GeoPoint(dispLat, dispLon)
-                            icon = MapPinHelper.getSelectedPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "🎯 选中目标点"
-                        }
-                        mapView.overlays.add(selectMarker)
-                    }
 
                     // Real Physical Location Puck (Apple Maps Signature Glowing Blue Puck)
                     val realLoc = userRealLocation
                         ?: realPhysicalLocation?.let { it.latitude to it.longitude }
-                        ?: realLocation
+                        ?: userRealLocation
                     realLoc?.let { (rLat, rLon) ->
                         val (dispLat, dispLon) = if (isGcjMap) {
                             CoordinateConverter.wgs84ToGcj02(rLat, rLon)
@@ -669,7 +643,7 @@ fun MapScreen(
                             title = "🔵 当前真实物理位置"
                             snippet = "硬件 GPS 坐标: ${"%.5f".format(rLat)}, ${"%.5f".format(rLon)}"
                             setOnMarkerClickListener { _, _ ->
-                                selectedTapPoint = rLat to rLon
+                                centerAimingCoord = rLat to rLon
                                 simulationViewModel.updateSelectedTarget(rLat, rLon)
                                 true
                             }
@@ -797,9 +771,6 @@ fun MapScreen(
                         IconButton(
                             onClick = {
                                 isContinuousDrawMode = !isContinuousDrawMode
-                                if (isContinuousDrawMode) {
-                                    selectedTapPoint = null
-                                }
                             },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -1050,7 +1021,7 @@ fun MapScreen(
                                 userRealLocation = real
                                 simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
                                 simulationViewModel.updateSelectedTarget(real.first, real.second)
-                                selectedTapPoint = real
+                                centerAimingCoord = real
                                 val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                                 val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
                                 mapViewRef?.controller?.apply {
@@ -1133,7 +1104,7 @@ fun MapScreen(
                             animateTo(GeoPoint(dispLat, dispLon))
                         }
                         simulationViewModel.updateSelectedTarget(item.latitude, item.longitude)
-                        selectedTapPoint = item.latitude to item.longitude
+                        centerAimingCoord = item.latitude to item.longitude
                         mapViewModel.clearSearch()
                     },
                     onClearSearch = { mapViewModel.clearSearch() },
@@ -1166,7 +1137,7 @@ fun MapScreen(
                             userRealLocation = real
                             simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
                             simulationViewModel.updateSelectedTarget(real.first, real.second)
-                            selectedTapPoint = real
+                            centerAimingCoord = real
                             val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                             val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
                             mapViewRef?.controller?.apply {
@@ -1184,6 +1155,7 @@ fun MapScreen(
                         mapViewModel.selectRoute(route)
                         val first = route.waypoints.firstOrNull()
                         if (first != null) {
+                            centerAimingCoord = first.latitude to first.longitude
                             val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                             val (dispLat, dispLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(first.latitude, first.longitude) else (first.latitude to first.longitude)
                             mapViewRef?.controller?.animateTo(GeoPoint(dispLat, dispLon))
@@ -1308,7 +1280,7 @@ fun MapScreen(
                     setZoom(16.5)
                     animateTo(GeoPoint(tLat, tLon))
                 }
-                selectedTapPoint = lat to lon
+                centerAimingCoord = lat to lon
                 showSearchDialog = false
                 Toast.makeText(context, "已定位至：$name", Toast.LENGTH_SHORT).show()
             },
@@ -1328,7 +1300,7 @@ fun MapScreen(
                     setZoom(16.5)
                     animateTo(GeoPoint(tLat, tLon))
                 }
-                selectedTapPoint = lat to lon
+                centerAimingCoord = lat to lon
                 showSearchDialog = false
                 Toast.makeText(context, "已开启即时虚拟定位！", Toast.LENGTH_SHORT).show()
             }
@@ -1339,8 +1311,8 @@ fun MapScreen(
         RoadRouteDialog(
             mapViewModel = mapViewModel,
             simulationViewModel = simulationViewModel,
-            realLocation = realLocation,
-            selectedTapPoint = selectedTapPoint,
+            realLocation = userRealLocation,
+            selectedTapPoint = centerAimingCoord,
             pointMockLocation = pointMockLocation,
             onDismissRequest = { showRoadRouteDialog = false },
             onNavigateToOrigin = { lat, lon ->
