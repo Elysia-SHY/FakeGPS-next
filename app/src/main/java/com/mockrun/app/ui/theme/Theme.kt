@@ -36,9 +36,9 @@ private val LightColorScheme = lightColorScheme(
     secondary = IosGreen,
     onSecondary = Color.White,
     tertiary = IosPurple,
-    background = IosSystemBackground,
+    background = Color(0xFFF2F2F7),
     onBackground = Color(0xFF1C1C1E),
-    surface = IosCardBackground,
+    surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF1C1C1E),
     surfaceVariant = Color(0xFFF2F2F7),
     onSurfaceVariant = IosGray,
@@ -61,10 +61,15 @@ fun MockRunTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val iosPalette = if (darkTheme) DarkIosColorPalette else LightIosColorPalette
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        shapes = IosShapes,
-        content = content
-    )
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalIosColors provides iosPalette
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = IosShapes,
+            content = content
+        )
+    }
 }

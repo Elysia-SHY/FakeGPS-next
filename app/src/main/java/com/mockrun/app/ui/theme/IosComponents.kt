@@ -160,7 +160,7 @@ fun IosListRow(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = IosColors.SystemGray3,
+                tint = IosColors.SecondaryLabel.copy(alpha = 0.6f),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -177,8 +177,10 @@ fun IosSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val isDark = LocalIosColors.current.isDark
+    val offTrackColor = if (isDark) Color(0xFF39393D) else Color(0xFFE9E9EA)
     val trackColor by animateColorAsState(
-        targetValue = if (checked) IosColors.SystemGreen else Color(0xFFE9E9EA),
+        targetValue = if (checked) IosColors.SystemGreen else offTrackColor,
         animationSpec = spring(),
         label = "iosSwitchTrack"
     )
@@ -214,7 +216,7 @@ fun IosSwitch(
 }
 
 /**
- * Apple HIG Segmented Control (sliding white pill selector)
+ * Apple HIG Segmented Control (sliding white/dark pill selector)
  */
 @Composable
 fun <T> IosSegmentedControl(
@@ -225,6 +227,8 @@ fun <T> IosSegmentedControl(
     labelProvider: (T) -> String = { it.toString() }
 ) {
     val selectedIndex = items.indexOf(selectedItem).coerceAtLeast(0)
+    val isDark = LocalIosColors.current.isDark
+    val activePillColor = if (isDark) Color(0xFF636366) else Color.White
 
     Surface(
         modifier = modifier
@@ -246,7 +250,7 @@ fun <T> IosSegmentedControl(
                         .weight(1f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(7.dp))
-                        .background(if (isSelected) Color.White else Color.Transparent)
+                        .background(if (isSelected) activePillColor else Color.Transparent)
                         .then(if (isSelected) Modifier.shadow(1.dp, RoundedCornerShape(7.dp)) else Modifier)
                         .bouncyClickable { onItemSelected(item) },
                     contentAlignment = Alignment.Center

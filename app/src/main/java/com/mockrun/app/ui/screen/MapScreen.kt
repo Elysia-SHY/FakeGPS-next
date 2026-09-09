@@ -124,10 +124,30 @@ val AutoNaviSatelliteTileSource = object : OnlineTileSourceBase(
 }
 
 enum class MapSourceType(val label: String) {
-    AUTONAVI_VECTOR("高德路网 (秒开)"),
+    AUTONAVI_AUTO("高德路网 (跟随系统)"),
+    AUTONAVI_VECTOR("高德路网 (浅色标准)"),
+    AUTONAVI_DARK("高德路网 (深色夜间)"),
     AUTONAVI_SATELLITE("高德卫星影像"),
     OPEN_STREET_MAP("OSM 国际地图")
 }
+
+/**
+ * Authentic Apple Maps Dark / Night Mode ColorMatrix Filter for vector tiles.
+ * Inverts base light backgrounds to deep night gray (#141416) while keeping roads clear and readable.
+ */
+val DarkMapColorMatrix = android.graphics.ColorMatrix().apply {
+    val r = -0.82f
+    val g = -0.82f
+    val b = -0.82f
+    val offset = 215f
+    set(floatArrayOf(
+        r,  0f, 0f, 0f, offset,
+        0f, g,  0f, 0f, offset,
+        0f, 0f, b,  0f, offset + 15f,
+        0f, 0f, 0f, 1f, 0f
+    ))
+}
+val DarkMapColorFilter = android.graphics.ColorMatrixColorFilter(DarkMapColorMatrix)
 
 /**
  * Apple Maps Style Vector Pin & Radar Marker Generator.
@@ -428,8 +448,15 @@ fun MapScreen(
 
     var showSaveDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("") }
-    var currentMapType by remember { mutableStateOf(MapSourceType.AUTONAVI_VECTOR) }
+    var currentMapType by remember { mutableStateOf(MapSourceType.AUTONAVI_AUTO) }
     var showMapTypeMenu by remember { mutableStateOf(false) }
+
+    val isSystemDark = LocalIosColors.current.isDark
+    val shouldApplyDarkMap = when (currentMapType) {
+        MapSourceType.AUTONAVI_AUTO -> isSystemDark
+        MapSourceType.AUTONAVI_DARK -> true
+        else -> false
+    }
     val coroutineScope = rememberCoroutineScope()
     var updateCenterJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
@@ -564,6 +591,13 @@ fun MapScreen(
                 },
                 update = { mapView ->
                     val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+
+                    // 0. Dynamic Apple Maps Dark Mode / Night Map Filter
+                    if (shouldApplyDarkMap && currentMapType != MapSourceType.AUTONAVI_SATELLITE) {
+                        mapView.overlayManager.tilesOverlay.setColorFilter(DarkMapColorFilter)
+                    } else {
+                        mapView.overlayManager.tilesOverlay.setColorFilter(null)
+                    }
 
                     // 1. Draw route polyline
                     val routeOverlays = mapView.overlays.filterIsInstance<Polyline>()
@@ -753,6 +787,7 @@ fun MapScreen(
                                 text = currentAddressText,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium,
+                                color = IosColors.Label,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
@@ -798,13 +833,21 @@ fun MapScreen(
                             ) {
                                 MapSourceType.values().forEach { type ->
                                     DropdownMenuItem(
-                                        text = { Text(type.label, fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal) },
+                                        text = {
+                                            Text(
+                                                type.label,
+                                                fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (type == currentMapType) IosBlue else IosColors.Label
+                                            )
+                                        },
                                         onClick = {
                                             currentMapType = type
                                             showMapTypeMenu = false
                                             mapViewRef?.let { map ->
                                                 when (type) {
-                                                    MapSourceType.AUTONAVI_VECTOR -> map.setTileSource(AutoNaviVectorTileSource)
+                                                    MapSourceType.AUTONAVI_AUTO,
+                                                    MapSourceType.AUTONAVI_VECTOR,
+                                                    MapSourceType.AUTONAVI_DARK -> map.setTileSource(AutoNaviVectorTileSource)
                                                     MapSourceType.AUTONAVI_SATELLITE -> map.setTileSource(AutoNaviSatelliteTileSource)
                                                     MapSourceType.OPEN_STREET_MAP -> map.setTileSource(TileSourceFactory.MAPNIK)
                                                 }
@@ -1197,7 +1240,8 @@ fun MapScreen(
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text("保存路线", fontWeight = FontWeight.Bold) },
+            title = { Text("保存路线", fontWeight = FontWeight.Bold, color = IosColors.Label) },
+            containerColor = IosColors.SecondaryGroupedBackground,
             text = {
                 OutlinedTextField(
                     value = routeNameInput,
@@ -1453,14 +1497,14 @@ fun SearchLocationDialog(
         onDismissRequest = onDismissRequest,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         shape = RoundedCornerShape(24.dp),
-        containerColor = IosFrostedCapsule,
+        containerColor = IosColors.SecondaryGroupedBackground,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🔍 搜索地点与经纬度", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text("🔍 搜索地点与经纬度", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = IosColors.Label)
                 IconButton(
                     onClick = onDismissRequest,
                     modifier = Modifier.size(32.dp)
@@ -1554,7 +1598,7 @@ fun SearchLocationDialog(
                         items(searchResults) { item ->
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = Color.White,
+                                color = if (LocalIosColors.current.isDark) Color(0xFF2C2C2E) else Color.White,
                                 border = BorderStroke(0.5.dp, IosHairlineBorder),
                                 shadowElevation = 1.dp,
                                 modifier = Modifier.fillMaxWidth()
@@ -1566,7 +1610,7 @@ fun SearchLocationDialog(
                                     ) {
                                         Icon(Icons.Default.Place, contentDescription = null, tint = IosBlue, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = IosColors.Label)
                                     }
                                     Spacer(Modifier.height(2.dp))
                                     Text(
@@ -1697,14 +1741,14 @@ fun RoadRouteDialog(
         onDismissRequest = onDismissRequest,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         shape = RoundedCornerShape(24.dp),
-        containerColor = IosFrostedCapsule,
+        containerColor = IosColors.SecondaryGroupedBackground,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🛣️ 真实道路路线规划", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text("🛣️ 真实道路路线规划", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = IosColors.Label)
                 IconButton(onClick = onDismissRequest, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "关闭", tint = IosGray)
                 }
@@ -1724,7 +1768,7 @@ fun RoadRouteDialog(
                 // 1. Origin Card
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
+                    color = if (LocalIosColors.current.isDark) Color(0xFF2C2C2E) else Color.White,
                     border = BorderStroke(0.5.dp, IosHairlineBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1739,7 +1783,7 @@ fun RoadRouteDialog(
                                     modifier = Modifier.size(10.dp).clip(CircleShape).background(IosGreen)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = IosColors.Label)
                             }
                             if (roadOrigin != null) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1765,7 +1809,7 @@ fun RoadRouteDialog(
                             text = roadOrigin?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置起点",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (roadOrigin != null) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (roadOrigin != null) Color.Black else IosGray
+                            color = if (roadOrigin != null) IosColors.Label else IosGray
                         )
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1809,7 +1853,7 @@ fun RoadRouteDialog(
                 // 2. Destination Card
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
+                    color = if (LocalIosColors.current.isDark) Color(0xFF2C2C2E) else Color.White,
                     border = BorderStroke(0.5.dp, IosHairlineBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1824,7 +1868,7 @@ fun RoadRouteDialog(
                                     modifier = Modifier.size(10.dp).clip(CircleShape).background(IosOrange)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("终点 (Destination)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                                Text("终点 (Destination)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = IosColors.Label)
                             }
                             if (roadDestination != null) {
                                 Text(
@@ -1840,7 +1884,7 @@ fun RoadRouteDialog(
                             text = roadDestination?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置终点",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (roadDestination != null) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (roadDestination != null) Color.Black else IosGray
+                            color = if (roadDestination != null) IosColors.Label else IosGray
                         )
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1878,12 +1922,15 @@ fun RoadRouteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(IosFrostedPill)
+                        .background(IosColors.TertiarySystemFill)
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     RoadMode.values().forEach { mode ->
                         val isSelected = mode == roadMode
+                        val isDark = LocalIosColors.current.isDark
+                        val activePillColor = if (isDark) Color(0xFF636366) else Color.White
+                        val activeTextColor = if (isDark) Color.White else Color.Black
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
@@ -1892,14 +1939,14 @@ fun RoadRouteDialog(
                                     mapViewModel.setRoadMode(mode)
                                 },
                             shape = RoundedCornerShape(9.dp),
-                            color = if (isSelected) Color.White else Color.Transparent,
+                            color = if (isSelected) activePillColor else Color.Transparent,
                             shadowElevation = if (isSelected) 2.dp else 0.dp
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp)) {
                                 Text(
                                     text = "${mode.emoji} ${mode.label}",
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color.Black else IosGray,
+                                    color = if (isSelected) activeTextColor else IosGray,
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             }

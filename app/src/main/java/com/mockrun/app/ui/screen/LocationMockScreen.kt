@@ -739,7 +739,7 @@ fun LocationMockScreen(
                 }
             },
             shape = RoundedCornerShape(14.dp),
-            containerColor = Color.White
+            containerColor = IosColors.SecondaryGroupedBackground
         )
     }
 
@@ -863,7 +863,7 @@ fun LocationMockScreen(
                 }
             },
             shape = RoundedCornerShape(14.dp),
-            containerColor = Color.White
+            containerColor = IosColors.SecondaryGroupedBackground
         )
     }
 
@@ -950,7 +950,7 @@ fun LocationMockScreen(
                 }
             },
             shape = RoundedCornerShape(14.dp),
-            containerColor = Color.White
+            containerColor = IosColors.SecondaryGroupedBackground
         )
     }
 

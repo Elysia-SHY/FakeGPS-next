@@ -1,15 +1,31 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`2.9.0`  
-> **Android 内部版本**：`versionCode = 209`  
-> **Android 显示版本**：`versionName = "v2.9"`  
+> **当前真实基准版本**：`1.1.0`  
+> **Android 内部版本**：`versionCode = 2`  
+> **Android 显示版本**：`versionName = "v1.1.0"`  
 > **交付存放目录**：`d:\Desktop\fake gps\`  
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v2.9-LATEST.apk`  
-> **构建时间**：2026-09-09 14:18  
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.1.0-LATEST.apk`  
+> **构建时间**：2026-09-09 20:25  
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.1.0] - 2026-09-09
+- **构建状态**：全功能模块暗黑模式（深色模式）彻底适配，高德地图夜间色阶矩阵滤镜重构，Apple HIG 动态色彩系统全面升级 (`outputs/app-debug.apk`)。
+- **Android 配置**：`versionCode = 2`, `versionName = "v1.1.0"`
+- **核心特性与修复**：
+  1. **高德地图深色夜间模式 (Apple Maps Style Night Matrix)**：
+     - 在地图图层菜单中新增「高德路网 (跟随系统)」与「高德路网 (深色夜间)」选项；
+     - 引入基于专业 ColorMatrix 的深色夜间滤镜，将白天刺眼的纯白路网转换为深邃的 `#141416` 夜间底图，同时保持高反差清晰路网与饱和地标；
+     - 修复地图顶部地址胶囊在深色模式下文字对比度问题，自适应为动态白色高亮文字。
+  2. **Apple HIG 动态语义色彩系统架构 (Dynamic IosColorPalette)**：
+     - 构建 `IosColorPalette`、`LightIosColorPalette` 与 `DarkIosColorPalette`，通过 `LocalIosColors` 全局无缝注入；
+     - 所有基础组件（`IosColors.Label`、`IosColors.SecondaryLabel`、`IosColors.SystemGroupedBackground`、`IosColors.SecondaryGroupedBackground`、`IosColors.TertiarySystemFill`、`IosFrostedCapsule`、`IosHairlineBorder`）全面自适应明暗切换；
+     - iOS 开关 `IosSwitch` 增加暗黑版深灰轨道底色 (`#39393D`)，分段选择器 `IosSegmentedControl` 适配深灰滑动选中胶囊 (`#636366`)。
+  3. **功能界面与弹窗全暗黑配色适配**：
+     - 彻底修复主控状态/虚拟定位界面 (`LocationMockScreen`)、路线模拟界面 (`RouteSimulationScreen`)、路线库界面中的原生白色弹窗；
+     - 地点检索弹窗 (`SearchLocationDialog`)、真实道路规划弹窗 (`RoadRouteDialog`)、路线保存弹窗、微信防检测向导、防杀后台保活弹窗全量适配深色磨砂材质与高对比度文本。
 
 ### [2.9.0] - 2026-09-09
 - **构建状态**：非 Root 环境安全隐藏高阶拟真功能，悬浮摇杆下拉控制面板深度重构为 iOS 极简拟物卡片，GitHub 官方文案全量规范与发布规整 (`outputs/app-debug.apk`)。
