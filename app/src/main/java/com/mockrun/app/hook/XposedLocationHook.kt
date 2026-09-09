@@ -659,6 +659,107 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 })
             }
         }
+
+        // Tencent Location SDK (Used by WeChat com.tencent.mm, Tencent Map, QQ, Didi, Meituan)
+        runCatching {
+            val tencentLocClass = XposedHelpers.findClassIfExists("com.tencent.map.geolocation.TencentLocation", lpparam.classLoader)
+            if (tencentLocClass != null) {
+                XposedBridge.hookAllMethods(tencentLocClass, "getLatitude", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = spoof.latitude
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "getLongitude", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = spoof.longitude
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "getAltitude", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = spoof.altitude
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "getAccuracy", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = 2.0f
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "getBearing", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = spoof.bearing
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "getSpeed", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = spoof.speed
+                        }
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentLocClass, "isMockGps", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            param.result = 0 // 0 = Not mock
+                        }
+                    }
+                })
+                runCatching {
+                    XposedBridge.hookAllMethods(tencentLocClass, "getFakeReason", object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                param.result = 0
+                            }
+                        }
+                    })
+                }
+            }
+
+            // Hook TencentLocationManager to intercept last known location
+            val tencentMgrClass = XposedHelpers.findClassIfExists("com.tencent.map.geolocation.TencentLocationManager", lpparam.classLoader)
+            if (tencentMgrClass != null) {
+                XposedBridge.hookAllMethods(tencentMgrClass, "getLastKnownLocation", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        val originalLoc = param.result ?: return
+                        // The original object's methods are already hooked above via TencentLocation
+                    }
+                })
+            }
+
+            // Hook TencentLocationListener callbacks
+            val tencentListenerClass = XposedHelpers.findClassIfExists("com.tencent.map.geolocation.TencentLocationListener", lpparam.classLoader)
+            if (tencentListenerClass != null) {
+                XposedBridge.hookAllMethods(tencentListenerClass, "onLocationChanged", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        // Force error code to 0 (TencentLocation.ERROR_OK)
+                        if (param.args.size >= 2 && param.args[1] is Int) {
+                            param.args[1] = 0
+                        }
+                    }
+                })
+            }
+        }
     }
 
     // =========================================================================

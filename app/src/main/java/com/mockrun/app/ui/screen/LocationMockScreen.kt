@@ -143,6 +143,7 @@ fun LocationMockScreen(
     }
 
     var showHelpSheet by remember { mutableStateOf(false) }
+    var showWeChatGuideSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -203,6 +204,51 @@ fun LocationMockScreen(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                     )
                 }
+            }
+        }
+
+        // =====================================================================
+        // WeChat / Anti-Detection Troubleshooter Banner
+        // =====================================================================
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .bouncyClickable { showWeChatGuideSheet = true },
+            shape = RoundedCornerShape(14.dp),
+            color = IosColors.SystemOrange.copy(alpha = 0.12f),
+            border = BorderStroke(0.5.dp, IosColors.SystemOrange.copy(alpha = 0.35f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = IosColors.SystemOrange,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "微信/打卡软件仍显示真实位置？",
+                        style = IosTypography.Subheadline,
+                        fontWeight = FontWeight.Bold,
+                        color = IosColors.SystemOrange
+                    )
+                    Text(
+                        text = "关闭系统 WLAN 扫描 / 检查精确位置与强停微信",
+                        style = IosTypography.Caption1,
+                        color = IosColors.SecondaryLabel
+                    )
+                }
+                Text(
+                    text = "排查解决 ▾",
+                    style = IosTypography.Caption1,
+                    fontWeight = FontWeight.SemiBold,
+                    color = IosColors.SystemOrange
+                )
             }
         }
 
@@ -680,6 +726,130 @@ fun LocationMockScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showHelpSheet = false }) {
+                    Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = Color.White
+        )
+    }
+
+    // WeChat & Anti-Real-Location Troubleshooting Dialog
+    if (showWeChatGuideSheet) {
+        AlertDialog(
+            onDismissRequest = { showWeChatGuideSheet = false },
+            title = {
+                Text(
+                    text = "💬 微信显示真实位置排查指南",
+                    style = IosTypography.Title3,
+                    fontWeight = FontWeight.Bold,
+                    color = IosColors.Label
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = IosColors.SystemOrange.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "💡 原理说明：微信内嵌腾讯定位 SDK。即便模拟了 GPS，微信默认仍会在后台扫描您周边的 Wi-Fi 路由器 MAC 地址（BSSID）上报给腾讯服务器反查真实经纬度；若检测到 Mock 标记则会直接舍弃 GPS 回退到 Wi-Fi 定位。",
+                            style = IosTypography.Footnote,
+                            color = IosColors.SystemOrange,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+
+                    Column {
+                        Text("【免 ROOT 模式：4 步解决方案】", style = IosTypography.Headline, color = IosColors.SystemBlue)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "① 关闭系统 WLAN 扫描：进入系统设置，彻底关闭「WLAN 扫描」与「蓝牙扫描」（切断后台路由器 MAC 探针）。\n" +
+                            "② 检查微信权限：系统设置 -> 微信应用信息 -> 权限 -> 位置信息 -> 务必选【精确位置】（非大致位置）。\n" +
+                            "③ 临时改用移动流量：断开家用 Wi-Fi，改用手机蜂窝网络。\n" +
+                            "④ 强行停止微信：开启 FakeGPS 虚拟定位后，进入手机设置点击微信的【强行停止】清除物理缓存，再重新打开微信即可！",
+                            style = IosTypography.Callout,
+                            color = IosColors.SecondaryLabel
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                }.onFailure {
+                                    Toast.makeText(context, "请在系统设置中搜索「扫描」", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("关闭扫描", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.parse("package:com.tencent.mm")
+                                    }
+                                    context.startActivity(intent)
+                                }.onFailure {
+                                    Toast.makeText(context, "未能直接打开微信应用信息", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemGreen),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("微信强停/权限", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (isRootAvailable) {
+                        Column {
+                            Text("【ROOT / LSPosed 模式建议】", style = IosTypography.Headline, color = IosColors.SystemPurple)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "① 打开 LSPosed 管理器，在 FakeGPS 模块的作用域中务必勾选【微信 (com.tencent.mm)】与【系统框架】；\n" +
+                                "② 点击下方一键通过 Root 禁用底层硬件扫描：",
+                                style = IosTypography.Callout,
+                                color = IosColors.SecondaryLabel
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        val ok = rootBridge.disableScanningHardware()
+                                        if (ok) {
+                                            Toast.makeText(context, "已通过 Root 禁用硬件扫描探针", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Root 命令执行未完成", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🛡️ ROOT 一键关闭硬件扫描", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWeChatGuideSheet = false }) {
                     Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
                 }
             },

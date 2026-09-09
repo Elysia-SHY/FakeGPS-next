@@ -201,7 +201,16 @@ class MockLocationEngine(private val context: Context) {
                     bundle.putInt("satellites", totalSats)
                     bundle.putInt("beidou_satellites", kotlin.random.Random.nextInt(8, 13))
                     bundle.putInt("gps_satellites", kotlin.random.Random.nextInt(8, 12))
+                    bundle.remove("mockLocation")
+                    bundle.putBoolean("mockLocation", false)
                     this.extras = bundle
+
+                    // Strip internal mock field if accessible
+                    runCatching {
+                        val mField = Location::class.java.getDeclaredField("mIsFromMockProvider")
+                        mField.isAccessible = true
+                        mField.setBoolean(this, false)
+                    }
                 }
                 locationManager.setTestProviderLocation(p, loc)
             }.onFailure { e ->

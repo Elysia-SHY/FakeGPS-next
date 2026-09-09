@@ -85,6 +85,19 @@ object HookStateBridge {
             }
 
             runCatching {
+                val jsonStr = """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
+                val tmpFile = java.io.File("/data/local/tmp/fake_gps_hook.json")
+                tmpFile.writeText(jsonStr)
+                tmpFile.setReadable(true, false)
+                tmpFile.setWritable(true, false)
+            }.onFailure {
+                runCatching {
+                    val jsonStr = "{\"isActive\":$active,\"latitude\":$lat,\"longitude\":$lon,\"altitude\":$alt,\"bearing\":$bear,\"speed\":$spd,\"time\":$updateTimestamp}"
+                    Runtime.getRuntime().exec(arrayOf("su", "-c", "echo '$jsonStr' > /data/local/tmp/fake_gps_hook.json && chmod 666 /data/local/tmp/fake_gps_hook.json"))
+                }
+            }
+
+            runCatching {
                 val cacheDir = ctx.cacheDir
                 val tmpFile = java.io.File(cacheDir, "current_hook.json")
                 tmpFile.writeText(
