@@ -1,4 +1,4 @@
-﻿# AGENTS.md - FakeGPS-next 协作规范与自动化流水线
+# AGENTS.md - FakeGPS-next 协作规范与自动化流水线
 
 本项目为 **FakeGPS-next**，系系统级底层深度 Hook 虚拟定位与路线运动模拟 Android 应用。所有 Agent 和开发协作在此项目根目录下开展。
 
@@ -19,3 +19,8 @@
 1. **工作目录**：所有开发、修改、构建全部在 `FakeGPS-next` 目录下执行。
 2. **原有项目保护**：严禁回写或改动原有旧项目（`MockRunApp`）的任何文件。
 3. **技术栈锁定**：保持 Kotlin 1.9 + Jetpack Compose + Hilt + Xposed 架构，零破坏性变更。
+
+## Git 与 Release 发布规范 (Version History Retention)
+
+1. **历史版本完整保留**：正常 Git 提交与 GitHub Release 迭代发布时，**保留所有历史 Release、Git Tag 与发布产物，严禁删除上一个或历史版本**。
+2. **标准递增发布**：后续版本更新只需正常递增创建新 Release 并上传对应 APK 产物即可。
