@@ -57,6 +57,7 @@ fun AndroidFloatingBottomBar(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
+            .widthIn(max = 480.dp)
             .fillMaxWidth()
             .height(62.dp)
             .liquidGlass(

@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.ui.navigation
+package com.mockrun.app.ui.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,7 +25,6 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
 import com.mockrun.app.ui.components.FloatingTabItem
-import com.mockrun.app.ui.components.TabletNavigationRail
 import com.mockrun.app.ui.screen.AboutScreen
 import com.mockrun.app.ui.screen.LocationMockScreen
 import com.mockrun.app.ui.screen.MapScreen
@@ -66,9 +65,9 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Phone: dynamic bottom bar padding. Tablet: no bottom bar, use 0.
+    // Dynamic padding: nav bar inset + pill (62dp) + vertical padding (8+8dp) + safety margin (8dp)
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomBarPadding = if (isTablet) 0.dp else navBarBottom + 86.dp
+    val bottomBarPadding = navBarBottom + 86.dp
 
     val navigationTabs = remember {
         listOf(
@@ -87,85 +86,66 @@ fun AppNavigation(
         }
     }
 
-    val navHost: @Composable (Modifier) -> Unit = { navModifier ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Location.route,
-            modifier = navModifier
-        ) {
-            composable(Screen.Location.route) {
-                MapScreen(
-                    mapViewModel = mapViewModel,
-                    simulationViewModel = simulationViewModel,
-                    initialTab = MapTab.LOCATION,
-                    isLiquidGlass = isLiquidGlassEnabled,
-                    isTablet = isTablet,
-                    bottomBarPadding = bottomBarPadding,
-                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                )
-            }
-            composable(Screen.Route.route) {
-                MapScreen(
-                    mapViewModel = mapViewModel,
-                    simulationViewModel = simulationViewModel,
-                    initialTab = MapTab.ROUTE,
-                    isLiquidGlass = isLiquidGlassEnabled,
-                    isTablet = isTablet,
-                    bottomBarPadding = bottomBarPadding,
-                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                )
-            }
-            composable(Screen.Features.route) {
-                LocationMockScreen(
-                    simulationViewModel = simulationViewModel,
-                    onNavigateToMap = { navController.navigate(Screen.Location.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                )
-            }
-            composable(Screen.About.route) {
-                AboutScreen(
-                    isLiquidGlass = isLiquidGlassEnabled,
-                    isTablet = isTablet,
-                    onToggleLiquidGlass = { isLiquidGlassEnabled = it },
-                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
-                )
-            }
-            composable(Screen.Library.route) {
-                RouteLibraryScreen(
-                    mapViewModel = mapViewModel,
-                    onRouteSelected = { navController.navigate(Screen.Route.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                )
-            }
-        }
-    }
-
     CompositionLocalProvider(LocalLiquidGlassEnabled provides isLiquidGlassEnabled) {
-        if (isTablet) {
-            // =================================================================
-            // TABLET LAYOUT: Left NavigationRail + Content
-            // =================================================================
-            Row(modifier = Modifier.fillMaxSize()) {
-                TabletNavigationRail(
-                    tabs = navigationTabs,
-                    currentRoute = currentRoute,
-                    isLiquidGlass = isLiquidGlassEnabled,
-                    onTabSelected = onTabNavigate
-                )
-                navHost(Modifier.weight(1f).fillMaxHeight())
+        // 沉浸式全景架构：地图铺满整屏（手机 & Pad 通用），无左侧冲突
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Location.route,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(Screen.Location.route) {
+                    MapScreen(
+                        mapViewModel = mapViewModel,
+                        simulationViewModel = simulationViewModel,
+                        initialTab = MapTab.LOCATION,
+                        isLiquidGlass = isLiquidGlassEnabled,
+                        isTablet = isTablet,
+                        bottomBarPadding = bottomBarPadding,
+                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                    )
+                }
+                composable(Screen.Route.route) {
+                    MapScreen(
+                        mapViewModel = mapViewModel,
+                        simulationViewModel = simulationViewModel,
+                        initialTab = MapTab.ROUTE,
+                        isLiquidGlass = isLiquidGlassEnabled,
+                        isTablet = isTablet,
+                        bottomBarPadding = bottomBarPadding,
+                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                    )
+                }
+                composable(Screen.Features.route) {
+                    LocationMockScreen(
+                        simulationViewModel = simulationViewModel,
+                        onNavigateToMap = { navController.navigate(Screen.Location.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                    )
+                }
+                composable(Screen.About.route) {
+                    AboutScreen(
+                        isLiquidGlass = isLiquidGlassEnabled,
+                        isTablet = isTablet,
+                        onToggleLiquidGlass = { isLiquidGlassEnabled = it },
+                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
+                    )
+                }
+                composable(Screen.Library.route) {
+                    RouteLibraryScreen(
+                        mapViewModel = mapViewModel,
+                        onRouteSelected = { navController.navigate(Screen.Route.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                    )
+                }
             }
-        } else {
-            // =================================================================
-            // PHONE LAYOUT: Full-screen content + Floating Bottom Bar overlay
-            // =================================================================
-            Box(modifier = Modifier.fillMaxSize()) {
-                navHost(Modifier.fillMaxSize())
-                AndroidFloatingBottomBar(
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                    tabs = navigationTabs,
-                    currentRoute = currentRoute,
-                    isLiquidGlass = isLiquidGlassEnabled,
-                    onTabSelected = onTabNavigate
-                )
-            }
+
+            // 悬浮式毛玻璃底栏（手机自适应拉伸，Pad 上自动居中最大 480dp 悬浮胶囊，绝不阻挡左侧地图手势）
+            AndroidFloatingBottomBar(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                tabs = navigationTabs,
+                currentRoute = currentRoute,
+                isLiquidGlass = isLiquidGlassEnabled,
+                onTabSelected = onTabNavigate
+            )
         }
     }
 }
