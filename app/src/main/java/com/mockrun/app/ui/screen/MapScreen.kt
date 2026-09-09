@@ -1038,45 +1038,6 @@ fun MapScreen(
                         Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = IosBlue, modifier = Modifier.size(22.dp))
                     }
                 }
-
-                // Map Layer Switcher FAB
-                Box {
-                    Surface(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(CircleShape)
-                            .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
-                            .bouncyClickable { showMapTypeMenu = true },
-                        shape = CircleShape,
-                        color = Color.Transparent
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.Default.Layers, contentDescription = "图层切换", tint = IosBlue, modifier = Modifier.size(22.dp))
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = showMapTypeMenu,
-                        onDismissRequest = { showMapTypeMenu = false }
-                    ) {
-                        MapSourceType.values().forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.label, fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal) },
-                                onClick = {
-                                    currentMapType = type
-                                    showMapTypeMenu = false
-                                    mapViewRef?.let { map ->
-                                        when (type) {
-                                            MapSourceType.AUTONAVI_VECTOR -> map.setTileSource(AutoNaviVectorTileSource)
-                                            MapSourceType.AUTONAVI_SATELLITE -> map.setTileSource(AutoNaviSatelliteTileSource)
-                                            MapSourceType.OPEN_STREET_MAP -> map.setTileSource(TileSourceFactory.MAPNIK)
-                                        }
-                                        map.invalidate()
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
             }
 
             // =================================================================
