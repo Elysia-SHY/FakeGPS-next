@@ -7,12 +7,14 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
+import android.content.Intent
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,9 +24,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.AddLocationAlt
+import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.animation.core.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.unit.Dp
+import com.mockrun.app.ui.screen.tabs.LocationControlPanel
+import com.mockrun.app.ui.screen.tabs.RouteBottomPanel
+import com.mockrun.app.ui.screen.tabs.RouteConfigDialog
+import com.mockrun.app.ui.screen.tabs.RouteStage
+import com.mockrun.app.ui.theme.LiquidGlassDefaults
+import com.mockrun.app.ui.theme.liquidGlass
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -360,16 +371,48 @@ object MapPinHelper {
     }
 }
 
+enum class MapTab {
+    LOCATION,
+    ROUTE
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     mapViewModel: MapViewModel,
-    simulationViewModel: SimulationViewModel
+    simulationViewModel: SimulationViewModel,
+    initialTab: MapTab = MapTab.LOCATION,
+    isLiquidGlass: Boolean = true,
+    bottomBarPadding: Dp = 76.dp,
+    onNavigateToLibrary: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    var activeMapTab by remember { mutableStateOf(initialTab) }
+    LaunchedEffect(initialTab) {
+        activeMapTab = initialTab
+    }
+
+    var routeStage by remember { mutableStateOf(RouteStage.SELECTING) }
+    var selectedSpeed by remember { mutableFloatStateOf(8f) }
+    var isCadenceEnabled by remember { mutableStateOf(false) }
+    var showRouteConfigDialog by remember { mutableStateOf(false) }
+
     val drawnWaypoints by mapViewModel.drawnWaypoints.collectAsState()
     val simState by simulationViewModel.state.collectAsState()
     val joystickLocation by simulationViewModel.joystickLocation.collectAsState()
+    val savedRoutes by mapViewModel.savedRoutes.collectAsState()
+    val searchQuery by mapViewModel.searchQuery.collectAsState()
+    val searchResults by mapViewModel.searchResults.collectAsState()
+    val isSearching by mapViewModel.isSearching.collectAsState()
+
+    LaunchedEffect(simState.status, drawnWaypoints) {
+        if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running ||
+            simState.status is com.mockrun.app.domain.model.SimulationStatus.Paused) {
+            routeStage = RouteStage.RUNNING
+        } else if (drawnWaypoints.size >= 2 && routeStage != RouteStage.SELECTING) {
+            routeStage = RouteStage.READY
+        }
+    }
 
     val isPointMockActive by simulationViewModel.isPointMockActive.collectAsState()
     val pointMockLocation by simulationViewModel.pointMockLocation.collectAsState()
@@ -464,7 +507,19 @@ fun MapScreen(
                                 event?.zoomLevel?.let { currentZoom = it }
                                 return true
                             }
-                            override fun onScroll(event: ScrollEvent?): Boolean = false
+                            override fun onScroll(event: ScrollEvent?): Boolean {
+                                mapViewRef?.mapCenter?.let { centerGeo ->
+                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                    val (wgsLat, wgsLon) = if (isGcjMap) {
+                                        CoordinateConverter.gcj02ToWgs84(centerGeo.latitude, centerGeo.longitude)
+                                    } else {
+                                        centerGeo.latitude to centerGeo.longitude
+                                    }
+                                    selectedTapPoint = wgsLat to wgsLon
+                                    simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+                                }
+                                return false
+                            }
                         })
 
                         // Center on user's real physical location by default (converted to GCJ-02)
@@ -913,481 +968,303 @@ fun MapScreen(
                 }
             }
 
-            // Floating Action Buttons (Draw Route Mode + Locate to Real Physical Location)
+            // =================================================================
+            // 4. Center Crosshair Aiming Pin (LocationSpoofer Style)
+            // =================================================================
+            AnimatedVisibility(
+                visible = activeMapTab == MapTab.LOCATION || (activeMapTab == MapTab.ROUTE && routeStage == RouteStage.SELECTING),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(bottom = 28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AddLocationAlt,
+                        contentDescription = "定位十字准心",
+                        tint = IosBlue,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
+
+            // =================================================================
+            // 5. Right Floating Action Buttons (Fit Bounds / GPS Relocate / Layers)
+            // =================================================================
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = if (selectedTapPoint != null || isContinuousDrawMode) 205.dp else 145.dp, end = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(bottom = bottomBarPadding + 140.dp, end = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Continuous Route Draw Mode Toggle FAB
-                Surface(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .border(
-                            0.5.dp,
-                            if (isContinuousDrawMode) IosGreen else IosHairlineBorder,
-                            CircleShape
-                        )
-                        .bouncyClickable {
-                            isContinuousDrawMode = !isContinuousDrawMode
-                            if (isContinuousDrawMode) {
-                                selectedTapPoint = null
-                                Toast.makeText(context, "✏️ 划线模式：直接点击底图各拐点连线", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                    shape = CircleShape,
-                    color = if (isContinuousDrawMode) IosGreen else IosFrostedCapsule,
-                    shadowElevation = 6.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "划线模拟",
-                            tint = if (isContinuousDrawMode) Color.White else IosBlue,
-                            modifier = Modifier.size(22.dp)
-                        )
+                // Route Fit Bounds FAB (only in ROUTE mode when waypoints >= 2)
+                if (activeMapTab == MapTab.ROUTE && drawnWaypoints.size >= 2) {
+                    Surface(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
+                            .bouncyClickable {
+                                val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                val points = drawnWaypoints.map { wp ->
+                                    if (isGcj) CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude) else (wp.latitude to wp.longitude)
+                                }
+                                val minLat = points.minOf { it.first }
+                                val maxLat = points.maxOf { it.first }
+                                val minLon = points.minOf { it.second }
+                                val maxLon = points.maxOf { it.second }
+                                val box = org.osmdroid.util.BoundingBox(maxLat + 0.002, maxLon + 0.002, minLat - 0.002, minLon - 0.002)
+                                mapViewRef?.zoomToBoundingBox(box, true, 80)
+                            },
+                        shape = CircleShape,
+                        color = Color.Transparent
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = IosBlue, modifier = Modifier.size(22.dp))
+                        }
                     }
                 }
 
-                // 2. Locate to Real Physical Location (重置为当前真实物理位置)
+                // Locate to Real Physical Location FAB
                 Surface(
                     modifier = Modifier
                         .size(46.dp)
                         .clip(CircleShape)
-                        .border(0.5.dp, IosHairlineBorder, CircleShape)
+                        .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
                         .bouncyClickable {
-                            // Terminate any ongoing virtual location
-                            if (isPointMockActive) {
-                                simulationViewModel.stopPointMock(context)
-                            }
-                            if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running ||
-                                simState.status is com.mockrun.app.domain.model.SimulationStatus.Paused) {
-                                simulationViewModel.stopSimulation(context)
-                            }
-                            // Directly purge test providers so real hardware GPS reclaims control
+                            if (isPointMockActive) simulationViewModel.stopPointMock(context)
+                            if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
                             runCatching {
                                 val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
                                 listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused").forEach { p ->
                                     runCatching { lm.removeTestProvider(p) }
                                 }
                             }
-                            // Request fresh hardware GPS fix
                             CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
                                 userRealLocation = freshLat to freshLon
                                 simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
                             }
-                            val real = CoordinateConverter.getRealDeviceLocation(context)
-                                ?: userRealLocation
-                                ?: realPhysicalLocation?.let { it.latitude to it.longitude }
-
+                            val real = CoordinateConverter.getRealDeviceLocation(context) ?: userRealLocation
                             if (real != null) {
                                 userRealLocation = real
                                 simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
                                 simulationViewModel.updateSelectedTarget(real.first, real.second)
-                                selectedTapPoint = real.first to real.second
-
-                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                val (tLat, tLon) = if (isGcjMap) {
-                                    CoordinateConverter.wgs84ToGcj02(real.first, real.second)
-                                } else {
-                                    real
-                                }
+                                selectedTapPoint = real
+                                val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
                                 mapViewRef?.controller?.apply {
                                     setZoom(16.5)
                                     animateTo(GeoPoint(tLat, tLon))
                                 }
-                                Toast.makeText(context, "已复位至真实物理位置并停止虚拟定位", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "正在搜寻真机物理 GPS 定位，请稍候...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
                             }
                         },
                     shape = CircleShape,
-                    color = IosFrostedCapsule,
-                    shadowElevation = 6.dp
+                    color = Color.Transparent
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "重置为真机物理位置",
-                            tint = IosBlue,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            // Bottom Area: Continuous Route Draw Bar or Single-Point Floating Capsule
-            if (isContinuousDrawMode) {
-                val totalDistanceKm = remember(drawnWaypoints) {
-                    if (drawnWaypoints.size < 2) 0.0 else {
-                        com.mockrun.app.domain.model.Route(name = "", waypoints = drawnWaypoints).totalDistanceKm
+                        Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = IosBlue, modifier = Modifier.size(22.dp))
                     }
                 }
 
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = 12.dp, end = 12.dp, bottom = 86.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(26.dp))
-                        .border(0.5.dp, IosBlue.copy(alpha = 0.4f), RoundedCornerShape(26.dp)),
-                    color = IosFrostedCapsule,
-                    shadowElevation = 8.dp
-                ) {
-                    Row(
+                // Map Layer Switcher FAB
+                Box {
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
+                            .bouncyClickable { showMapTypeMenu = true },
+                        shape = CircleShape,
+                        color = Color.Transparent
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(IosGreen))
-                            Spacer(Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = "连续连点绘制中 (点地图即连线)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = IosBlue
-                                )
-                                Text(
-                                    text = "已标 ${drawnWaypoints.size} 点" + (if (drawnWaypoints.size >= 2) " · ${"%.2f".format(totalDistanceKm)} km" else ""),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            if (drawnWaypoints.isNotEmpty()) {
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(16.dp))
-                                        .bouncyClickable { mapViewModel.removeLastWaypoint() },
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = Color(0x0C000000)
-                                ) {
-                                    Text("撤销", color = IosBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp))
-                                }
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(16.dp))
-                                        .bouncyClickable { mapViewModel.clearWaypoints() },
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = Color(0x0C000000)
-                                ) {
-                                    Text("清空", color = IosRed, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp))
-                                }
-                            }
-                            if (drawnWaypoints.size >= 2) {
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .border(0.5.dp, IosBlue, RoundedCornerShape(16.dp))
-                                        .bouncyClickable { showSaveDialog = true },
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = IosBlue.copy(alpha = 0.12f)
-                                ) {
-                                    Text("保存", color = IosBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp))
-                                }
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .bouncyClickable {
-                                            val route = com.mockrun.app.domain.model.Route(
-                                                name = "手绘模拟路线",
-                                                waypoints = drawnWaypoints
-                                            )
-                                            simulationViewModel.startSimulation(context, route, 8f)
-                                            isContinuousDrawMode = false
-                                        },
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = IosGreen
-                                ) {
-                                    Text("模拟", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp))
-                                }
-                            }
-                            IconButton(
-                                onClick = { isContinuousDrawMode = false },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "退出连点", tint = IosGray, modifier = Modifier.size(16.dp))
-                            }
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.Layers, contentDescription = "图层切换", tint = IosBlue, modifier = Modifier.size(22.dp))
                         }
                     }
-                }
-            } else if (selectedTapPoint != null) {
-                val tapLat = selectedTapPoint!!.first
-                val tapLon = selectedTapPoint!!.second
-                val isThisPointActive = isPointMockActive &&
-                        pointMockLocation?.latitude?.let { kotlin.math.abs(it - tapLat) < 0.0001 } == true &&
-                        pointMockLocation?.longitude?.let { kotlin.math.abs(it - tapLon) < 0.0001 } == true
-
-                val isRealLocation = (userRealLocation ?: realPhysicalLocation?.let { it.latitude to it.longitude })?.let {
-                    kotlin.math.abs(it.first - tapLat) < 0.0001 && kotlin.math.abs(it.second - tapLon) < 0.0001
-                } == true
-
-                val badgeText = when {
-                    isThisPointActive && isRealLocation -> "🟢 真实位置 (已设为模拟)"
-                    isThisPointActive -> "🟢 虚拟定位生效中"
-                    isRealLocation -> "🔵 当前真实物理位置"
-                    else -> "🎯 目标选定点"
-                }
-                val badgeColor = when {
-                    isThisPointActive -> IosGreen
-                    isRealLocation -> IosBlue
-                    else -> IosBlue
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = 12.dp, end = 12.dp, bottom = 86.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(22.dp))
-                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(22.dp)),
-                    color = IosFrostedCapsule,
-                    shadowElevation = 8.dp
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    DropdownMenu(
+                        expanded = showMapTypeMenu,
+                        onDismissRequest = { showMapTypeMenu = false }
                     ) {
-                        // Row 1: Pin icon, Title, Coordinates & Address, and Close (X) button
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (isRealLocation) IosBlue.copy(alpha = 0.15f) else IosRed.copy(alpha = 0.12f),
-                                    modifier = Modifier.size(26.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            if (isRealLocation) Icons.Default.LocationOn else Icons.Default.Place,
-                                            contentDescription = null,
-                                            tint = if (isRealLocation) IosBlue else IosRed,
-                                            modifier = Modifier.size(15.dp)
-                                        )
+                        MapSourceType.values().forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.label, fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    currentMapType = type
+                                    showMapTypeMenu = false
+                                    mapViewRef?.let { map ->
+                                        when (type) {
+                                            MapSourceType.AUTONAVI_VECTOR -> map.setTileSource(AutoNaviVectorTileSource)
+                                            MapSourceType.AUTONAVI_SATELLITE -> map.setTileSource(AutoNaviSatelliteTileSource)
+                                            MapSourceType.OPEN_STREET_MAP -> map.setTileSource(TileSourceFactory.MAPNIK)
+                                        }
+                                        map.invalidate()
                                     }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = badgeText,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeColor
-                                    )
-                                    Text(
-                                        text = "${"%.4f".format(tapLat)}, ${"%.4f".format(tapLon)} · $currentAddressText",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            IconButton(
-                                onClick = { selectedTapPoint = null },
-                                modifier = Modifier.size(26.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "取消选择", tint = IosGray, modifier = Modifier.size(16.dp))
-                            }
-                        }
-
-                        // Row 2: Proportional, non-wrapping action buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            // Primary button
-                            if (isRealLocation && isPointMockActive && !isThisPointActive) {
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1.3f)
-                                        .height(34.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .bouncyClickable {
-                                            simulationViewModel.stopPointMock(context)
-                                            Toast.makeText(context, "已停止虚拟定位，恢复真机物理位置", Toast.LENGTH_SHORT).show()
-                                        },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = IosGreen
-                                ) {
-                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                        Text("恢复真实", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                            } else {
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1.3f)
-                                        .height(34.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .bouncyClickable {
-                                            if (isThisPointActive) {
-                                                simulationViewModel.stopPointMock(context)
-                                                Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                simulationViewModel.startPointMock(context, tapLat, tapLon)
-                                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                                val (mLat, mLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(tapLat, tapLon) else (tapLat to tapLon)
-                                                mapViewRef?.controller?.animateTo(GeoPoint(mLat, mLon))
-                                                Toast.makeText(context, "已开启虚拟定位！", Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isThisPointActive) IosRed else IosBlue
-                                ) {
-                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                        Text(if (isThisPointActive) "停止" else "开启定位", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                            }
-
-                            // Waypoint button
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(0.5.dp, IosBlue, RoundedCornerShape(12.dp))
-                                    .bouncyClickable {
-                                        mapViewModel.addWaypoint(tapLat, tapLon)
-                                        isContinuousDrawMode = true
-                                        selectedTapPoint = null
-                                        Toast.makeText(context, "✏️ 已标第 1 点：点击底图连线", Toast.LENGTH_SHORT).show()
-                                    },
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("✏️ 划线", color = IosBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-
-                            // Road Origin button
-                            Surface(
-                                modifier = Modifier
-                                    .weight(0.7f)
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(0.5.dp, IosGreen, RoundedCornerShape(12.dp))
-                                    .bouncyClickable { mapViewModel.setRoadOrigin(WayPoint(tapLat, tapLon)) },
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("起", color = IosGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-
-                            // Road Destination button
-                            Surface(
-                                modifier = Modifier
-                                    .weight(0.7f)
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(0.5.dp, IosOrange, RoundedCornerShape(12.dp))
-                                    .bouncyClickable { mapViewModel.setRoadDestination(WayPoint(tapLat, tapLon)) },
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("终", color = IosOrange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Default floating hint capsule
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = 16.dp, end = 16.dp, bottom = 86.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(20.dp)),
-                    shape = RoundedCornerShape(20.dp),
-                    color = IosFrostedCapsule,
-                    shadowElevation = 6.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (drawnWaypoints.isEmpty()) "🎯 轻触底图直接选点定位"
-                                   else "已标记 ${drawnWaypoints.size} 个航点，可点右上角保存路线",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF3C3C43)
-                        )
-                    }
-                }
-            }
-
-            // Floating Road Route Ready Capsule
-            if (roadOrigin != null || roadDestination != null) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = if (selectedTapPoint != null) 210.dp else 165.dp, start = 16.dp, end = 16.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(20.dp))
-                        .bouncyClickable {
-                            showRoadRouteDialog = true
-                        },
-                    shape = RoundedCornerShape(20.dp),
-                    color = IosFrostedCapsule,
-                    shadowElevation = 6.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "🛣️ ${if (roadOrigin != null) "起点已选" else "未选起点"} ➔ ${if (roadDestination != null) "终点已选" else "未选终点"}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = IosBlue
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (roadOrigin != null && roadDestination != null) IosGreen else IosGray.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = if (roadOrigin != null && roadDestination != null) "规划道路" else "配置路线",
-                                color = if (roadOrigin != null && roadDestination != null) Color.White else IosGray,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }
                 }
             }
+
+            // =================================================================
+            // 6. Bottom Panels (LocationControlPanel or RouteBottomPanel)
+            // =================================================================
+            if (activeMapTab == MapTab.LOCATION) {
+                LocationControlPanel(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    isMockActive = isPointMockActive || isJoystickRunning,
+                    latitude = activeCoord.first,
+                    longitude = activeCoord.second,
+                    address = currentAddressText,
+                    searchQuery = searchQuery,
+                    searchResults = searchResults,
+                    isSearching = isSearching,
+                    savedRoutes = savedRoutes,
+                    isLiquidGlass = isLiquidGlass,
+                    bottomBarPadding = bottomBarPadding,
+                    onSearchQueryChange = { mapViewModel.performSearch(it) },
+                    onSearchResultSelect = { item ->
+                        val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                        val (dispLat, dispLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(item.latitude, item.longitude) else (item.latitude to item.longitude)
+                        mapViewRef?.controller?.apply {
+                            setZoom(16.5)
+                            animateTo(GeoPoint(dispLat, dispLon))
+                        }
+                        simulationViewModel.updateSelectedTarget(item.latitude, item.longitude)
+                        selectedTapPoint = item.latitude to item.longitude
+                        mapViewModel.clearSearch()
+                    },
+                    onClearSearch = { mapViewModel.clearSearch() },
+                    onStartMock = {
+                        simulationViewModel.startPointMock(context, activeCoord.first, activeCoord.second)
+                        Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                    },
+                    onStopMock = {
+                        simulationViewModel.stopPointMock(context)
+                        if (isJoystickRunning) {
+                            context.stopService(Intent(context, com.mockrun.app.location.FloatingJoystickService::class.java))
+                        }
+                        Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
+                    },
+                    onResetRealLocation = {
+                        if (isPointMockActive) simulationViewModel.stopPointMock(context)
+                        if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
+                        runCatching {
+                            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused").forEach { p ->
+                                runCatching { lm.removeTestProvider(p) }
+                            }
+                        }
+                        CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
+                            userRealLocation = freshLat to freshLon
+                            simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
+                        }
+                        val real = CoordinateConverter.getRealDeviceLocation(context) ?: userRealLocation
+                        if (real != null) {
+                            userRealLocation = real
+                            simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
+                            simulationViewModel.updateSelectedTarget(real.first, real.second)
+                            selectedTapPoint = real
+                            val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                            val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
+                            mapViewRef?.controller?.apply {
+                                setZoom(16.5)
+                                animateTo(GeoPoint(tLat, tLon))
+                            }
+                            Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onSaveLocation = {
+                        mapViewModel.saveCurrentRoute("收藏地点: $currentAddressText")
+                        Toast.makeText(context, "已收藏当前位置", Toast.LENGTH_SHORT).show()
+                    },
+                    onSelectSavedRoute = { route ->
+                        mapViewModel.selectRoute(route)
+                        val first = route.waypoints.firstOrNull()
+                        if (first != null) {
+                            val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                            val (dispLat, dispLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(first.latitude, first.longitude) else (first.latitude to first.longitude)
+                            mapViewRef?.controller?.animateTo(GeoPoint(dispLat, dispLon))
+                        }
+                    }
+                )
+            } else if (activeMapTab == MapTab.ROUTE) {
+                RouteBottomPanel(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    stage = routeStage,
+                    waypoints = drawnWaypoints,
+                    simState = simState,
+                    selectedSpeed = selectedSpeed,
+                    isLiquidGlass = isLiquidGlass,
+                    bottomBarPadding = bottomBarPadding,
+                    onAddWaypoint = {
+                        mapViewModel.addWaypoint(activeCoord.first, activeCoord.second)
+                    },
+                    onFinishSelecting = {
+                        if (drawnWaypoints.size >= 2) {
+                            routeStage = RouteStage.READY
+                        }
+                    },
+                    onUndoWaypoint = {
+                        mapViewModel.removeLastWaypoint()
+                    },
+                    onClearWaypoints = {
+                        mapViewModel.clearWaypoints()
+                        routeStage = RouteStage.SELECTING
+                    },
+                    onReselect = {
+                        routeStage = RouteStage.SELECTING
+                    },
+                    onOpenConfig = {
+                        showRouteConfigDialog = true
+                    },
+                    onSaveRoute = {
+                        showSaveDialog = true
+                    },
+                    onStartSimulation = {
+                        val route = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
+                            name = "规划路线 (${drawnWaypoints.size}点)",
+                            waypoints = drawnWaypoints
+                        )
+                        simulationViewModel.startSimulation(context, route, selectedSpeed)
+                        routeStage = RouteStage.RUNNING
+                        Toast.makeText(context, "路线模拟已开启！", Toast.LENGTH_SHORT).show()
+                    },
+                    onPauseSimulation = {
+                        simulationViewModel.pauseSimulation(context)
+                    },
+                    onResumeSimulation = {
+                        simulationViewModel.resumeSimulation(context)
+                    },
+                    onStopSimulation = {
+                        simulationViewModel.stopSimulation(context)
+                        routeStage = RouteStage.READY
+                        Toast.makeText(context, "已停止模拟", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
         }
+
+    if (showRouteConfigDialog) {
+        RouteConfigDialog(
+            currentSpeed = selectedSpeed,
+            isCadenceEnabled = isCadenceEnabled,
+            onSpeedChange = { speed ->
+                selectedSpeed = speed
+                if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) {
+                    simulationViewModel.setSpeed(context, speed)
+                }
+            },
+            onCadenceToggle = { enabled ->
+                isCadenceEnabled = enabled
+                simulationViewModel.setCadenceEnabled(enabled, selectedSpeed)
+            },
+            onDismiss = { showRouteConfigDialog = false },
+            isLiquidGlass = isLiquidGlass
+        )
+    }
 
     if (showSaveDialog) {
         AlertDialog(
