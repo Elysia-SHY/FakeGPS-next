@@ -563,11 +563,12 @@ fun RouteSimulationScreen(
         }
 
         // =====================================================================
-        // 5. Cadence & Step Simulation (iOS Inset Group Card)
+        // 5. Cadence & Step Simulation (iOS Inset Group Card, Root Required)
         // =====================================================================
-        IosSectionHeader("运动步频与计步仿真")
+        if (isRootActive == true) {
+            IosSectionHeader("运动步频与计步仿真 (Root 专享)")
 
-        IosInsetGroupCard {
+            IosInsetGroupCard {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Switch Row
                 Row(
@@ -748,11 +749,12 @@ fun RouteSimulationScreen(
         }
 
         // =====================================================================
-        // 6. GPS Realism & Anti-Detection (iOS Inset Group Card)
+        // 6. GPS Realism & Anti-Detection (iOS Inset Group Card, Root Required)
         // =====================================================================
-        IosSectionHeader("GPS 底层拟真与抗检测")
+        if (isRootActive == true) {
+            IosSectionHeader("GPS 底层拟真与抗检测 (Root 专享)")
 
-        IosInsetGroupCard {
+            IosInsetGroupCard {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Realism Engine Status Banner
                 Row(
@@ -849,6 +851,7 @@ fun RouteSimulationScreen(
             }
         }
     }
+    }
 
     // iOS Style Route Picker Dialog
     if (showRoutePickerDialog) {
@@ -925,6 +928,9 @@ fun RouteSimulationScreen(
         )
     }
 }
+}
+
+
 
 @Composable
 private fun StatusBadge(status: SimulationStatus) {

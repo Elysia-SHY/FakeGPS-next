@@ -1,15 +1,33 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`2.8.0`  
-> **Android 内部版本**：`versionCode = 208`  
-> **Android 显示版本**：`versionName = "v2.8"`  
+> **当前真实基准版本**：`2.9.0`  
+> **Android 内部版本**：`versionCode = 209`  
+> **Android 显示版本**：`versionName = "v2.9"`  
 > **交付存放目录**：`d:\Desktop\fake gps\`  
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v2.8-LATEST.apk`  
-> **构建时间**：2026-09-09 13:51  
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v2.9-LATEST.apk`  
+> **构建时间**：2026-09-09 14:18  
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [2.9.0] - 2026-09-09
+- **构建状态**：非 Root 环境安全隐藏高阶拟真功能，悬浮摇杆下拉控制面板深度重构为 iOS 极简拟物卡片，GitHub 官方文案全量规范与发布规整 (`outputs/app-debug.apk`)。
+- **Android 配置**：`versionCode = 209`, `versionName = "v2.9"`
+- **交付与目录规整**：
+  1. 所有构建产物统一置于 `d:\Desktop\fake gps\` 文件夹；
+  2. 交付产物：`FakeGPS-v2.9-LATEST.apk`、`FakeGPS-v2.9.apk`，彻底清理过时旧版安装包，仅保留当前版本与原始黄金参考基准；
+  3. GitHub 仓库同步最新源码与 Release。
+- **核心功能与交互演进**：
+  1. **ROOT 权限安全自适应隐藏 (Root Feature Auto-Hiding)**：
+     - 在「路线模拟」页中，「运动步频与计步仿真」与「GPS 底层拟真与抗检测」严格受 `isRootActive` 状态守卫保护；在非 ROOT 手机或未授权环境下，此两项高阶功能**自动完全隐藏**，界面回归极致清爽简洁，有 ROOT 环境时自动高亮展示；
+     - 明确软件三种梯级工作模式：免 ROOT 模式（开发者选项模拟位置开箱即用）、ROOT 模式（解锁传感器拟真）、LSPosed 模块（可选的系统级增强，实现 0 闪回、0 注入、抹除 Mock 标志）。
+  2. **全局悬浮摇杆下拉控制面板重构 (iOS Translucent Options Card)**：
+     - 彻底重构原先青绿色（Teal）老旧简陋下拉面板；
+     - 切换胶囊重构为精致的 iOS 拟物圆角胶囊 `[ ⚙️ 控制 ▾ ]` / `[ ⚙️ 收起 ▴ ]`；
+     - 控制面板重塑为 32px 大圆角磨砂卡片，全面融入 Apple Blue (`#007AFF`)、Apple Green (`#34C759`) 与细红标签 (`#FF3B30`)；
+     - 巡航速度、尺寸预设、方向模式与八方向锁定采用 iOS 分段胶囊排布；
+     - 非 Root 设备自动剔除「步频仿真」行，体验与主应用一脉相承。
 
 ### [2.8.0] - 2026-09-09
 - **构建状态**：彻底修复切换步频模式时预估步幅无响应的问题，修复滑动配速条导致累计步数异常上涨的致命逻辑漏洞，计步与步幅进入全动态实时响应时代 (`outputs/app-debug.apk`)。

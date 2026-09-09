@@ -258,26 +258,27 @@ class FloatingJoystickService : Service() {
         joystickViewRef = joystickView
         container.addView(joystickView)
 
-        // Pill Button (= ▣) to toggle Layer 2 options
+        // Pill Button to toggle options card (iOS Frosted Pill Capsule)
         var isSecondLevelExpanded = false
         val pillBtn = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            val pillWidth = (70 * resources.displayMetrics.density).toInt()
+            val pillWidth = (84 * resources.displayMetrics.density).toInt()
             val pillHeight = (28 * resources.displayMetrics.density).toInt()
             layoutParams = LinearLayout.LayoutParams(pillWidth, pillHeight).apply {
                 topMargin = (6 * resources.displayMetrics.density).toInt()
                 bottomMargin = (6 * resources.displayMetrics.density).toInt()
             }
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
+                setColor(Color.parseColor("#F2F2F7"))
                 cornerRadius = 30f
-                setStroke(2, Color.parseColor("#DDDDDD"))
+                setStroke((1 * resources.displayMetrics.density).toInt(), Color.parseColor("#007AFF"))
             }
             val pillText = TextView(context).apply {
-                text = "＝ ▣"
+                text = "⚙️ 控制 ▾"
                 textSize = 12f
-                setTextColor(Color.parseColor("#00796B"))
+                setTextColor(Color.parseColor("#007AFF"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 gravity = Gravity.CENTER
             }
             addView(pillText)
@@ -285,28 +286,30 @@ class FloatingJoystickService : Service() {
         container.addView(pillBtn)
 
         // ==========================================
-        // 第二层级：高级设置卡片（默认隐藏）
+        // 第二层级：iOS 拟物磨砂控制面板（默认隐藏）
         // ==========================================
-        val cardWidthPx = (240 * resources.displayMetrics.density).toInt()
+        val cardWidthPx = (250 * resources.displayMetrics.density).toInt()
         val optionsCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(cardWidthPx, LinearLayout.LayoutParams.WRAP_CONTENT)
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = 24f
-                setStroke(1, Color.parseColor("#E0E0E0"))
+                setColor(Color.parseColor("#F9F9FB"))
+                cornerRadius = 32f
+                setStroke((1.2 * resources.displayMetrics.density).toInt(), Color.parseColor("#E5E5EA"))
             }
-            setPadding(30, 24, 30, 24)
+            val padH = (16 * resources.displayMetrics.density).toInt()
+            val padV = (14 * resources.displayMetrics.density).toInt()
+            setPadding(padH, padV, padH, padV)
             visibility = View.GONE
         }
 
         fun addDivider() {
             val divider = View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2).apply {
-                    topMargin = 16
-                    bottomMargin = 16
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (1 * resources.displayMetrics.density).toInt().coerceAtLeast(1)).apply {
+                    topMargin = (10 * resources.displayMetrics.density).toInt()
+                    bottomMargin = (10 * resources.displayMetrics.density).toInt()
                 }
-                setBackgroundColor(Color.parseColor("#EEEEEE"))
+                setBackgroundColor(Color.parseColor("#E5E5EA"))
             }
             optionsCard.addView(divider)
         }
@@ -317,14 +320,20 @@ class FloatingJoystickService : Service() {
             gravity = Gravity.CENTER_VERTICAL
             val label = TextView(context).apply {
                 text = "摇杆方向"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
+                textSize = 14f
+                setTextColor(Color.parseColor("#1C1C1E"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val valueText = TextView(context).apply {
                 text = "相对于设备"
-                textSize = 15f
-                setTextColor(Color.parseColor("#00796B"))
+                textSize = 13f
+                setTextColor(Color.parseColor("#007AFF"))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#EBF3FF"))
+                    cornerRadius = 14f
+                }
+                setPadding(16, 6, 16, 6)
                 setOnClickListener {
                     text = if (text == "相对于设备") "相对于地图" else "相对于设备"
                 }
@@ -338,16 +347,23 @@ class FloatingJoystickService : Service() {
         // 2. 摇杆速度
         val speedValueText = TextView(this).apply {
             text = "2.0 m/s"
-            textSize = 15f
-            setTextColor(Color.parseColor("#00796B"))
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.parseColor("#007AFF"))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#EBF3FF"))
+                cornerRadius = 14f
+            }
+            setPadding(16, 6, 16, 6)
         }
         val speedRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             val label = TextView(context).apply {
-                text = "摇杆速度"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
+                text = "巡航速度"
+                textSize = 14f
+                setTextColor(Color.parseColor("#1C1C1E"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             addView(label)
@@ -369,7 +385,7 @@ class FloatingJoystickService : Service() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = 12
+                topMargin = 8
             }
         }
         optionsCard.addView(speedSeekBar)
@@ -379,16 +395,24 @@ class FloatingJoystickService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = 8
+                topMargin = 6
             }
         }
         val presets = listOf("🚶" to 1.2f, "🏃" to 2.5f, "🚴" to 6.0f, "🚗" to 15.0f, "✈️" to 50.0f)
         presets.forEach { (icon, spd) ->
             val btn = TextView(this).apply {
                 text = icon
-                textSize = 20f
+                textSize = 18f
                 gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#F2F2F7"))
+                    cornerRadius = 16f
+                }
+                setPadding(6, 6, 6, 6)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = 3
+                    marginEnd = 3
+                }
                 setOnClickListener {
                     currentSpeedMps = spd
                     speedSeekBar.progress = ((spd - 0.5f) / 0.5f).toInt()
@@ -403,8 +427,14 @@ class FloatingJoystickService : Service() {
         // 3. 摇杆大小调节 (80dp ~ 220dp)
         val sizeValueText = TextView(this).apply {
             text = "$currentJoystickSizeDp dp"
-            textSize = 15f
-            setTextColor(Color.parseColor("#00796B"))
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.parseColor("#007AFF"))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#EBF3FF"))
+                cornerRadius = 14f
+            }
+            setPadding(16, 6, 16, 6)
         }
         sizeValueTextRef = sizeValueText
 
@@ -412,9 +442,10 @@ class FloatingJoystickService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             val label = TextView(context).apply {
-                text = "摇杆大小"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
+                text = "摇杆尺寸"
+                textSize = 14f
+                setTextColor(Color.parseColor("#1C1C1E"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             addView(label)
@@ -435,7 +466,7 @@ class FloatingJoystickService : Service() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = 10
+                topMargin = 8
             }
         }
         sizeSeekBarRef = sizeSeekBar
@@ -455,16 +486,16 @@ class FloatingJoystickService : Service() {
                 text = label
                 textSize = 11f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#555555"))
+                setTextColor(Color.parseColor("#3A3A3C"))
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F5F5F5"))
-                    cornerRadius = 16f
-                    setStroke(1, Color.parseColor("#DDDDDD"))
+                    setColor(Color.parseColor("#F2F2F7"))
+                    cornerRadius = 14f
+                    setStroke(1, Color.parseColor("#E5E5EA"))
                 }
                 setPadding(12, 6, 12, 6)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    marginStart = 4
-                    marginEnd = 4
+                    marginStart = 3
+                    marginEnd = 3
                 }
                 setOnClickListener {
                     updateJoystickSize(sz)
@@ -480,9 +511,10 @@ class FloatingJoystickService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             val label = TextView(context).apply {
-                text = "摇杆锁定"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
+                text = "八方向锁定"
+                textSize = 14f
+                setTextColor(Color.parseColor("#1C1C1E"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val lockSwitch = Switch(context).apply {
@@ -500,42 +532,40 @@ class FloatingJoystickService : Service() {
             addView(lockSwitch)
         }
         optionsCard.addView(lockRow)
-        addDivider()
 
-        // 4. 步频模拟 (严格判断 ROOT 权限，非 ROOT 不允许开启)
-        val stepRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            val label = TextView(context).apply {
-                text = "步频模拟"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            val stepSwitch = Switch(context).apply {
-                isEnabled = isRootDevice
-                isChecked = false
-                setOnCheckedChangeListener { _, _ ->
-                    if (!isRootDevice) {
-                        isChecked = false
-                        Toast.makeText(context, "🔒 该高级拟真功能需要 ROOT 权限", Toast.LENGTH_SHORT).show()
+        // 5. 步频模拟 (严格仅在有 ROOT 环境下展示)
+        if (isRootDevice) {
+            addDivider()
+            val stepRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                val label = TextView(context).apply {
+                    text = "步频仿真 (Root)"
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#1C1C1E"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val stepSwitch = Switch(context).apply {
+                    isChecked = false
+                    setOnCheckedChangeListener { _, _ ->
                     }
                 }
+                addView(label)
+                addView(stepSwitch)
             }
-            addView(label)
-            addView(stepSwitch)
+            optionsCard.addView(stepRow)
         }
-        optionsCard.addView(stepRow)
         addDivider()
 
-        // 5. 底部栏：模拟开关 + 关闭摇杆
+        // 6. 底部栏：模拟开关 + 关闭摇杆
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             val simLabel = TextView(context).apply {
-                text = "模拟"
-                textSize = 14f
-                setTextColor(Color.parseColor("#333333"))
+                text = "模拟激活"
+                textSize = 13f
+                setTextColor(Color.parseColor("#3A3A3C"))
             }
             val simSwitch = Switch(context).apply {
                 isChecked = true
@@ -545,16 +575,26 @@ class FloatingJoystickService : Service() {
             }
             val closeBtn = TextView(context).apply {
                 text = "关闭摇杆"
-                textSize = 14f
-                setTextColor(Color.parseColor("#333333"))
-                gravity = Gravity.END
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                textSize = 12f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(Color.parseColor("#FF3B30"))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#FFEBEA"))
+                    cornerRadius = 14f
+                    setStroke(1, Color.parseColor("#FFD1CF"))
+                }
+                setPadding(18, 8, 18, 8)
+                gravity = Gravity.CENTER
                 setOnClickListener {
                     stopSelf()
                 }
             }
+            val spacer = View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
+            }
             addView(simLabel)
             addView(simSwitch)
+            addView(spacer)
             addView(closeBtn)
         }
         optionsCard.addView(bottomRow)
@@ -564,6 +604,8 @@ class FloatingJoystickService : Service() {
         pillBtn.setOnClickListener {
             isSecondLevelExpanded = !isSecondLevelExpanded
             optionsCard.visibility = if (isSecondLevelExpanded) View.VISIBLE else View.GONE
+            val pillText = pillBtn.getChildAt(0) as? TextView
+            pillText?.text = if (isSecondLevelExpanded) "⚙️ 收起 ▴" else "⚙️ 控制 ▾"
         }
 
         var initialX = 0; var initialY = 0; var touchX = 0f; var touchY = 0f

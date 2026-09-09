@@ -1,4 +1,4 @@
-# 🛰️ Fake GPS (MockRun) — Android 系统级虚拟定位与路线巡航引擎
+# 🛰️ Fake GPS (MockRun) — Android 虚拟定位与路线巡航引擎
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-green.svg)](https://developer.android.com)
@@ -6,148 +6,82 @@
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Xposed / LSPosed](https://img.shields.io/badge/Hook-LSPosed%20System%20Server-red.svg)](https://github.com/LSPosed/LSPosed)
 
-基于 **Kotlin + Jetpack Compose + LSPosed (system_server 系统层拦截)** 架构开发的高性能 Android 虚拟定位与路线巡航模拟引擎。
-
-突破传统应用层 Hook 容易闪回真实地址与被风控检测的瓶颈，直接作用于 Android 操作系统内核服务 `system_server`（`android` 系统框架），由操作系统官方服务向全机所有应用程序（高德、微信、百度等）直接分发纯净原生坐标，**彻底解决定位闪回问题，实现目标 App 进程内 0 注入、0 痕迹**。
+基于 **Kotlin + Jetpack Compose** 开发的现代化 Android 高性能虚拟定位、道路路线巡航与桌面悬浮摇杆模拟引擎。
 
 ---
 
-## 🌟 核心特性
+## 🌟 灵活的工作模式支持
 
-### 1. 🏛️ system_server 操作系统级 Hook
-- **全机统一生效**：只需在 LSPosed 中勾选【系统框架 (Android)】，无需在宿主 App 进程注入任何代码。
-- **天然无闪回**：在系统服务底层 `LocationManagerService` 与 `LocationProviderManager` 直接改写分发流，杜绝 App 绕过检测偷取物理基站/GPS。
-- **硬件探针阻断**：在系统底层屏蔽未授权偷扫 Wi-Fi AP 列表 (`WifiServiceImpl`) 与蜂窝基站数据 (`TelephonyRegistry`)，封死网络辅助定位后门。
-- **Mock 标志位抹除**：分发的坐标天然携带系统签名，`isFromMockProvider` / `isMock()` 恒定为 `false`。
+本项目兼顾普通用户与高阶玩家，支持三种梯级工作模式：
 
-### 2. 🕹️ 全局桌面悬浮触控摇杆
-- 独立半透明悬浮窗，不占用主界面。
-- 支持 80dp ~ 220dp 自由缩放尺寸，适应单手盲操。
-- 八方向微调与连续位移，支持步频步幅实时仿真。
+### 1. 🟢 免 ROOT 模式（开箱即用，无任何门槛）
+- **无须 Root 手机**，适用于所有普通 Android 设备。
+- 只需在系统 **【开发者选项】➔【选择模拟位置信息应用】** 中选中本应用。
+- 支持核心功能：底图精准选点、一键定点定位、沿真实路网规划巡航、GPX 运动轨迹导入漫游、全局桌面悬浮摇杆控制器等。
 
-### 3. 🛣️ 自动沿真实道路规划路线模拟
-- **道路级路线生成**：在地图上选定起点和终点，自动基于实际路网算路并生成顺滑贴路轨迹，告别直线穿墙穿建筑。
-- **多种出行方案**：驾车、骑行、步行三种路网拓扑模型可选。
-- **GPX 轨迹导入**：支持 Keep、Strava、Garmin 等主流运动平台的 GPX 轨迹文件直接导入并自动拟真巡航。
+### 2. ⚡ ROOT 模式（自动解锁硬件级拟真）
+- 当检测到设备拥有 Root 权限时，自动解锁高阶拟真能力；**若无 Root 环境，此类高阶功能将自动安全隐藏，绝不打扰普通使用**：
+  - **运动步频与计步仿真**：接入运动生物力学模型，随配速与步频模式（健步 110、慢跑 160、跑马 180、自定义）实时换算预估步幅与垂直颠簸加速度；
+  - **GPS 底层拟真与抗检测**：多星系统动态搜星（GPS/北斗/Galileo）、拟真水平精度（±1.8m）、Box-Muller 高斯微漂移与体力呼吸抖动；
+  - **系统级自动提权**：自动静默授权模拟位置权限与后台长效运行。
 
-### 4. 🏃 拟真物理运动算法
-- **球面大圆插值**：沿路线轨迹逐米平滑步进。
-- **Box-Muller 高斯噪声漂移**：模拟真实卫星因电离层与多径效应产生的微弱抖动（~0.3m 拟真漂移）。
-- **动态配速抖动**：避免绝对匀速被运动算法模型判异。
-- **航向角（Bearing）与高程（Altitude）实时解算**。
-
-### 5. 🎨 现代极简 iOS + Material3 质感 UI
-- 沉浸式顶部状态栏，全面兼容居中挖孔、药丸孔及曲面屏幕。
-- 逆地理编码实时反查：经纬度秒级反查为真实中文道路街区门牌，支持一键复制。
-- 2×2 模块健康矩阵：实时检测 LSPosed 状态、Root 提权、常驻通知及电池优化策略。
+### 3. 🏛️ LSPosed 模块系统级增强（终极防风控防闪回）
+- **LSPosed 属于可选的高级系统级深度增强扩展**（非强制，免 Root / 仅 Root 同样能正常使用）。
+- 突破传统应用层 Hook 容易闪回真实地址与被风控检测的瓶颈，直接作用于 Android 操作系统内核服务 `system_server`（`android` 系统框架）：
+  - **全机统一生效**：只需在 LSPosed 中勾选【系统框架 (Android)】，无需在宿主 App 进程注入任何代码；
+  - **天然无闪回**：在系统服务底层 `LocationManagerService` 与 `LocationProviderManager` 直接改写分发流，杜绝 App 绕过检测偷取物理基站/GPS；
+  - **硬件探针阻断**：在系统底层屏蔽未授权偷扫 Wi-Fi AP 列表 (`WifiServiceImpl`) 与蜂窝基站数据 (`TelephonyRegistry`)，封死网络辅助定位后门；
+  - **Mock 标志位抹除**：分发的坐标天然携带系统官方签名，`isFromMockProvider` / `isMock()` 恒定为 `false`。
 
 ---
 
-## 🏗️ 架构概览
+## 🕹️ 核心功能亮点
 
-```mermaid
-graph TD
-    subgraph AndroidOS["Android 操作系统核心 (system_server / android)"]
-        subgraph Providers["LocationProviderManager (Android 11 - 15+)"]
-            LPM_Report["onReportLocation(LocationResult)"]
-            LPM_Last["getLastLocation(...)"]
-            LPM_Set["setLastLocation(...)"]
-        end
-
-        subgraph LMS["LocationManagerService (全版本覆盖)"]
-            LMS_Last["getLastLocation(...)"]
-            LMS_Curr["getCurrentLocation(...)"]
-            LMS_Legacy["reportLocation / handleLocationChanged"]
-            LMS_Dispatch["Receiver / LocationRegistration 回调分发"]
-        end
-
-        subgraph NetShield["网络与硬件探针拦截层"]
-            Wifi_Scan["WifiServiceImpl.getScanResults() ➔ 强制空列表 []"]
-            Wifi_Conn["WifiServiceImpl.getConnectionInfo() ➔ 掩码 BSSID"]
-            Tel_Cell["TelephonyRegistry.notifyCellInfo() ➔ 强制空列表 []"]
-            Tel_Loc["TelephonyRegistry.notifyCellLocation() ➔ 拦截清空"]
-        end
-
-        subgraph MockShield["底层防作弊抹除"]
-            Loc_Mock["Location.isFromMockProvider() / isMock() ➔ 恒定 false"]
-        end
-    end
-
-    subgraph FastIPC["0 延迟极速跨进程共享总线"]
-        TmpFile["/data/local/tmp/fake_gps_hook.json (666权限极速文件读取)"]
-        XShared["XSharedPreferences (hook_config)"]
-        ProviderIPC["ContentProvider IPC (HookConfigProvider)"]
-    end
-
-    subgraph UserApps["全机应用程序 (高德地图、百度地图、微信、钉钉等)"]
-        Amap["高德地图"]
-        WeChat["微信"]
-        OtherApps["其他任意应用"]
-    end
-
-    FastIPC -. 实时坐标极速同步 .-> Providers
-    FastIPC -. 实时坐标极速同步 .-> LMS
-    Providers --> LMS
-    LMS --> LMS_Dispatch
-
-    LMS_Dispatch == 原生系统 Binder 官方分发虚拟坐标 ==> Amap
-    LMS_Dispatch == 原生系统 Binder 官方分发虚拟坐标 ==> WeChat
-    LMS_Dispatch == 原生系统 Binder 官方分发虚拟坐标 ==> OtherApps
-
-    NetShield == 阻断偷扫 Wi-Fi/基站探针 ==> Amap
-```
+1. **全新 iOS 拟物悬浮底栏与动态防遮挡 UI**：
+   - 彻底优化窄屏（360~390dp）卡片折行问题；
+   - 悬浮功能按钮群（FAB）自适应高度避让，卡片展开与划线时平滑上浮，与底部底栏保持 25dp 以上开阔安全间距。
+2. **Apple Maps 级真实物理位置发光光标与一键复位**：
+   - 严格杜绝 Mock 虚假缓存劫持，点击「重置位置」强制注销 Test Provider 并从硬件芯片夺回真实物理 GPS；
+   - 在底图常驻高亮发光蓝环定位光标，真实位置与虚拟位置一目了然。
+3. **全局桌面悬浮触控摇杆**：
+   - 独立磨砂半透明悬浮窗，支持 80dp ~ 220dp 实时缩放大小；
+   - 支持八方向摇杆锁定、自定义速度步进（🚶 🏃 🚴 🚗 ✈️）与一键隐藏/展开。
+4. **道路级拓扑路线巡航**：
+   - 支持驾车、骑行、步行三种路网拓扑模型，自动沿真实道路走向平滑步进；
+   - 兼容 Keep、Strava、Garmin 等主流运动平台的 GPX 轨迹文件直接导入。
 
 ---
 
-## 🚀 安装与使用指南
+## 🚀 安装与下载
 
-### 前置要求
-1. 设备已 Root（推荐 KernelSU、Magisk 或 APatch）。
-2. 已安装 **LSPosed** 框架（Zygisk 版）。
-
-### 配置步骤
-1. **安装 APK**：从 Releases 下载最新版并安装。
-2. **在 LSPosed 中勾选系统框架**：
-   - 打开 **LSPosed 管理器**。
-   - 找到并点击 **Fake GPS**。
-   - 开启模块，并在作用域列表中勾选第一项：**【系统框架】（`android`）**。
-3. **重启手机**：首次勾选系统框架后，请**重启手机**使系统服务挂载 Hook。
-4. **启动定位**：
-   - 打开 Fake GPS，在地图上选点或规划道路路线。
-   - 开启「虚拟定位」或「悬浮摇杆」。
-   - 打开任意地图软件，全局系统即刻生效，绝无闪回。
+请前往 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases) 下载最新编译好的正式版安装包：
+- **最新发布包**：`FakeGPS-v2.9-LATEST.apk`
 
 ---
 
-## 🛠️ 编译与开发
+## 🛠️ 源码构建与开发
 
 ### 环境要求
 - **JDK**：OpenJDK 17
-- **Android SDK**：API Level 34 (Android 14) 或更高
+- **Android SDK**：API Level 34 (Android 14)
 - **Gradle**：8.4+
 
-### 本地构建
+### 本地编译
 ```bash
-# 克隆仓库
-git clone https://github.com/<your-username>/FakeGPS.git
-cd FakeGPS
+# 克隆本仓库
+git clone https://github.com/Elysia-SHY/FakeGPS-next.git
+cd FakeGPS-next
 
-# 构建 Debug APK
+# 编译 Debug APK
 ./gradlew assembleDebug
-
-# 构建 Release APK
-./gradlew assembleRelease
 ```
-产物将输出在 `app/build/outputs/apk/debug/app-debug.apk`。
+构建产物输出于：`app/build/outputs/apk/debug/app-debug.apk`。
 
 ---
 
-## ⚖️ 免责声明 (Disclaimer)
+## ⚖️ 免责声明
 
-本项目仅供 **移动应用开发调试、软件逆向安全研究、自动化测试以及学术探索** 使用。
-
-- 请勿将本项目用于任何违反当地法律法规、侵犯第三方合法权益或违反应用服务协议的场景。
-- 开发者对使用者因不正当使用本软件而产生的任何直接或间接后果不承担任何法律责任。
+本项目仅供 **移动应用开发调试、地理信息系统开发、安全研究及学术探索** 使用。请勿用于任何违反法律法规或侵犯第三方合法权益的场景。
 
 ---
 
