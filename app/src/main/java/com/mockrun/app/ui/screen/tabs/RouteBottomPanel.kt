@@ -70,6 +70,7 @@ fun RouteBottomPanel(
 
     Surface(
         modifier = modifier
+            .widthIn(max = 560.dp)
             .fillMaxWidth()
             .padding(horizontal = 14.dp)
             .padding(bottom = (bottomBarPadding + 8.dp).coerceAtLeast(0.dp))

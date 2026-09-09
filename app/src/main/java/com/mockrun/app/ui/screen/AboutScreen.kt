@@ -38,6 +38,7 @@ import com.mockrun.app.ui.theme.*
 @Composable
 fun AboutScreen(
     isLiquidGlass: Boolean,
+    isTablet: Boolean = false,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onNavigateToLibrary: () -> Unit = {}
 ) {
@@ -45,16 +46,22 @@ fun AboutScreen(
     val isDark = isSystemInDarkTheme()
     val gitRepoUrl = "https://github.com/Elysia-SHY/FakeGPS-next"
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF000000) else IosColors.SystemGroupedBackground)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-            .padding(top = 16.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .background(if (isDark) Color(0xFF000000) else IosColors.SystemGroupedBackground),
+        contentAlignment = Alignment.TopCenter
     ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 680.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp, bottom = if (isTablet) 32.dp else 120.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
         // =====================================================================
         // 1. App Header & Logo Card
         // =====================================================================
@@ -490,6 +497,7 @@ fun AboutScreen(
                 )
             }
         }
+    }
     }
 }
 

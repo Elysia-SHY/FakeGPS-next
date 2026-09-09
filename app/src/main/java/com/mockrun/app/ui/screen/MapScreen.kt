@@ -385,6 +385,7 @@ fun MapScreen(
     simulationViewModel: SimulationViewModel,
     initialTab: MapTab = MapTab.LOCATION,
     isLiquidGlass: Boolean = true,
+    isTablet: Boolean = false,
     bottomBarPadding: Dp = 76.dp,
     onNavigateToLibrary: () -> Unit = {}
 ) {
@@ -759,29 +760,6 @@ fun MapScreen(
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Search Button
-                        IconButton(
-                            onClick = { showSearchDialog = true },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索地点与坐标", tint = IosBlue, modifier = Modifier.size(20.dp))
-                        }
-
-                        // Continuous Waypoint Drawing Mode Toggle Button (像第1版一样直接连点规划)
-                        IconButton(
-                            onClick = {
-                                isContinuousDrawMode = !isContinuousDrawMode
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = if (isContinuousDrawMode) "退出连点" else "连续连点绘制",
-                                tint = if (isContinuousDrawMode) IosGreen else IosBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
                         // Road Route Planner Button
                         IconButton(
                             onClick = { showRoadRouteDialog = true },
@@ -793,13 +771,13 @@ fun MapScreen(
                             )
                         }
 
-                        // Map Layer Selector
+                        // Map Layer Selector (唯一的地图API底图切换入口)
                         Box {
                             IconButton(
                                 onClick = { showMapTypeMenu = true },
                                 modifier = Modifier.size(36.dp)
                             ) {
-                                Icon(Icons.Default.Place, contentDescription = "切换底图", tint = IosBlue, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Layers, contentDescription = "切换底图API", tint = IosBlue, modifier = Modifier.size(20.dp))
                             }
                             DropdownMenu(
                                 expanded = showMapTypeMenu,

@@ -1,4 +1,4 @@
-package com.mockrun.app.ui.navigation
+﻿package com.mockrun.app.ui.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,6 +25,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
 import com.mockrun.app.ui.components.FloatingTabItem
+import com.mockrun.app.ui.components.TabletNavigationRail
 import com.mockrun.app.ui.screen.AboutScreen
 import com.mockrun.app.ui.screen.LocationMockScreen
 import com.mockrun.app.ui.screen.MapScreen
@@ -53,6 +55,9 @@ fun AppNavigation(
     simulationViewModel: SimulationViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+
     var isLiquidGlassEnabled by remember {
         mutableStateOf(LiquidGlassDefaults.isEnabled(context))
     }
@@ -61,9 +66,9 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Dynamic padding: nav bar inset + pill (62dp) + vertical padding (8+8dp) + safety margin (8dp)
+    // Phone: dynamic bottom bar padding. Tablet: no bottom bar, use 0.
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomBarPadding = navBarBottom + 86.dp
+    val bottomBarPadding = if (isTablet) 0.dp else navBarBottom + 86.dp
 
     val navigationTabs = remember {
         listOf(
@@ -74,117 +79,93 @@ fun AppNavigation(
         )
     }
 
-    CompositionLocalProvider(LocalLiquidGlassEnabled provides isLiquidGlassEnabled) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Location.route,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // 1. Location Spoofing (LocationSpoofer Style Interactive Map)
-                composable(Screen.Location.route) {
-                    MapScreen(
-                        mapViewModel = mapViewModel,
-                        simulationViewModel = simulationViewModel,
-                        initialTab = MapTab.LOCATION,
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = bottomBarPadding,
-                        onNavigateToLibrary = {
-                            navController.navigate(Screen.Library.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
+    val onTabNavigate: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
-                // 2. Route Simulation (LocationSpoofer Style Route Planner & Simulator)
-                composable(Screen.Route.route) {
-                    MapScreen(
-                        mapViewModel = mapViewModel,
-                        simulationViewModel = simulationViewModel,
-                        initialTab = MapTab.ROUTE,
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = bottomBarPadding,
-                        onNavigateToLibrary = {
-                            navController.navigate(Screen.Library.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
-
-                // 3. System Features, SELinux status, Root & Joystick & Stepper
-                composable(Screen.Features.route) {
-                    LocationMockScreen(
-                        simulationViewModel = simulationViewModel,
-                        onNavigateToMap = {
-                            navController.navigate(Screen.Location.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
-
-                // 4. About App Screen (With GitHub link, liquid glass secondary setting, credits)
-                composable(Screen.About.route) {
-                    AboutScreen(
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        onToggleLiquidGlass = { enabled ->
-                            isLiquidGlassEnabled = enabled
-                        },
-                        onNavigateToLibrary = {
-                            navController.navigate(Screen.Library.route)
-                        }
-                    )
-                }
-
-                // 5. Saved Route Library
-                composable(Screen.Library.route) {
-                    RouteLibraryScreen(
-                        mapViewModel = mapViewModel,
-                        onRouteSelected = {
-                            navController.navigate(Screen.Route.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
+    val navHost: @Composable (Modifier) -> Unit = { navModifier ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Location.route,
+            modifier = navModifier
+        ) {
+            composable(Screen.Location.route) {
+                MapScreen(
+                    mapViewModel = mapViewModel,
+                    simulationViewModel = simulationViewModel,
+                    initialTab = MapTab.LOCATION,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    isTablet = isTablet,
+                    bottomBarPadding = bottomBarPadding,
+                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                )
             }
+            composable(Screen.Route.route) {
+                MapScreen(
+                    mapViewModel = mapViewModel,
+                    simulationViewModel = simulationViewModel,
+                    initialTab = MapTab.ROUTE,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    isTablet = isTablet,
+                    bottomBarPadding = bottomBarPadding,
+                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                )
+            }
+            composable(Screen.Features.route) {
+                LocationMockScreen(
+                    simulationViewModel = simulationViewModel,
+                    onNavigateToMap = { navController.navigate(Screen.Location.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                )
+            }
+            composable(Screen.About.route) {
+                AboutScreen(
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    isTablet = isTablet,
+                    onToggleLiquidGlass = { isLiquidGlassEnabled = it },
+                    onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
+                )
+            }
+            composable(Screen.Library.route) {
+                RouteLibraryScreen(
+                    mapViewModel = mapViewModel,
+                    onRouteSelected = { navController.navigate(Screen.Route.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
+                )
+            }
+        }
+    }
 
+    CompositionLocalProvider(LocalLiquidGlassEnabled provides isLiquidGlassEnabled) {
+        if (isTablet) {
             // =================================================================
-            // LocationSpoofer Style Floating Bottom Bar (Clean Tabs, Sliding Indicator)
+            // TABLET LAYOUT: Left NavigationRail + Content
             // =================================================================
-            AndroidFloatingBottomBar(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                tabs = navigationTabs,
-                currentRoute = currentRoute,
-                isLiquidGlass = isLiquidGlassEnabled,
-                onTabSelected = { route ->
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
+            Row(modifier = Modifier.fillMaxSize()) {
+                TabletNavigationRail(
+                    tabs = navigationTabs,
+                    currentRoute = currentRoute,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    onTabSelected = onTabNavigate
+                )
+                navHost(Modifier.weight(1f).fillMaxHeight())
+            }
+        } else {
+            // =================================================================
+            // PHONE LAYOUT: Full-screen content + Floating Bottom Bar overlay
+            // =================================================================
+            Box(modifier = Modifier.fillMaxSize()) {
+                navHost(Modifier.fillMaxSize())
+                AndroidFloatingBottomBar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    tabs = navigationTabs,
+                    currentRoute = currentRoute,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    onTabSelected = onTabNavigate
+                )
+            }
         }
     }
 }
