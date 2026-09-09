@@ -6,6 +6,7 @@
         <item>com.baidu.BaiduMap</item>
         <item>com.tencent.map</item>
         <item>com.tencent.mm</item>
+        <item>com.tencent.mobileqq</item>
         <item>com.alibaba.android.rimet</item>
     </string-array>
 </resources>

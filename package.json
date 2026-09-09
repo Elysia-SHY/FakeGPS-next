@@ -1,6 +1,6 @@
 {
   "name": "fakegps-next",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "description": "FakeGPS-next: Android System-Level Deep Hook Virtual Location & Route Simulation",
   "private": true,
   "scripts": {

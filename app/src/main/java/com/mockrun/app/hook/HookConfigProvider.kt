@@ -40,6 +40,12 @@ object HookStateBridge {
     var lastSystemHookHeartbeat: Long = 0L
         private set
 
+    @Volatile
+    private var lastSuSyncTime: Long = 0L
+
+    @Volatile
+    private var lastSyncedActive: Boolean? = null
+
     fun recordSystemHookHeartbeat() {
         lastSystemHookHeartbeat = System.currentTimeMillis()
     }
@@ -66,6 +72,7 @@ object HookStateBridge {
         updateTimestamp = System.currentTimeMillis()
 
         context?.let { ctx ->
+            // 1. SharedPreferences update
             runCatching {
                 val sp = ctx.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
                 sp.edit()
@@ -77,24 +84,25 @@ object HookStateBridge {
                     .putLong("timestamp", updateTimestamp)
                     .apply()
 
-                // Ensure file is world-readable so XSharedPreferences can read without IPC
                 val prefsFile = java.io.File(ctx.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
                 if (prefsFile.exists()) {
                     prefsFile.setReadable(true, false)
                 }
             }
 
+            val jsonStr = """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
+
+            // 2. Settings.Global update (zero IPC overhead in system_server, readable by all apps)
             runCatching {
-                val jsonStr = """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
+                android.provider.Settings.Global.putString(ctx.contentResolver, "fake_gps_config", jsonStr)
+            }
+
+            // 3. Local file writes (cacheDir & /data/local/tmp if writable)
+            runCatching {
                 val tmpFile = java.io.File("/data/local/tmp/fake_gps_hook.json")
                 tmpFile.writeText(jsonStr)
                 tmpFile.setReadable(true, false)
                 tmpFile.setWritable(true, false)
-            }.onFailure {
-                runCatching {
-                    val jsonStr = "{\"isActive\":$active,\"latitude\":$lat,\"longitude\":$lon,\"altitude\":$alt,\"bearing\":$bear,\"speed\":$spd,\"time\":$updateTimestamp}"
-                    Runtime.getRuntime().exec(arrayOf("su", "-c", "echo '$jsonStr' > /data/local/tmp/fake_gps_hook.json && chmod 666 /data/local/tmp/fake_gps_hook.json"))
-                }
             }
 
             runCatching {
@@ -104,6 +112,37 @@ object HookStateBridge {
                     """{"active":$active,"lat":$lat,"lon":$lon,"alt":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
                 )
                 tmpFile.setReadable(true, false)
+            }
+
+            // 4. Multi-Channel System Sync via Root (SystemProperties, /data/system/, Settings.Global, DAC permissions)
+            // Throttled to max 1 execution every 1200ms unless active state toggles
+            val now = System.currentTimeMillis()
+            val stateChanged = (lastSyncedActive != active)
+            if (stateChanged || (now - lastSuSyncTime > 1200L)) {
+                lastSuSyncTime = now
+                lastSyncedActive = active
+
+                runCatching {
+                    val activeInt = if (active) 1 else 0
+                    val pkgDir = ctx.applicationInfo.dataDir
+                    val suCmd = buildString {
+                        append("setprop debug.fakegps.active $activeInt; ")
+                        append("setprop debug.fakegps.lat $lat; ")
+                        append("setprop debug.fakegps.lon $lon; ")
+                        append("setprop debug.fakegps.alt $alt; ")
+                        append("setprop debug.fakegps.bearing $bear; ")
+                        append("setprop debug.fakegps.speed $spd; ")
+                        append("echo '$jsonStr' > /data/system/fake_gps_hook.json 2>/dev/null; ")
+                        append("chmod 666 /data/system/fake_gps_hook.json 2>/dev/null; ")
+                        append("echo '$jsonStr' > /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
+                        append("chmod 666 /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
+                        append("settings put global fake_gps_config '$jsonStr' 2>/dev/null; ")
+                        append("chmod 755 $pkgDir 2>/dev/null; ")
+                        append("chmod 755 $pkgDir/shared_prefs 2>/dev/null; ")
+                        append("chmod 666 $pkgDir/shared_prefs/hook_config.xml 2>/dev/null")
+                    }
+                    Runtime.getRuntime().exec(arrayOf("su", "-c", suCmd))
+                }
             }
         }
     }

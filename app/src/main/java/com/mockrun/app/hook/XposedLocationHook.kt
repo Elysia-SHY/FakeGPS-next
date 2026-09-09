@@ -73,6 +73,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
         // Universal Anti-Mock detection hook in all processes
         hookMockDetection(lpparam)
 
+        // Eagerly resolve context from ActivityThread if available
+        runCatching { getAnyContext() }
+
         if (pkg == "android") {
             // =========================================================================
             // 核心系统层 Hook (System Framework / system_server)
@@ -109,6 +112,45 @@ class XposedLocationHook : IXposedHookLoadPackage {
         hookSystemTelephonyRegistry(lpparam)
     }
 
+    private fun createLocationResult(resultClass: Class<*>, location: Location): Any? {
+        // 1. Try wrap(Location...)
+        runCatching {
+            val wrapMethod = XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
+            if (wrapMethod != null) {
+                return wrapMethod.invoke(null, arrayOf(location))
+            }
+        }
+        // 2. Try wrap(List)
+        runCatching {
+            val wrapMethod = XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
+            if (wrapMethod != null) {
+                return wrapMethod.invoke(null, listOf(location))
+            }
+        }
+        // 3. Try create(List)
+        runCatching {
+            val createMethod = XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
+            if (createMethod != null) {
+                return createMethod.invoke(null, listOf(location))
+            }
+        }
+        // 4. Try create(Location...)
+        runCatching {
+            val createMethod = XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
+            if (createMethod != null) {
+                return createMethod.invoke(null, arrayOf(location))
+            }
+        }
+        // 5. Fallback via XposedHelpers
+        return runCatching {
+            XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
+        }.getOrElse {
+            runCatching {
+                XposedHelpers.callStaticMethod(resultClass, "create", listOf(location))
+            }.getOrNull()
+        }
+    }
+
     private fun hookLocationProviderManager(lpparam: XC_LoadPackage.LoadPackageParam) {
         val lpmClasses = listOfNotNull(
             XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager", lpparam.classLoader),
@@ -129,14 +171,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }.getOrNull() ?: LocationManager.GPS_PROVIDER
 
                         val spoofedLoc = createSpoofedLocation(providerName, spoof)
-                        val resultClass = resultArg.javaClass
-                        val newResult = runCatching {
-                            XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(spoofedLoc))
-                        }.getOrElse {
-                            runCatching {
-                                XposedHelpers.callStaticMethod(resultClass, "create", listOf(spoofedLoc))
-                            }.getOrNull()
-                        }
+                        val newResult = createLocationResult(resultArg.javaClass, spoofedLoc)
                         if (newResult != null) {
                             param.args[0] = newResult
                         }
@@ -144,14 +179,29 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 })
             }
 
-            // getLastLocation(...)
+            // getLastLocation(...) - Critical fix for Android 12~16 LocationResult return type!
             runCatching {
                 XposedBridge.hookAllMethods(lpmClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
-                        if (spoof.isActive) {
-                            param.result = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
+                        if (!spoof.isActive) return
+
+                        val providerName = runCatching {
+                            XposedHelpers.callMethod(param.thisObject, "getName") as? String
+                        }.getOrNull() ?: LocationManager.GPS_PROVIDER
+
+                        val spoofedLoc = createSpoofedLocation(providerName, spoof)
+                        val method = param.method as? java.lang.reflect.Method
+                        val returnType = method?.returnType
+
+                        if (returnType != null && returnType.name.contains("LocationResult")) {
+                            val res = createLocationResult(returnType, spoofedLoc)
+                            if (res != null) {
+                                param.result = res
+                                return
+                            }
                         }
+                        param.result = spoofedLoc
                     }
                 })
             }
@@ -162,10 +212,19 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
                         if (!spoof.isActive) return
-                        val spoofedLoc = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
+                        val providerName = runCatching {
+                            XposedHelpers.callMethod(param.thisObject, "getName") as? String
+                        }.getOrNull() ?: LocationManager.GPS_PROVIDER
+                        val spoofedLoc = createSpoofedLocation(providerName, spoof)
                         for (i in param.args.indices) {
-                            if (param.args[i] is Location) {
+                            val arg = param.args[i] ?: continue
+                            if (arg is Location) {
                                 param.args[i] = spoofedLoc
+                            } else if (arg.javaClass.name.contains("LocationResult")) {
+                                val newResult = createLocationResult(arg.javaClass, spoofedLoc)
+                                if (newResult != null) {
+                                    param.args[i] = newResult
+                                }
                             }
                         }
                     }
@@ -247,7 +306,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
     }
 
     private fun hookLmsDispatchers(lpparam: XC_LoadPackage.LoadPackageParam) {
-        // Older Android Receiver
+        // Older Android Receiver (Android <= 10)
         runCatching {
             val receiverClass = XposedHelpers.findClassIfExists(
                 "com.android.server.LocationManagerService\$Receiver",
@@ -265,14 +324,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
             }
         }
 
-        // Android 11+ LocationRegistration
-        runCatching {
-            val locRegClass = XposedHelpers.findClassIfExists(
-                "com.android.server.location.LocationManagerService\$LocationRegistration",
-                lpparam.classLoader
-            )
-            if (locRegClass != null) {
-                XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", object : XC_MethodHook() {
+        // Android 11~16+ LocationRegistration dispatchers
+        val locRegClasses = listOfNotNull(
+            XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$LocationRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$LocationRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationManagerService\$LocationRegistration", lpparam.classLoader)
+        )
+
+        for (locRegClass in locRegClasses) {
+            runCatching {
+                val hookDispatch = object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
                         if (!spoof.isActive) return
@@ -280,21 +341,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         val spoofedLoc = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
                         if (arg is Location) {
                             param.args[0] = spoofedLoc
-                        } else {
-                            val locResultClass = arg.javaClass
-                            val newResult = runCatching {
-                                XposedHelpers.callStaticMethod(locResultClass, "wrap", arrayOf(spoofedLoc))
-                            }.getOrElse {
-                                runCatching {
-                                    XposedHelpers.callStaticMethod(locResultClass, "create", listOf(spoofedLoc))
-                                }.getOrNull()
-                            }
+                        } else if (arg.javaClass.name.contains("LocationResult")) {
+                            val newResult = createLocationResult(arg.javaClass, spoofedLoc)
                             if (newResult != null) {
                                 param.args[0] = newResult
                             }
                         }
                     }
-                })
+                }
+                XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", hookDispatch)
+                XposedBridge.hookAllMethods(locRegClass, "acceptLocationChange", hookDispatch)
             }
         }
     }
@@ -500,6 +556,33 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 }
             })
         }
+
+        // 4. getCurrentLocation(...) (Android 11~16)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                XposedBridge.hookAllMethods(lmClass, "getCurrentLocation", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+
+                        val provider = param.args.firstOrNull { it is String } as? String ?: LocationManager.GPS_PROVIDER
+                        val spoofed = createSpoofedLocation(provider, spoof)
+
+                        for (i in param.args.indices) {
+                            val arg = param.args[i] ?: continue
+                            if (arg.javaClass.name.contains("Consumer") || java.util.function.Consumer::class.java.isAssignableFrom(arg.javaClass)) {
+                                val originalConsumer = arg
+                                val newConsumer = java.util.function.Consumer<Location> { _ ->
+                                    @Suppress("UNCHECKED_CAST")
+                                    (originalConsumer as java.util.function.Consumer<Location>).accept(spoofed)
+                                }
+                                param.args[i] = newConsumer
+                            }
+                        }
+                    }
+                })
+            }
+        }
     }
 
     private val hookedListenerClasses = mutableSetOf<String>()
@@ -509,6 +592,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
         if (hookedListenerClasses.contains(className)) return
         hookedListenerClasses.add(className)
 
+        // Hook onLocationChanged(Location)
         runCatching {
             XposedHelpers.findAndHookMethod(
                 listenerClass,
@@ -521,6 +605,26 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             val originalLoc = param.args[0] as? Location
                             val provider = originalLoc?.provider ?: LocationManager.GPS_PROVIDER
                             param.args[0] = createSpoofedLocation(provider, spoof)
+                        }
+                    }
+                }
+            )
+        }
+
+        // Hook onLocationChanged(List<Location>) - Android 12~16
+        runCatching {
+            XposedHelpers.findAndHookMethod(
+                listenerClass,
+                "onLocationChanged",
+                List::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (spoof.isActive) {
+                            val list = param.args[0] as? List<*> ?: return
+                            val provider = (list.firstOrNull() as? Location)?.provider ?: LocationManager.GPS_PROVIDER
+                            val spoofed = createSpoofedLocation(provider, spoof)
+                            param.args[0] = listOf(spoofed)
                         }
                     }
                 }
@@ -730,17 +834,57 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     })
                 }
+                runCatching {
+                    XposedBridge.hookAllMethods(tencentLocClass, "getTime", object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                param.result = System.currentTimeMillis()
+                            }
+                        }
+                    })
+                }
+                runCatching {
+                    XposedBridge.hookAllMethods(tencentLocClass, "getElapsedRealtime", object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                param.result = SystemClock.elapsedRealtime()
+                            }
+                        }
+                    })
+                }
+                runCatching {
+                    XposedBridge.hookAllMethods(tencentLocClass, "getProvider", object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                param.result = "gps"
+                            }
+                        }
+                    })
+                }
             }
 
-            // Hook TencentLocationManager to intercept last known location
+            // Hook TencentLocationManager to intercept last known location & request updates
             val tencentMgrClass = XposedHelpers.findClassIfExists("com.tencent.map.geolocation.TencentLocationManager", lpparam.classLoader)
             if (tencentMgrClass != null) {
                 XposedBridge.hookAllMethods(tencentMgrClass, "getLastKnownLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
                         if (!spoof.isActive) return
-                        val originalLoc = param.result ?: return
-                        // The original object's methods are already hooked above via TencentLocation
+                        // The returned TencentLocation instance has all its getter methods hooked above
+                    }
+                })
+                XposedBridge.hookAllMethods(tencentMgrClass, "requestLocationUpdates", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        for (arg in param.args) {
+                            if (arg != null && (arg.javaClass.name.contains("TencentLocationListener") || arg.javaClass.interfaces.any { it.name.contains("TencentLocationListener") })) {
+                                hookTencentListenerClass(arg.javaClass)
+                            }
+                        }
                     }
                 })
             }
@@ -748,17 +892,28 @@ class XposedLocationHook : IXposedHookLoadPackage {
             // Hook TencentLocationListener callbacks
             val tencentListenerClass = XposedHelpers.findClassIfExists("com.tencent.map.geolocation.TencentLocationListener", lpparam.classLoader)
             if (tencentListenerClass != null) {
-                XposedBridge.hookAllMethods(tencentListenerClass, "onLocationChanged", object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (!spoof.isActive) return
-                        // Force error code to 0 (TencentLocation.ERROR_OK)
-                        if (param.args.size >= 2 && param.args[1] is Int) {
-                            param.args[1] = 0
-                        }
-                    }
-                })
+                hookTencentListenerClass(tencentListenerClass)
             }
+        }
+    }
+
+    private val hookedTencentListenerClasses = mutableSetOf<String>()
+    private fun hookTencentListenerClass(listenerClass: Class<*>) {
+        val className = listenerClass.name
+        if (hookedTencentListenerClasses.contains(className)) return
+        hookedTencentListenerClasses.add(className)
+
+        runCatching {
+            XposedBridge.hookAllMethods(listenerClass, "onLocationChanged", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    // Force error code to 0 (TencentLocation.ERROR_OK)
+                    if (param.args.size >= 2 && param.args[1] is Int) {
+                        param.args[1] = 0
+                    }
+                }
+            })
         }
     }
 
@@ -782,44 +937,133 @@ class XposedLocationHook : IXposedHookLoadPackage {
         return false
     }
 
+    private fun getSystemProperty(key: String): String {
+        return runCatching {
+            val spClass = Class.forName("android.os.SystemProperties")
+            val getMethod = spClass.getMethod("get", String::class.java, String::class.java)
+            getMethod.invoke(null, key, "") as String
+        }.getOrDefault("")
+    }
+
+    private fun getSystemContext(): Context? {
+        return runCatching {
+            val atClass = Class.forName("android.app.ActivityThread")
+            val catMethod = atClass.getMethod("currentActivityThread")
+            val at = catMethod.invoke(null)
+            val scMethod = atClass.getMethod("getSystemContext")
+            scMethod.invoke(at) as? Context
+        }.getOrNull()
+    }
+
+    private fun getAnyContext(): Context? {
+        if (appContext != null) return appContext
+        return runCatching {
+            val atClass = Class.forName("android.app.ActivityThread")
+            val caMethod = atClass.getMethod("currentApplication")
+            val app = caMethod.invoke(null) as? Context
+            if (app != null) {
+                appContext = app
+                app
+            } else {
+                val sc = getSystemContext()
+                if (sc != null) appContext = sc
+                sc
+            }
+        }.getOrNull()
+    }
+
+    private fun parseJsonLocation(text: String): SpoofLocation? {
+        if (text.isEmpty()) return null
+        if (text.contains("\"isActive\":false") || text.contains("\"active\":false")) {
+            return SpoofLocation(false, 0.0, 0.0, 0.0, 0f, 0f)
+        }
+        if (text.contains("\"isActive\":true") || text.contains("\"active\":true")) {
+            val lat = (text.substringAfter("\"latitude\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"lat\":", "").substringBefore(",") }).toDoubleOrNull() ?: 0.0
+            val lon = (text.substringAfter("\"longitude\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"lon\":", "").substringBefore(",") }).toDoubleOrNull() ?: 0.0
+            val alt = (text.substringAfter("\"altitude\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"alt\":", "").substringBefore(",") }).toDoubleOrNull() ?: 50.0
+            val bear = (text.substringAfter("\"bearing\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"bear\":", "").substringBefore(",") }).toFloatOrNull() ?: 0f
+            val spd = (text.substringAfter("\"speed\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"spd\":", "").substringBefore(",") }).toFloatOrNull() ?: 0f
+            if (lat != 0.0 || lon != 0.0) {
+                return SpoofLocation(true, lat, lon, alt, bear, spd)
+            }
+        }
+        return null
+    }
+
     private fun getActiveLocation(): SpoofLocation? {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastCacheCheckTime < 50 && cachedLocation != null) {
+        if (now - lastCacheCheckTime < 60 && cachedLocation != null) {
             return cachedLocation
         }
         lastCacheCheckTime = now
 
-        // 1. Fast Path: Read /data/local/tmp/fake_gps_hook.json (0-delay world-readable file)
+        // 1. Channel 1: SystemProperties (Fastest libc property lookup, zero SELinux barrier in system_server, WeChat, QQ)
         runCatching {
-            val file = java.io.File("/data/local/tmp/fake_gps_hook.json")
+            val activeStr = getSystemProperty("debug.fakegps.active")
+            if (activeStr == "1" || activeStr.equals("true", ignoreCase = true)) {
+                val lat = getSystemProperty("debug.fakegps.lat").toDoubleOrNull() ?: 0.0
+                val lon = getSystemProperty("debug.fakegps.lon").toDoubleOrNull() ?: 0.0
+                val alt = getSystemProperty("debug.fakegps.alt").toDoubleOrNull() ?: 50.0
+                val bear = getSystemProperty("debug.fakegps.bearing").toFloatOrNull() ?: 0f
+                val spd = getSystemProperty("debug.fakegps.speed").toFloatOrNull() ?: 0f
+                if (lat != 0.0 || lon != 0.0) {
+                    val loc = SpoofLocation(true, lat, lon, alt, bear, spd)
+                    cachedLocation = loc
+                    return loc
+                }
+            } else if (activeStr == "0" || activeStr.equals("false", ignoreCase = true)) {
+                cachedLocation = null
+                return null
+            }
+        }
+
+        // 2. Channel 2: /data/system/fake_gps_hook.json (Native system_server directory, owned by system:system)
+        runCatching {
+            val file = java.io.File("/data/system/fake_gps_hook.json")
             if (file.exists() && file.canRead()) {
                 val text = file.readText()
-                if (text.isNotEmpty() && text.contains("\"isActive\":true")) {
-                    val lat = text.substringAfter("\"latitude\":").substringBefore(",").toDoubleOrNull() ?: 0.0
-                    val lon = text.substringAfter("\"longitude\":").substringBefore(",").toDoubleOrNull() ?: 0.0
-                    val alt = text.substringAfter("\"altitude\":").substringBefore(",").toDoubleOrNull() ?: 50.0
-                    val bear = text.substringAfter("\"bearing\":").substringBefore(",").toFloatOrNull() ?: 0f
-                    val spd = text.substringAfter("\"speed\":").substringBefore(",").toFloatOrNull() ?: 0f
-                    if (lat != 0.0 || lon != 0.0) {
-                        val loc = SpoofLocation(
-                            isActive = true,
-                            latitude = lat,
-                            longitude = lon,
-                            altitude = alt,
-                            bearing = bear,
-                            speed = spd
-                        )
-                        cachedLocation = loc
-                        return loc
-                    }
-                } else if (text.contains("\"isActive\":false")) {
-                    cachedLocation = null
-                    return null
+                val loc = parseJsonLocation(text)
+                if (loc != null) {
+                    cachedLocation = if (loc.isActive) loc else null
+                    return cachedLocation
                 }
             }
         }
 
-        // 2. Standard Path: XSharedPreferences
+        // 3. Channel 3: /data/local/tmp/fake_gps_hook.json
+        runCatching {
+            val file = java.io.File("/data/local/tmp/fake_gps_hook.json")
+            if (file.exists() && file.canRead()) {
+                val text = file.readText()
+                val loc = parseJsonLocation(text)
+                if (loc != null) {
+                    cachedLocation = if (loc.isActive) loc else null
+                    return cachedLocation
+                }
+            }
+        }
+
+        // 4. Channel 4: Settings.Global (Zero IPC in system_server, universally accessible)
+        runCatching {
+            val ctx = getAnyContext()
+            if (ctx != null) {
+                val configStr = android.provider.Settings.Global.getString(ctx.contentResolver, "fake_gps_config")
+                if (!configStr.isNullOrEmpty()) {
+                    val loc = parseJsonLocation(configStr)
+                    if (loc != null) {
+                        cachedLocation = if (loc.isActive) loc else null
+                        return cachedLocation
+                    }
+                }
+            }
+        }
+
+        // 5. Channel 5: XSharedPreferences (LSPosed standard)
         xSharedPrefs?.let { sp ->
             runCatching {
                 sp.reload()
@@ -830,14 +1074,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     val bear = sp.getFloat("bearing", 0f)
                     val spd = sp.getFloat("speed", 0f)
                     if (lat != 0.0 || lon != 0.0) {
-                        val loc = SpoofLocation(
-                            isActive = true,
-                            latitude = lat,
-                            longitude = lon,
-                            altitude = 50.0,
-                            bearing = bear,
-                            speed = spd
-                        )
+                        val loc = SpoofLocation(true, lat, lon, 50.0, bear, spd)
                         cachedLocation = loc
                         return loc
                     }
@@ -848,28 +1085,20 @@ class XposedLocationHook : IXposedHookLoadPackage {
             }
         }
 
-        // 3. Fallback Path: ContentProvider IPC (if appContext available)
-        appContext?.let { ctx ->
-            runCatching {
-                val uri = Uri.parse("content://com.mockrun.app.hook.provider")
-                val bundle = ctx.contentResolver.call(uri, "getLocation", null, null)
-                if (bundle != null && bundle.getBoolean("is_active", false)) {
-                    val lat = bundle.getDouble("latitude")
-                    val lon = bundle.getDouble("longitude")
-                    val alt = bundle.getDouble("altitude", 50.0)
-                    val bear = bundle.getFloat("bearing", 0f)
-                    val spd = bundle.getFloat("speed", 0f)
-                    val loc = SpoofLocation(
-                        isActive = true,
-                        latitude = lat,
-                        longitude = lon,
-                        altitude = alt,
-                        bearing = bear,
-                        speed = spd
-                    )
-                    cachedLocation = loc
-                    return loc
-                }
+        // 6. Channel 6: ContentProvider IPC fallback via getAnyContext()
+        runCatching {
+            val ctx = getAnyContext() ?: return@runCatching
+            val uri = Uri.parse("content://com.mockrun.app.hook.provider")
+            val bundle = ctx.contentResolver.call(uri, "getLocation", null, null)
+            if (bundle != null && bundle.getBoolean("is_active", false)) {
+                val lat = bundle.getDouble("latitude")
+                val lon = bundle.getDouble("longitude")
+                val alt = bundle.getDouble("altitude", 50.0)
+                val bear = bundle.getFloat("bearing", 0f)
+                val spd = bundle.getFloat("speed", 0f)
+                val loc = SpoofLocation(true, lat, lon, alt, bear, spd)
+                cachedLocation = loc
+                return loc
             }
         }
 
