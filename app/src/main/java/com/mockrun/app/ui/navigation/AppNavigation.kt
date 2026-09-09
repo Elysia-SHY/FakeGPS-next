@@ -1,6 +1,9 @@
 package com.mockrun.app.ui.navigation
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
@@ -58,6 +61,10 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Dynamic padding: nav bar inset + pill (62dp) + vertical padding (8+8dp) + safety margin (8dp)
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomBarPadding = navBarBottom + 86.dp
+
     val navigationTabs = remember {
         listOf(
             FloatingTabItem(Screen.Location.route, Screen.Location.title, Screen.Location.icon),
@@ -81,7 +88,7 @@ fun AppNavigation(
                         simulationViewModel = simulationViewModel,
                         initialTab = MapTab.LOCATION,
                         isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = 76.dp,
+                        bottomBarPadding = bottomBarPadding,
                         onNavigateToLibrary = {
                             navController.navigate(Screen.Library.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -101,7 +108,7 @@ fun AppNavigation(
                         simulationViewModel = simulationViewModel,
                         initialTab = MapTab.ROUTE,
                         isLiquidGlass = isLiquidGlassEnabled,
-                        bottomBarPadding = 76.dp,
+                        bottomBarPadding = bottomBarPadding,
                         onNavigateToLibrary = {
                             navController.navigate(Screen.Library.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
