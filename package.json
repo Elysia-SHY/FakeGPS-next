@@ -1,0 +1,10 @@
+{
+  "name": "fakegps-next",
+  "version": "2.8.0",
+  "description": "FakeGPS-next: Android System-Level Deep Hook Virtual Location & Route Simulation",
+  "private": true,
+  "scripts": {
+    "build": "gradlew.bat assembleDebug",
+    "clean": "gradlew.bat clean"
+  }
+}

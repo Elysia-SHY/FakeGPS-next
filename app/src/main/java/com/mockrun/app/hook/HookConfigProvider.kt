@@ -1,0 +1,143 @@
+package com.mockrun.app.hook
+
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.net.Uri
+import android.os.Bundle
+
+object HookStateBridge {
+    @Volatile
+    var isHookActive: Boolean = false
+        private set
+
+    @Volatile
+    var latitude: Double = 39.9042
+        private set
+
+    @Volatile
+    var longitude: Double = 116.4074
+        private set
+
+    @Volatile
+    var altitude: Double = 50.0
+        private set
+
+    @Volatile
+    var bearing: Float = 0f
+        private set
+
+    @Volatile
+    var speed: Float = 0f
+        private set
+
+    @Volatile
+    var updateTimestamp: Long = 0L
+        private set
+
+    @Volatile
+    var lastSystemHookHeartbeat: Long = 0L
+        private set
+
+    fun recordSystemHookHeartbeat() {
+        lastSystemHookHeartbeat = System.currentTimeMillis()
+    }
+
+    fun isSystemHookAlive(): Boolean {
+        return (System.currentTimeMillis() - lastSystemHookHeartbeat) < 60_000L
+    }
+
+    fun update(
+        context: Context?,
+        active: Boolean,
+        lat: Double = latitude,
+        lon: Double = longitude,
+        alt: Double = 50.0,
+        bear: Float = 0f,
+        spd: Float = 0f
+    ) {
+        isHookActive = active
+        latitude = lat
+        longitude = lon
+        altitude = alt
+        bearing = bear
+        speed = spd
+        updateTimestamp = System.currentTimeMillis()
+
+        context?.let { ctx ->
+            runCatching {
+                val sp = ctx.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
+                sp.edit()
+                    .putBoolean("is_active", active)
+                    .putString("latitude", lat.toString())
+                    .putString("longitude", lon.toString())
+                    .putFloat("bearing", bear)
+                    .putFloat("speed", spd)
+                    .putLong("timestamp", updateTimestamp)
+                    .apply()
+
+                // Ensure file is world-readable so XSharedPreferences can read without IPC
+                val prefsFile = java.io.File(ctx.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
+                if (prefsFile.exists()) {
+                    prefsFile.setReadable(true, false)
+                }
+            }
+
+            runCatching {
+                val cacheDir = ctx.cacheDir
+                val tmpFile = java.io.File(cacheDir, "current_hook.json")
+                tmpFile.writeText(
+                    """{"active":$active,"lat":$lat,"lon":$lon,"alt":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
+                )
+                tmpFile.setReadable(true, false)
+            }
+        }
+    }
+}
+
+class HookConfigProvider : ContentProvider() {
+
+    override fun onCreate(): Boolean = true
+
+    override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
+        return when (method) {
+            "getLocation" -> {
+                HookStateBridge.recordSystemHookHeartbeat()
+                Bundle().apply {
+                    putBoolean("is_active", HookStateBridge.isHookActive)
+                    putDouble("latitude", HookStateBridge.latitude)
+                    putDouble("longitude", HookStateBridge.longitude)
+                    putDouble("altitude", HookStateBridge.altitude)
+                    putFloat("bearing", HookStateBridge.bearing)
+                    putFloat("speed", HookStateBridge.speed)
+                    putLong("timestamp", HookStateBridge.updateTimestamp)
+                }
+            }
+            "pingSystemServer" -> {
+                HookStateBridge.recordSystemHookHeartbeat()
+                Bundle().apply {
+                    putBoolean("ack", true)
+                }
+            }
+            "isHookActive" -> {
+                Bundle().apply {
+                    putBoolean("is_active", HookStateBridge.isSystemHookAlive() || XposedStatusHelper.isModuleActive())
+                }
+            }
+            "ping" -> {
+                Bundle().apply {
+                    putBoolean("available", true)
+                    putString("version", com.mockrun.app.BuildConfig.VERSION_NAME)
+                }
+            }
+            else -> null
+        }
+    }
+
+    override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null
+    override fun getType(uri: Uri): String? = null
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = 0
+}

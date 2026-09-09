@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Fake GPS</string>
+    <string name="tab_map">地图</string>
+    <string name="tab_control">控制</string>
+    <string name="tab_library">路线库</string>
+    <string name="notification_channel_name">模拟定位运行</string>
+    <string name="go_to_developer_settings">前往开发者选项</string>
+    <string name="no_route_selected">未选择路线</string>
+    <string name="save_route">保存路线</string>
+    <string name="route_name_hint">路线名称（例如：奥森5公里）</string>
+    <string name="import_gpx">导入 GPX</string>
+    <string name="clear_route">清除路线</string>
+</resources>
