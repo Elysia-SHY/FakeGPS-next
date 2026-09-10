@@ -7,21 +7,26 @@ import android.os.Build
 import android.os.Process
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.location.CadenceMode
 import com.mockrun.app.location.MockLocationService
+import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.location.SensorMockData
 import com.mockrun.app.location.SensorMockEngine
 import com.mockrun.app.location.SimulationStateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SimulationViewModel @Inject constructor(
     private val stateRepo: SimulationStateRepository,
-    val sensorEngine: SensorMockEngine
+    val sensorEngine: SensorMockEngine,
+    val rootBridge: RootSuBridge
 ) : ViewModel() {
 
     val state: StateFlow<SimulationState> = stateRepo.state
@@ -91,6 +96,12 @@ class SimulationViewModel @Inject constructor(
         stateRepo.setPointMock(false)
         com.mockrun.app.hook.HookStateBridge.update(context, false)
         com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
+        com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
+        viewModelScope.launch(Dispatchers.IO) {
+            if (rootBridge.isRootAvailable()) {
+                rootBridge.restoreScanningHardware()
+            }
+        }
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_STOP_POINT_MOCK
         }
@@ -137,6 +148,12 @@ class SimulationViewModel @Inject constructor(
     fun stopSimulation(context: Context) {
         com.mockrun.app.hook.HookStateBridge.update(context, false)
         com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
+        com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
+        viewModelScope.launch(Dispatchers.IO) {
+            if (rootBridge.isRootAvailable()) {
+                rootBridge.restoreScanningHardware()
+            }
+        }
         sendCommand(context, MockLocationService.ACTION_STOP)
     }
 

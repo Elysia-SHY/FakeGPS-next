@@ -523,7 +523,7 @@ fun LocationMockScreen(
             // Item 2: Root
             IosListRow(
                 title = "Root 权限状态",
-                subtitle = if (isRootAvailable) "底层打通 · 硬件探针已压制" else "免 Root 模式",
+                subtitle = if (isRootAvailable) "底层打通 · 硬件高精度模式" else "免 Root 模式",
                 icon = Icons.Default.CheckCircle,
                 iconBackground = if (isRootAvailable) IosColors.SystemGreen else IosColors.SystemOrange,
                 trailingText = if (isRootAvailable) "已授权底层打通" else "未检测到",
@@ -531,9 +531,9 @@ fun LocationMockScreen(
                 onClick = {
                     if (isRootAvailable) {
                         coroutineScope.launch {
-                            rootBridge.disableScanningHardware()
+                            rootBridge.restoreScanningHardware()
                             rootBridge.grantMockLocation(context.packageName)
-                            Toast.makeText(context, "⚡ 已优化硬件探针与底层模拟权限", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "⚡ 已打通底层模拟权限并确保高精度扫描开启", Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         Toast.makeText(context, "免 Root 模式下可通过系统设置优化", Toast.LENGTH_SHORT).show()
@@ -638,8 +638,8 @@ fun LocationMockScreen(
         // Root One-Click Anti-Flashback Optimization
         IosInsetGroupCard {
             IosListRow(
-                title = "一键免闪回优化 (关闭 Wi-Fi 硬件探针)",
-                subtitle = if (isRootAvailable) "掐死 Wi-Fi/蓝牙位置扫描探针并注入模拟权限" else "免 Root 模式：可在系统设置中关闭 Wi-Fi 扫描",
+                title = "一键高精度恢复与权限打通",
+                subtitle = if (isRootAvailable) "注入底层模拟权限并确保系统高精度 Wi-Fi/蓝牙扫描畅通" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",
                 icon = Icons.Default.Build,
                 iconBackground = if (isRootAvailable) IosColors.SystemGreen else IosColors.SystemBlue,
                 trailingText = if (isRootAvailable) "立即优化" else "使用指南",
@@ -647,9 +647,9 @@ fun LocationMockScreen(
                 onClick = {
                     if (isRootAvailable) {
                         coroutineScope.launch {
-                            rootBridge.disableScanningHardware()
+                            rootBridge.restoreScanningHardware()
                             rootBridge.grantMockLocation(context.packageName)
-                            Toast.makeText(context, "⚡ 已掐死硬件探针并注入模拟权限", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "⚡ 已打通底层模拟权限并恢复高精度模式", Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         Toast.makeText(context, "免 Root 模式下可通过系统设置优化", Toast.LENGTH_SHORT).show()
@@ -827,7 +827,7 @@ fun LocationMockScreen(
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "① 打开 LSPosed 管理器，在 FakeGPS 模块的作用域中务必勾选【微信 (com.tencent.mm)】与【系统框架】；\n" +
-                                "② 点击下方一键通过 Root 禁用底层硬件扫描：",
+                                "② 如停止模拟后未立刻复原真机定位，可一键恢复高精度扫描：",
                                 style = IosTypography.Callout,
                                 color = IosColors.SecondaryLabel
                             )
@@ -835,9 +835,10 @@ fun LocationMockScreen(
                             Button(
                                 onClick = {
                                     coroutineScope.launch {
-                                        val ok = rootBridge.disableScanningHardware()
+                                        val ok = rootBridge.restoreScanningHardware()
                                         if (ok) {
-                                            Toast.makeText(context, "已通过 Root 禁用硬件扫描探针", Toast.LENGTH_SHORT).show()
+                                            CoordinateConverter.flushRealLocation(context)
+                                            Toast.makeText(context, "已恢复高精度扫描并刷新真实物理位置", Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, "Root 命令执行未完成", Toast.LENGTH_SHORT).show()
                                         }
@@ -847,7 +848,7 @@ fun LocationMockScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("🛡️ ROOT 一键关闭硬件扫描", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
+                                Text("🛡️ ROOT 一键恢复高精度与硬件扫描", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

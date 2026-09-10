@@ -103,7 +103,7 @@ object HookStateBridge {
                     android.provider.Settings.Global.putString(
                         ctx.contentResolver,
                         "fake_gps_config",
-                        """{"isActive":false,"latitude":0.0,"longitude":0.0,"time":$updateTimestamp}"""
+                        """{"isActive":false,"latitude":$lat,"longitude":$lon,"time":$updateTimestamp}"""
                     )
                 }
             }
@@ -161,7 +161,11 @@ object HookStateBridge {
                                 append("rm -f /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("rm -f /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings delete global fake_gps_config 2>/dev/null; ")
-                                append("settings put global fake_gps_config '{\"isActive\":false}' 2>/dev/null")
+                                append("settings put global fake_gps_config '{\"isActive\":false,\"latitude\":$lat,\"longitude\":$lon}' 2>/dev/null; ")
+                                append("settings put secure location_mode 3 2>/dev/null; ")
+                                append("settings put global wifi_scan_always_enabled 1 2>/dev/null; ")
+                                append("settings put global ble_scan_always_enabled 1 2>/dev/null; ")
+                                append("settings put global assisted_gps_enabled 1 2>/dev/null")
                             }
                         }
                         var process: Process? = null

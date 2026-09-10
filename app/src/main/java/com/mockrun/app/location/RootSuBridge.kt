@@ -55,7 +55,12 @@ class RootSuBridge @Inject constructor() {
         return executeCommand("appops set $packageName android:mock_location allow")
     }
 
+    suspend fun restoreScanningHardware(): Boolean {
+        return executeCommand("settings put secure location_mode 3 && settings put global wifi_scan_always_enabled 1 && settings put global ble_scan_always_enabled 1 && settings put global assisted_gps_enabled 1")
+    }
+
+    @Deprecated("Disabling scanning permanently breaks indoor positioning. Use restoreScanningHardware instead.")
     suspend fun disableScanningHardware(): Boolean {
-        return executeCommand("settings put secure location_mode 1 && settings put global wifi_scan_always_enabled 0 && settings put global ble_scan_always_enabled 0 && settings put global assisted_gps_enabled 0")
+        return restoreScanningHardware()
     }
 }

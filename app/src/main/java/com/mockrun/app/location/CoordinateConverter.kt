@@ -145,6 +145,47 @@ object CoordinateConverter {
     }
 
     /**
+     * Actively flushes and wakes up system hardware location providers (Wi-Fi, Cell, GPS)
+     * immediately upon stopping mock location. This resets system_server's mLastLocation cache.
+     */
+    fun flushRealLocation(context: android.content.Context) {
+        val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return
+        val providers = listOf(
+            android.location.LocationManager.NETWORK_PROVIDER,
+            android.location.LocationManager.GPS_PROVIDER,
+            android.location.LocationManager.PASSIVE_PROVIDER
+        )
+        for (provider in providers) {
+            if (!lm.isProviderEnabled(provider)) continue
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
+                        if (loc != null && !isMockLocation(loc)) {
+                            saveRealLocation(context, loc.latitude, loc.longitude)
+                        }
+                    }
+                } else {
+                    val listener = object : android.location.LocationListener {
+                        override fun onLocationChanged(loc: android.location.Location) {
+                            if (!isMockLocation(loc)) {
+                                saveRealLocation(context, loc.latitude, loc.longitude)
+                            }
+                            runCatching { lm.removeUpdates(this) }
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
+                        override fun onProviderEnabled(p: String) {}
+                        override fun onProviderDisabled(p: String) {}
+                    }
+                    lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
+                }
+            } catch (_: SecurityException) {
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /**
      * Actively requests the freshest physical hardware location from system GPS or network providers.
      * Strictly filters out mock locations and invokes callback with (lat, lon).
      */
@@ -156,49 +197,46 @@ object CoordinateConverter {
             onLocation(lat, lon)
         }
 
-        // 2. Request single active hardware GPS fix for highest accuracy
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                val provider = if (lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
-                    android.location.LocationManager.GPS_PROVIDER
-                } else {
-                    android.location.LocationManager.NETWORK_PROVIDER
-                }
-                lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
-                    if (loc != null && !isMockLocation(loc)) {
-                        if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
-                            saveRealLocation(context, loc.latitude, loc.longitude)
-                        }
-                        onLocation(loc.latitude, loc.longitude)
-                    }
-                }
-            } else {
-                val provider = if (lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
-                    android.location.LocationManager.GPS_PROVIDER
-                } else {
-                    android.location.LocationManager.NETWORK_PROVIDER
-                }
-                val listener = object : android.location.LocationListener {
-                    override fun onLocationChanged(loc: android.location.Location) {
-                        if (!isMockLocation(loc)) {
+        // 2. Query both Network (fast indoor Wi-Fi/Cell fix) and GPS
+        val providers = listOf(
+            android.location.LocationManager.NETWORK_PROVIDER,
+            android.location.LocationManager.GPS_PROVIDER
+        )
+        for (provider in providers) {
+            if (!lm.isProviderEnabled(provider)) continue
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
+                        if (loc != null && !isMockLocation(loc)) {
                             if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
                                 saveRealLocation(context, loc.latitude, loc.longitude)
                             }
                             onLocation(loc.latitude, loc.longitude)
                         }
-                        runCatching { lm.removeUpdates(this) }
                     }
-                    @Deprecated("Deprecated in Java")
-                    override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
-                    override fun onProviderEnabled(p: String) {}
-                    override fun onProviderDisabled(p: String) {}
+                } else {
+                    val listener = object : android.location.LocationListener {
+                        override fun onLocationChanged(loc: android.location.Location) {
+                            if (!isMockLocation(loc)) {
+                                if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
+                                    saveRealLocation(context, loc.latitude, loc.longitude)
+                                }
+                                onLocation(loc.latitude, loc.longitude)
+                            }
+                            runCatching { lm.removeUpdates(this) }
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
+                        override fun onProviderEnabled(p: String) {}
+                        override fun onProviderDisabled(p: String) {}
+                    }
+                    lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
                 }
-                lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
+            } catch (_: SecurityException) {
+                // Missing location permission
+            } catch (_: Throwable) {
+                // Sensor unavailable
             }
-        } catch (_: SecurityException) {
-            // Missing location permission
-        } catch (_: Throwable) {
-            // Sensor unavailable
         }
     }
 }

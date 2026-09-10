@@ -235,6 +235,7 @@ class MockLocationService : Service() {
         stateRepo.setPointMock(false)
         stateRepo.onStopped()
         com.mockrun.app.hook.HookStateBridge.update(this, false)
+        CoordinateConverter.flushRealLocation(this)
     }
 
     // ---- Simulation Control ----
@@ -297,6 +298,7 @@ class MockLocationService : Service() {
         }
         stateRepo.onStopped()
         com.mockrun.app.hook.HookStateBridge.update(this, false)
+        CoordinateConverter.flushRealLocation(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -393,6 +395,7 @@ class MockLocationService : Service() {
         savePointMockState(active = false)
         stateRepo.setPointMock(false)
         com.mockrun.app.hook.HookStateBridge.update(this, false)
+        CoordinateConverter.flushRealLocation(this)
         if (!stateRepo.isJoystickActive.value) {
             mockEngine.unregister()
             MockLocationEngine.forceCleanAllTestProviders(this)

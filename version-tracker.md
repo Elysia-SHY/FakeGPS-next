@@ -1,15 +1,32 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`1.2.0`  
-> **Android 内部版本**：`versionCode = 3`  
-> **Android 显示版本**：`versionName = "v1.2.0"`  
+> **当前真实基准版本**：`1.2.1`  
+> **Android 内部版本**：`versionCode = 4`  
+> **Android 显示版本**：`versionName = "v1.2.1"`  
 > **交付存放目录**：`d:\Desktop\fake gps\`  
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.2.0-LATEST.apk`  
-> **构建时间**：2026-09-10 17:05  
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.2.1-LATEST.apk`  
+> **构建时间**：2026-09-10 17:55  
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.2.1] - 2026-09-10
+- **构建状态**：根除退出后定位残留、解决篡改系统扫描配置导致室内无法定位等问题 (`outputs/app-debug.apk`)。
+- **Android 配置**：`versionCode = 4`, `versionName = "v1.2.1"`
+- **核心修复与特性**：
+  1. **根治系统级硬件扫描设置被篡改与室内定位瘫痪问题**：
+     - 彻底废除 `disableScanningHardware()`（原命令强设 `location_mode 1` 并关死 `wifi_scan_always_enabled`，导致室内无 GPS 信号且被剥夺基站/Wi-Fi 定位能力）；
+     - 实现 `restoreScanningHardware()`，在停止模拟、服务销毁以及 App 启动时，主动执行 `settings put secure location_mode 3` 并重开 Wi-Fi/BLE 扫描，自愈修复任何历史受影响的系统环境；
+     - 遵循成熟开源项目准则：Wi-Fi 与基站探针屏蔽完全交由 Xposed 在内存级动态拦截，严禁修改 Android 全局系统设置。
+  2. **Android 12~15 `LocationResult` 深度解包与系统级假坐标清洗**：
+     - 新增 `extractLocationFromResult`，兼容系统高版本 `LocationResult` 与经典 `Location` 类型；
+     - 当 Hook 处于非激活状态时，比对提取出的经纬度与停止前模拟的虚假坐标，若吻合直接将系统 `mLastLocation` 判定结果置为 `null`，强迫系统与微信、高德等客户端即刻重新调用底层硬件。
+  3. **主动硬件网络与物理定位冲刷 (`flushRealLocation`)**：
+     - 停止虚拟定位时，同时向 `NETWORK_PROVIDER` 与 `GPS_PROVIDER` 发起即时单次定位请求；
+     - 室内仅需 200~300ms 即可借助周围 Wi-Fi 路由器拿到真实物理位置，瞬间更新系统全局定位缓存。
+  4. **全链路 UI 纠偏与操作优化**：
+     - 主界面与微信向导弹窗全面更正为「🛡️ 一键恢复高精度与硬件扫描」，避免用户误操作关闭硬件探针。
 
 ### [1.2.0] - 2026-09-10
 - **构建状态**：彻底解决开启定位主界面卡死停滞、关闭定位残留虚假坐标必须重启手机方可复原等问题 (`outputs/app-debug.apk`)。
