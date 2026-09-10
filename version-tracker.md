@@ -1,15 +1,31 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`1.1.0`  
-> **Android 内部版本**：`versionCode = 2`  
-> **Android 显示版本**：`versionName = "v1.1.0"`  
+> **当前真实基准版本**：`1.2.0`  
+> **Android 内部版本**：`versionCode = 3`  
+> **Android 显示版本**：`versionName = "v1.2.0"`  
 > **交付存放目录**：`d:\Desktop\fake gps\`  
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.1.0-LATEST.apk`  
-> **构建时间**：2026-09-09 20:25  
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.2.0-LATEST.apk`  
+> **构建时间**：2026-09-10 17:05  
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.2.0] - 2026-09-10
+- **构建状态**：彻底解决开启定位主界面卡死停滞、关闭定位残留虚假坐标必须重启手机方可复原等问题 (`outputs/app-debug.apk`)。
+- **Android 配置**：`versionCode = 3`, `versionName = "v1.2.0"`
+- **核心修复与特性**：
+  1. **彻底解决开启定位主界面卡顿/停滞问题**：
+     - 将 `HookStateBridge` 中的 Root 命令执行（`Runtime.exec("su")`）及跨进程文件写入全面移入 `Dispatchers.IO` 后台异步线程，杜绝主线程与 root 守护进程建立 IPC 握手时阻塞造成的 UI 假死与 ANR 风险；
+     - 移除 `startPointMock` 中每次开启无条件触发的系统电池优化弹窗打断，按钮点击即时反馈。
+  2. **引入 20 秒心跳超时 (TTL) 机制，杜绝异常残留**：
+     - 在 SystemProperties (`debug.fakegps.time`)、`/data/system/fake_gps_hook.json`、`Settings.Global` 及 `XSharedPreferences` 中引入时间戳检测；
+     - 若 App 崩溃、被清理杀后台或服务停止且超过 20 秒无心跳，系统级 Hook 自动失效归位并直接返回系统真实定位，彻底告别“不重启就无法恢复正常 GPS”的痛点。
+  3. **主动净化系统级 mLastLocation 假坐标污染**：
+     - 当检测到模拟停止时，若系统框架 `LocationProviderManager` 或 `LocationManagerService` 的 `getLastLocation` 依然返回此前注入的虚假坐标，Hook 主动将其置空 (`param.result = null`)，强制系统与所有 App 重新向物理硬件传感器申请真实位置。
+  4. **强力注销 Android Mock Test Provider 与真机缓存保护**：
+     - 新增 `MockLocationEngine.forceCleanAllTestProviders` 静态清理方法，直接移除 `gps`、`network`、`passive`、`fused` 等所有测试 Provider，绝不在移除前调用可能残留禁用标记的 `setTestProviderEnabled(false)`；
+     - 新增 `CoordinateConverter.clearSavedRealLocation`，并在 `saveRealLocation` 中增加 `HookStateBridge.isHookActive` 守卫，杜绝开启模拟时将虚假坐标误保存为真机物理位置的情况。
 
 ### [1.1.0] - 2026-09-09
 - **构建状态**：全功能模块暗黑模式（深色模式）彻底适配，高德地图夜间色阶矩阵滤镜重构，Apple HIG 动态色彩系统全面升级 (`outputs/app-debug.apk`)。

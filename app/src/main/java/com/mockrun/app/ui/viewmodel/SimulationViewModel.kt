@@ -65,9 +65,6 @@ class SimulationViewModel @Inject constructor(
             }
             return false
         }
-        if (!com.mockrun.app.location.KeepAliveHelper.isBatteryOptimized(context)) {
-            com.mockrun.app.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
-        }
         stateRepo.setPointMock(true, com.mockrun.app.domain.model.WayPoint(latitude, longitude))
         stateRepo.updateJoystickLocation(latitude, longitude)
         com.mockrun.app.hook.HookStateBridge.update(context, true, latitude, longitude)
@@ -93,6 +90,7 @@ class SimulationViewModel @Inject constructor(
     fun stopPointMock(context: Context) {
         stateRepo.setPointMock(false)
         com.mockrun.app.hook.HookStateBridge.update(context, false)
+        com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_STOP_POINT_MOCK
         }
@@ -119,9 +117,6 @@ class SimulationViewModel @Inject constructor(
             }
             return false
         }
-        if (!com.mockrun.app.location.KeepAliveHelper.isBatteryOptimized(context)) {
-            com.mockrun.app.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
-        }
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_START
             putExtra(MockLocationService.EXTRA_ROUTE, route)
@@ -140,6 +135,8 @@ class SimulationViewModel @Inject constructor(
     }
 
     fun stopSimulation(context: Context) {
+        com.mockrun.app.hook.HookStateBridge.update(context, false)
+        com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
         sendCommand(context, MockLocationService.ACTION_STOP)
     }
 

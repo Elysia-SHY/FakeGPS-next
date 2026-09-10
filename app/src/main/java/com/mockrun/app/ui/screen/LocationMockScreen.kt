@@ -361,12 +361,8 @@ fun LocationMockScreen(
                         simulationViewModel.stopPointMock(context)
                     }
                     simulationViewModel.stopSimulation(context)
-                    runCatching {
-                        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused").forEach { p ->
-                            runCatching { lm?.removeTestProvider(p) }
-                        }
-                    }
+                    CoordinateConverter.clearSavedRealLocation(context)
+                    com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
                     CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
                         realLocationCoord = freshLat to freshLon
                         simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)

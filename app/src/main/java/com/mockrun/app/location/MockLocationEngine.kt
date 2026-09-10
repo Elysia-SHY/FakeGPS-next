@@ -24,6 +24,22 @@ class MockLocationEngine(private val context: Context) {
         private const val POWER_LOW = 1
         private const val ACCURACY_FINE = 1
         private const val ACCURACY_COARSE = 2
+
+        fun forceCleanAllTestProviders(context: Context) {
+            val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER,
+                "fused"
+            )
+            val fusedS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                listOf(LocationManager.FUSED_PROVIDER)
+            } else emptyList()
+            (providers + fusedS).distinct().forEach { p ->
+                runCatching { lm.removeTestProvider(p) }
+            }
+        }
     }
 
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -143,10 +159,9 @@ class MockLocationEngine(private val context: Context) {
 
     @Synchronized
     fun unregister() {
-        val allToClean = activeProviders.toSet() + candidateProviders + setOf("fused")
+        val allToClean = (activeProviders.toSet() + candidateProviders + setOf("fused", LocationManager.PASSIVE_PROVIDER)).distinct()
         for (p in allToClean) {
             runCatching {
-                locationManager.setTestProviderEnabled(p, false)
                 locationManager.removeTestProvider(p)
             }
         }

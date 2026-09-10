@@ -1040,12 +1040,8 @@ fun MapScreen(
                         .bouncyClickable {
                             if (isPointMockActive) simulationViewModel.stopPointMock(context)
                             if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
-                            runCatching {
-                                val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                                listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused").forEach { p ->
-                                    runCatching { lm.removeTestProvider(p) }
-                                }
-                            }
+                            CoordinateConverter.clearSavedRealLocation(context)
+                            com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
                             CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
                                 userRealLocation = freshLat to freshLon
                                 simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
@@ -1119,12 +1115,8 @@ fun MapScreen(
                     onResetRealLocation = {
                         if (isPointMockActive) simulationViewModel.stopPointMock(context)
                         if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
-                        runCatching {
-                            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused").forEach { p ->
-                                runCatching { lm.removeTestProvider(p) }
-                            }
-                        }
+                        CoordinateConverter.clearSavedRealLocation(context)
+                        com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
                         CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
                             userRealLocation = freshLat to freshLon
                             simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)

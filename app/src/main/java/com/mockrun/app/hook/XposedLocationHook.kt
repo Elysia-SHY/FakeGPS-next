@@ -21,7 +21,8 @@ data class SpoofLocation(
     val longitude: Double,
     val altitude: Double,
     val bearing: Float,
-    val speed: Float
+    val speed: Float,
+    val timestamp: Long = 0L
 )
 
 class XposedLocationHook : IXposedHookLoadPackage {
@@ -30,6 +31,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private var appContext: Context? = null
     private var cachedLocation: SpoofLocation? = null
     private var lastCacheCheckTime: Long = 0L
+    private var lastSpoofedLocation: Location? = null
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName ?: return
@@ -183,25 +185,37 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lpmClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (!spoof.isActive) return
+                        val spoof = getActiveLocation()
+                        if (spoof != null && spoof.isActive) {
+                            val providerName = runCatching {
+                                XposedHelpers.callMethod(param.thisObject, "getName") as? String
+                            }.getOrNull() ?: LocationManager.GPS_PROVIDER
 
-                        val providerName = runCatching {
-                            XposedHelpers.callMethod(param.thisObject, "getName") as? String
-                        }.getOrNull() ?: LocationManager.GPS_PROVIDER
+                            val spoofedLoc = createSpoofedLocation(providerName, spoof)
+                            val method = param.method as? java.lang.reflect.Method
+                            val returnType = method?.returnType
 
-                        val spoofedLoc = createSpoofedLocation(providerName, spoof)
-                        val method = param.method as? java.lang.reflect.Method
-                        val returnType = method?.returnType
-
-                        if (returnType != null && returnType.name.contains("LocationResult")) {
-                            val res = createLocationResult(returnType, spoofedLoc)
-                            if (res != null) {
-                                param.result = res
-                                return
+                            if (returnType != null && returnType.name.contains("LocationResult")) {
+                                val res = createLocationResult(returnType, spoofedLoc)
+                                if (res != null) {
+                                    param.result = res
+                                    return
+                                }
+                            }
+                            param.result = spoofedLoc
+                        } else {
+                            // Spoof is inactive: purge stale fake coordinates from system_server's mLastLocation cache
+                            val last = lastSpoofedLocation
+                            if (last != null) {
+                                val res = param.result
+                                if (res is Location) {
+                                    if (Math.abs(res.latitude - last.latitude) < 0.00001 &&
+                                        Math.abs(res.longitude - last.longitude) < 0.00001) {
+                                        param.result = null
+                                    }
+                                }
                             }
                         }
-                        param.result = spoofedLoc
                     }
                 })
             }
@@ -244,12 +258,23 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmsClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (!spoof.isActive) return
-                        if (isCallingPackageSelf(param)) return
-
-                        val provider = param.args.firstOrNull { it is String } as? String ?: LocationManager.GPS_PROVIDER
-                        param.result = createSpoofedLocation(provider, spoof)
+                        val spoof = getActiveLocation()
+                        if (spoof != null && spoof.isActive) {
+                            if (isCallingPackageSelf(param)) return
+                            val provider = param.args.firstOrNull { it is String } as? String ?: LocationManager.GPS_PROVIDER
+                            param.result = createSpoofedLocation(provider, spoof)
+                        } else {
+                            val last = lastSpoofedLocation
+                            if (last != null) {
+                                val res = param.result
+                                if (res is Location) {
+                                    if (Math.abs(res.latitude - last.latitude) < 0.00001 &&
+                                        Math.abs(res.longitude - last.longitude) < 0.00001) {
+                                        param.result = null
+                                    }
+                                }
+                            }
+                        }
                     }
                 })
             }
@@ -518,10 +543,21 @@ class XposedLocationHook : IXposedHookLoadPackage {
         runCatching {
             XposedBridge.hookAllMethods(lmClass, "getLastKnownLocation", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
-                    val spoof = getActiveLocation() ?: return
-                    if (spoof.isActive) {
+                    val spoof = getActiveLocation()
+                    if (spoof != null && spoof.isActive) {
                         val provider = param.args.firstOrNull { it is String } as? String ?: LocationManager.GPS_PROVIDER
                         param.result = createSpoofedLocation(provider, spoof)
+                    } else {
+                        val last = lastSpoofedLocation
+                        if (last != null) {
+                            val res = param.result
+                            if (res is Location) {
+                                if (Math.abs(res.latitude - last.latitude) < 0.00001 &&
+                                    Math.abs(res.longitude - last.longitude) < 0.00001) {
+                                    param.result = null
+                                }
+                            }
+                        }
                     }
                 }
             })
@@ -532,9 +568,20 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (spoof.isActive) {
+                        val spoof = getActiveLocation()
+                        if (spoof != null && spoof.isActive) {
                             param.result = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
+                        } else {
+                            val last = lastSpoofedLocation
+                            if (last != null) {
+                                val res = param.result
+                                if (res is Location) {
+                                    if (Math.abs(res.latitude - last.latitude) < 0.00001 &&
+                                        Math.abs(res.longitude - last.longitude) < 0.00001) {
+                                        param.result = null
+                                    }
+                                }
+                            }
                         }
                     }
                 })
@@ -975,9 +1022,13 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private fun parseJsonLocation(text: String): SpoofLocation? {
         if (text.isEmpty()) return null
         if (text.contains("\"isActive\":false") || text.contains("\"active\":false")) {
-            return SpoofLocation(false, 0.0, 0.0, 0.0, 0f, 0f)
+            return SpoofLocation(false, 0.0, 0.0, 0.0, 0f, 0f, 0L)
         }
         if (text.contains("\"isActive\":true") || text.contains("\"active\":true")) {
+            val time = (text.substringAfter("\"time\":", "").substringBefore(",")
+                .ifEmpty { text.substringAfter("\"timestamp\":", "").substringBefore(",") }
+                .ifEmpty { text.substringAfter("\"time\":", "").substringBefore("}") }
+                .ifEmpty { text.substringAfter("\"timestamp\":", "").substringBefore("}") }).toLongOrNull() ?: 0L
             val lat = (text.substringAfter("\"latitude\":", "").substringBefore(",")
                 .ifEmpty { text.substringAfter("\"lat\":", "").substringBefore(",") }).toDoubleOrNull() ?: 0.0
             val lon = (text.substringAfter("\"longitude\":", "").substringBefore(",")
@@ -989,7 +1040,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
             val spd = (text.substringAfter("\"speed\":", "").substringBefore(",")
                 .ifEmpty { text.substringAfter("\"spd\":", "").substringBefore(",") }).toFloatOrNull() ?: 0f
             if (lat != 0.0 || lon != 0.0) {
-                return SpoofLocation(true, lat, lon, alt, bear, spd)
+                return SpoofLocation(true, lat, lon, alt, bear, spd, time)
             }
         }
         return null
@@ -997,8 +1048,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     private fun getActiveLocation(): SpoofLocation? {
         val now = SystemClock.elapsedRealtime()
+        val nowMs = System.currentTimeMillis()
         if (now - lastCacheCheckTime < 60 && cachedLocation != null) {
-            return cachedLocation
+            val c = cachedLocation!!
+            if (c.timestamp == 0L || (nowMs - c.timestamp <= 20_000L)) {
+                return c
+            } else {
+                cachedLocation = null
+                return null
+            }
         }
         lastCacheCheckTime = now
 
@@ -1006,13 +1064,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
         runCatching {
             val activeStr = getSystemProperty("debug.fakegps.active")
             if (activeStr == "1" || activeStr.equals("true", ignoreCase = true)) {
+                val time = getSystemProperty("debug.fakegps.time").toLongOrNull() ?: 0L
+                if (time > 0L && (nowMs - time > 20_000L)) {
+                    cachedLocation = null
+                    return null
+                }
                 val lat = getSystemProperty("debug.fakegps.lat").toDoubleOrNull() ?: 0.0
                 val lon = getSystemProperty("debug.fakegps.lon").toDoubleOrNull() ?: 0.0
                 val alt = getSystemProperty("debug.fakegps.alt").toDoubleOrNull() ?: 50.0
                 val bear = getSystemProperty("debug.fakegps.bearing").toFloatOrNull() ?: 0f
                 val spd = getSystemProperty("debug.fakegps.speed").toFloatOrNull() ?: 0f
                 if (lat != 0.0 || lon != 0.0) {
-                    val loc = SpoofLocation(true, lat, lon, alt, bear, spd)
+                    val loc = SpoofLocation(true, lat, lon, alt, bear, spd, time)
                     cachedLocation = loc
                     return loc
                 }
@@ -1029,8 +1092,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 val text = file.readText()
                 val loc = parseJsonLocation(text)
                 if (loc != null) {
-                    cachedLocation = if (loc.isActive) loc else null
-                    return cachedLocation
+                    if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
+                        cachedLocation = null
+                        return null
+                    }
+                    cachedLocation = loc
+                    return loc
                 }
             }
         }
@@ -1042,8 +1109,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 val text = file.readText()
                 val loc = parseJsonLocation(text)
                 if (loc != null) {
-                    cachedLocation = if (loc.isActive) loc else null
-                    return cachedLocation
+                    if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
+                        cachedLocation = null
+                        return null
+                    }
+                    cachedLocation = loc
+                    return loc
                 }
             }
         }
@@ -1056,8 +1127,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 if (!configStr.isNullOrEmpty()) {
                     val loc = parseJsonLocation(configStr)
                     if (loc != null) {
-                        cachedLocation = if (loc.isActive) loc else null
-                        return cachedLocation
+                        if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
+                            cachedLocation = null
+                            return null
+                        }
+                        cachedLocation = loc
+                        return loc
                     }
                 }
             }
@@ -1068,13 +1143,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 sp.reload()
                 val isActive = sp.getBoolean("is_active", false)
+                val time = sp.getLong("timestamp", 0L)
                 if (isActive) {
+                    if (time > 0L && (nowMs - time > 20_000L)) {
+                        cachedLocation = null
+                        return null
+                    }
                     val lat = sp.getString("latitude", "0")?.toDoubleOrNull() ?: 0.0
                     val lon = sp.getString("longitude", "0")?.toDoubleOrNull() ?: 0.0
                     val bear = sp.getFloat("bearing", 0f)
                     val spd = sp.getFloat("speed", 0f)
                     if (lat != 0.0 || lon != 0.0) {
-                        val loc = SpoofLocation(true, lat, lon, 50.0, bear, spd)
+                        val loc = SpoofLocation(true, lat, lon, 50.0, bear, spd, time)
                         cachedLocation = loc
                         return loc
                     }
@@ -1091,12 +1171,17 @@ class XposedLocationHook : IXposedHookLoadPackage {
             val uri = Uri.parse("content://com.mockrun.app.hook.provider")
             val bundle = ctx.contentResolver.call(uri, "getLocation", null, null)
             if (bundle != null && bundle.getBoolean("is_active", false)) {
+                val time = bundle.getLong("timestamp", 0L)
+                if (time > 0L && (nowMs - time > 20_000L)) {
+                    cachedLocation = null
+                    return null
+                }
                 val lat = bundle.getDouble("latitude")
                 val lon = bundle.getDouble("longitude")
                 val alt = bundle.getDouble("altitude", 50.0)
                 val bear = bundle.getFloat("bearing", 0f)
                 val spd = bundle.getFloat("speed", 0f)
-                val loc = SpoofLocation(true, lat, lon, alt, bear, spd)
+                val loc = SpoofLocation(true, lat, lon, alt, bear, spd, time)
                 cachedLocation = loc
                 return loc
             }
@@ -1136,6 +1221,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
             XposedHelpers.setBooleanField(loc, "mIsFromMockProvider", false)
         }
 
+        lastSpoofedLocation = loc
         return loc
     }
 }

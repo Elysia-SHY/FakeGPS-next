@@ -225,12 +225,16 @@ class MockLocationService : Service() {
         simulationJob?.cancel()
         pointMockJob?.cancel()
         serviceJob.cancel()
+        savePointMockState(active = false)
+        saveSimulationState(active = false)
         if (!stateRepo.isJoystickActive.value) {
             mockEngine.unregister()
+            MockLocationEngine.forceCleanAllTestProviders(this)
         }
         releaseWakeLock()
         stateRepo.setPointMock(false)
         stateRepo.onStopped()
+        com.mockrun.app.hook.HookStateBridge.update(this, false)
     }
 
     // ---- Simulation Control ----
@@ -289,6 +293,7 @@ class MockLocationService : Service() {
         saveSimulationState(active = false)
         if (!stateRepo.isJoystickActive.value) {
             mockEngine.unregister()
+            MockLocationEngine.forceCleanAllTestProviders(this)
         }
         stateRepo.onStopped()
         com.mockrun.app.hook.HookStateBridge.update(this, false)
@@ -350,9 +355,11 @@ class MockLocationService : Service() {
                     // Natural micro-jitter (±0.2m) to mimic authentic GPS drift and bypass anti-cheat
                     val jitterLat = (kotlin.random.Random.nextDouble(-1.0, 1.0) * 0.000002)
                     val jitterLon = (kotlin.random.Random.nextDouble(-1.0, 1.0) * 0.000002)
+                    val currentLat = lat + jitterLat
+                    val currentLon = lon + jitterLon
                     mockEngine.inject(
-                        latitude = lat + jitterLat,
-                        longitude = lon + jitterLon,
+                        latitude = currentLat,
+                        longitude = currentLon,
                         altitude = 25.0,
                         speedMps = 0f,
                         bearingDeg = 0f,
@@ -360,11 +367,23 @@ class MockLocationService : Service() {
                     )
 
                     tick++
+                    if (tick % 2 == 0) {
+                        // Keep hook heartbeat alive across processes
+                        com.mockrun.app.hook.HookStateBridge.update(
+                            this@MockLocationService,
+                            true,
+                            currentLat,
+                            currentLon,
+                            25.0,
+                            0f,
+                            0f
+                        )
+                    }
                     if (tick % 20 == 0) {
                         updateNotification("单点虚拟定位生效中: ${"%.4f".format(lat)}, ${"%.4f".format(lon)}")
                     }
                 }
-                delay(500) // 2Hz continuous injection (optimal balance between GPS accuracy and low power consumption)
+                delay(500) // 2Hz continuous injection
             }
         }
     }
@@ -376,6 +395,7 @@ class MockLocationService : Service() {
         com.mockrun.app.hook.HookStateBridge.update(this, false)
         if (!stateRepo.isJoystickActive.value) {
             mockEngine.unregister()
+            MockLocationEngine.forceCleanAllTestProviders(this)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

@@ -82,10 +82,18 @@ object CoordinateConverter {
 
     fun saveRealLocation(context: android.content.Context, lat: Double, lon: Double) {
         if (lat.isNaN() || lon.isNaN() || (lat == 0.0 && lon == 0.0)) return
+        if (com.mockrun.app.hook.HookStateBridge.isHookActive) return
         context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_REAL_LAT, lat.toString())
             .putString(KEY_REAL_LON, lon.toString())
+            .apply()
+    }
+
+    fun clearSavedRealLocation(context: android.content.Context) {
+        context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .clear()
             .apply()
     }
 
@@ -117,12 +125,20 @@ object CoordinateConverter {
             val loc = runCatching { lm.getLastKnownLocation(p) }.getOrNull() ?: continue
             // Strictly filter out mock/spoofed locations!
             if (isMockLocation(loc)) continue
+            // Guard: If HookStateBridge is active, reject coordinates matching the spoofed location
+            if (com.mockrun.app.hook.HookStateBridge.isHookActive) {
+                val dLat = Math.abs(loc.latitude - com.mockrun.app.hook.HookStateBridge.latitude)
+                val dLon = Math.abs(loc.longitude - com.mockrun.app.hook.HookStateBridge.longitude)
+                if (dLat < 0.0001 && dLon < 0.0001) continue
+            }
             if (best == null || loc.time > best.time) {
                 best = loc
             }
         }
         if (best != null) {
-            saveRealLocation(context, best.latitude, best.longitude)
+            if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
+                saveRealLocation(context, best.latitude, best.longitude)
+            }
             return best.latitude to best.longitude
         }
         return getSavedRealLocation(context)
@@ -150,7 +166,9 @@ object CoordinateConverter {
                 }
                 lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
                     if (loc != null && !isMockLocation(loc)) {
-                        saveRealLocation(context, loc.latitude, loc.longitude)
+                        if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
+                            saveRealLocation(context, loc.latitude, loc.longitude)
+                        }
                         onLocation(loc.latitude, loc.longitude)
                     }
                 }
@@ -163,7 +181,9 @@ object CoordinateConverter {
                 val listener = object : android.location.LocationListener {
                     override fun onLocationChanged(loc: android.location.Location) {
                         if (!isMockLocation(loc)) {
-                            saveRealLocation(context, loc.latitude, loc.longitude)
+                            if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
+                                saveRealLocation(context, loc.latitude, loc.longitude)
+                            }
                             onLocation(loc.latitude, loc.longitude)
                         }
                         runCatching { lm.removeUpdates(this) }
@@ -178,7 +198,7 @@ object CoordinateConverter {
         } catch (_: SecurityException) {
             // Missing location permission
         } catch (_: Throwable) {
-            // Hardware fallback
+            // Sensor unavailable
         }
     }
 }
