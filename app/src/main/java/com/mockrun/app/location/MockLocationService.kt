@@ -104,11 +104,13 @@ class MockLocationService : Service() {
 
         when (action) {
             ACTION_START -> {
-                val route = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getSerializableExtra(EXTRA_ROUTE, Route::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.getSerializableExtra(EXTRA_ROUTE) as? Route
+                val route = stateRepo.pendingRoute ?: run {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE, Route::class.java) }.getOrNull()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE) as? Route }.getOrNull()
+                    }
                 }
                 val speed = intent.getFloatExtra(EXTRA_SPEED, 8f)
                 if (route != null) {

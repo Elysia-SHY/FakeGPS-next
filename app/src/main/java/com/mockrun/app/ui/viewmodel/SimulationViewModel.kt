@@ -128,9 +128,12 @@ class SimulationViewModel @Inject constructor(
             }
             return false
         }
+        stateRepo.prepareRoute(route)
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_START
-            putExtra(MockLocationService.EXTRA_ROUTE, route)
+            if (route.waypoints.size <= 50) {
+                putExtra(MockLocationService.EXTRA_ROUTE, route)
+            }
             putExtra(MockLocationService.EXTRA_SPEED, speedKmh)
         }
         ContextCompat.startForegroundService(context, intent)

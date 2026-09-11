@@ -641,6 +641,7 @@ class FloatingJoystickService : Service() {
                 if (currentPower > 0.05f) {
                     stepMove(currentAngleDeg, currentPower)
                 } else {
+                    sensorEngine.updateTick(0f, 0.10f)
                     // Continuous 10Hz (100ms) injection even when stationary to prevent Android from reverting to physical location
                     injectCurrentLocation()
                 }
@@ -775,6 +776,7 @@ class FloatingJoystickService : Service() {
         serviceScope.cancel()
         stateRepo.setJoystickActive(false)
         com.mockrun.app.hook.HookStateBridge.update(this, false)
+        sensorEngine.updateTick(0f, 0f)
         releaseWakeLock()
         mockEngine.unregister()
         stopForeground(STOP_FOREGROUND_REMOVE)

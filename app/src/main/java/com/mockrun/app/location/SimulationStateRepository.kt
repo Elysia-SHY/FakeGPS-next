@@ -72,7 +72,16 @@ class SimulationStateRepository @Inject constructor() {
         }
     }
 
+    // Pending Route for IPC-free simulation startup
+    private var _pendingRoute: Route? = null
+    val pendingRoute: Route? get() = _pendingRoute
+
+    fun prepareRoute(route: Route) {
+        _pendingRoute = route
+    }
+
     fun onSimulationStarted(route: Route, speedKmh: Float) {
+        _pendingRoute = route
         _state.value = SimulationState(
             status = SimulationStatus.Running,
             route = route,
@@ -113,6 +122,7 @@ class SimulationStateRepository @Inject constructor() {
     }
 
     fun onStopped() {
+        _pendingRoute = null
         _state.value = SimulationState()   // full reset
     }
 

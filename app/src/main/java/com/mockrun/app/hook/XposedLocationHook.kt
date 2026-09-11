@@ -128,36 +128,33 @@ class XposedLocationHook : IXposedHookLoadPackage {
         return null
     }
 
+    @Volatile
+    private var cachedLocationResultMethod: java.lang.reflect.Method? = null
+    @Volatile
+    private var cachedLocationResultMethodChecked = false
+
     private fun createLocationResult(resultClass: Class<*>, location: Location): Any? {
-        // 1. Try wrap(Location...)
-        runCatching {
-            val wrapMethod = XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
-            if (wrapMethod != null) {
-                return wrapMethod.invoke(null, arrayOf(location))
-            }
+        if (!cachedLocationResultMethodChecked) {
+            cachedLocationResultMethod = runCatching {
+                XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
+                    ?: XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
+                    ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
+                    ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
+            }.getOrNull()
+            cachedLocationResultMethodChecked = true
         }
-        // 2. Try wrap(List)
-        runCatching {
-            val wrapMethod = XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
-            if (wrapMethod != null) {
-                return wrapMethod.invoke(null, listOf(location))
-            }
+
+        cachedLocationResultMethod?.let { method ->
+            return runCatching {
+                if (method.parameterTypes.firstOrNull() == List::class.java) {
+                    method.invoke(null, listOf(location))
+                } else {
+                    method.invoke(null, arrayOf(location))
+                }
+            }.getOrNull()
         }
-        // 3. Try create(List)
-        runCatching {
-            val createMethod = XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
-            if (createMethod != null) {
-                return createMethod.invoke(null, listOf(location))
-            }
-        }
-        // 4. Try create(Location...)
-        runCatching {
-            val createMethod = XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
-            if (createMethod != null) {
-                return createMethod.invoke(null, arrayOf(location))
-            }
-        }
-        // 5. Fallback via XposedHelpers
+
+        // Fallback for non-standard framework derivatives
         return runCatching {
             XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
         }.getOrElse {

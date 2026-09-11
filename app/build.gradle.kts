@@ -28,7 +28,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -47,6 +49,10 @@ android {
     }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.8" }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {

@@ -155,11 +155,16 @@ object CoordinateConverter {
             android.location.LocationManager.GPS_PROVIDER,
             android.location.LocationManager.PASSIVE_PROVIDER
         )
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
         for (provider in providers) {
             if (!lm.isProviderEnabled(provider)) continue
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
+                    val cancellationSignal = android.os.CancellationSignal()
+                    handler.postDelayed({
+                        runCatching { cancellationSignal.cancel() }
+                    }, 15_000L)
+                    lm.getCurrentLocation(provider, cancellationSignal, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
                         if (loc != null && !isMockLocation(loc)) {
                             saveRealLocation(context, loc.latitude, loc.longitude)
                         }
@@ -177,6 +182,9 @@ object CoordinateConverter {
                         override fun onProviderEnabled(p: String) {}
                         override fun onProviderDisabled(p: String) {}
                     }
+                    handler.postDelayed({
+                        runCatching { lm.removeUpdates(listener) }
+                    }, 15_000L)
                     lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
                 }
             } catch (_: SecurityException) {
@@ -202,11 +210,16 @@ object CoordinateConverter {
             android.location.LocationManager.NETWORK_PROVIDER,
             android.location.LocationManager.GPS_PROVIDER
         )
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
         for (provider in providers) {
             if (!lm.isProviderEnabled(provider)) continue
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    lm.getCurrentLocation(provider, null, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
+                    val cancellationSignal = android.os.CancellationSignal()
+                    handler.postDelayed({
+                        runCatching { cancellationSignal.cancel() }
+                    }, 15_000L)
+                    lm.getCurrentLocation(provider, cancellationSignal, androidx.core.content.ContextCompat.getMainExecutor(context)) { loc ->
                         if (loc != null && !isMockLocation(loc)) {
                             if (!com.mockrun.app.hook.HookStateBridge.isHookActive) {
                                 saveRealLocation(context, loc.latitude, loc.longitude)
@@ -230,6 +243,9 @@ object CoordinateConverter {
                         override fun onProviderEnabled(p: String) {}
                         override fun onProviderDisabled(p: String) {}
                     }
+                    handler.postDelayed({
+                        runCatching { lm.removeUpdates(listener) }
+                    }, 15_000L)
                     lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
                 }
             } catch (_: SecurityException) {

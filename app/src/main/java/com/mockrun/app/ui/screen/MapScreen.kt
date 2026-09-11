@@ -488,8 +488,6 @@ fun MapScreen(
         }
     }
     val continuousDrawRef = rememberUpdatedState(isContinuousDrawMode)
-    val isPointMockActiveRef = rememberUpdatedState(isPointMockActive)
-    val isJoystickRunningRef = rememberUpdatedState(isJoystickRunning)
 
     // Actively query hardware GPS on screen entrance
     LaunchedEffect(Unit) {
@@ -516,6 +514,21 @@ fun MapScreen(
             context.contentResolver.openInputStream(it)?.use { stream ->
                 mapViewModel.importGpx(stream, "导入GPX路线")
             }
+        }
+    }
+
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapViewRef?.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapViewRef?.onPause()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -732,6 +745,14 @@ fun MapScreen(
                     }
 
                     mapView.invalidate()
+                },
+                onRelease = { mapView ->
+                    updateCenterJob?.cancel()
+                    mapView.overlays.clear()
+                    mapView.onDetach()
+                    if (mapViewRef === mapView) {
+                        mapViewRef = null
+                    }
                 }
             )
 

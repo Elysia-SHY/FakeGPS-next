@@ -1,23 +1,23 @@
-﻿# 更新日志 (Changelog)
+# 更新日志 (Changelog)
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，版本命名采用 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
 ---
 
-## [1.2.1] - 2026-09-10
-
-### 重点突破 (Highlights)
-彻底根除虚拟定位退出后依然停留在假坐标的痛点。废弃破坏性系统设置篡改，重构系统底层 system_server 解包净化逻辑，实现停止后 200ms 毫秒级室内物理定位自愈刷新。
+## [1.2.1] - 2026-09-11
 
 ### 修复 (Fixed)
-- **解决室内退出后定位残留死锁**：根治旧版执行 settings put secure location_mode 1 与 wifi_scan_always_enabled 0 导致的“仅限传感器”模式。此前手机在室内因无 GPS 卫星且被关死 Wi-Fi 扫描，系统无法计算新位置而无限期待在假坐标；重构后严禁修改系统持久化设置，保持高精度模式畅通。
-- **Android 12~15 LocationResult 假坐标清除失败**：高版本 Android 的 LocationProviderManager.getLastLocation 返回 LocationResult 包装对象而非传统 Location。新增 extractLocationFromResult 深度反射解包，退出后精准识别并置空 (param.result = null) 系统底层缓存。
-- **UI 操作误区纠偏**：主界面与微信向导弹窗中的“一键关闭硬件扫描”按钮全面纠偏为「🛡️ 一键恢复高精度与硬件扫描」，避免用户误操作关闭系统探针。
+- **退出后定位残留问题**：停止模拟后主动向系统请求一次网络与 GPS 真实位置更新，加速刷新 `system_server` 的 `mLastLocation` 缓存；调整硬件扫描设置逻辑，不再篡改系统级辅助扫描开关。
+- **Android 12+ 缓存清理适配**：在 `LocationProviderManager.getLastLocation` 中兼容 `LocationResult` 包装对象，停止模拟时置空底层分发的假坐标缓存。
+- **MapView 内存泄漏**：在 Compose `AndroidView` 中补齐 `onRelease` 回调，并在离开组合与前后台切换时正确绑定 `onResume` / `onPause` / `onDetach`，清理地图图层与监听器。
+- **大路线跨进程传输异常**：由单例状态仓库维护路由对象，避免长航点路线经由 `Intent` 序列化引发 `TransactionTooLargeException`。
+- **硬件定位监听器超时清理**：为单次真实位置请求引入 15 秒超时机制，避免在弱信号或无定位环境下系统监听器长期残留。
+- **悬浮摇杆与传感器状态同步**：摇杆归中静止时同步发送速度为 0 的传感器心跳，并在服务销毁时重置计步仿真状态。
 
-### 新增 (Added)
-- **estoreScanningHardware() 自动自愈**：在停止模拟、服务销毁以及 App 启动时，主动校正系统设置至 location_mode 3（高精度模式）并开启 Wi-Fi/BLE 后台扫描，自动修复历史受影响的设备。
-- **lushRealLocation 毫秒级冲刷机制**：退出模拟时，并发唤醒 NETWORK_PROVIDER 与 GPS_PROVIDER 请求单次真实位置，借助室内 Wi-Fi 在 200~300ms 内重刷 system_server 的 mLastLocation 缓存。
-- **退离坐标传递净化**：在 update(active = false) 时保留退出瞬间的经纬度坐标，确保 Hook 模块知晓需清洗的目标假位置。
+### 优化 (Changed)
+- **构建体积精简**：配置生产级 R8 代码混淆与资源缩减（`isMinifyEnabled` 与 `isShrinkResources`），安装包体积由 56.2 MB 降至 3.53 MB（缩减约 93.7%）。
+- **反射调用开销优化**：对 `XposedLocationHook` 中的 `LocationResult` 构造方法引入方法缓存，减少系统进程内的高频反射开销。
+- **界面文本规范化**：规范化应用内各模块提示与排查指南文案，去除夸大表述，提升表述准确度。
 
 ---
 
@@ -33,8 +33,7 @@
 
 ### 新增 (Added)
 - **20 秒动态心跳超时 (TTL) 机制**：在 SystemProperties (debug.fakegps.time)、/data/system/fake_gps_hook.json、Settings.Global 及 XSharedPreferences 中全量引入时间戳检测；超过 20 秒无心跳自动判定模拟失效并交还真实硬件控制权，告别重启手机。
-- **强力注销所有测试 Provider**：新增 MockLocationEngine.forceCleanAllTestProviders，直接调用 emoveTestProvider 剥离 gps、
-etwork、passive、used，绝不再调用易残留禁用标志的 setTestProviderEnabled(false)。
+- **注销测试 Provider**：新增 MockLocationEngine.forceCleanAllTestProviders，调用 removeTestProvider 清理 gps、network、passive、fused，避免残留禁用标志。
 
 ---
 
