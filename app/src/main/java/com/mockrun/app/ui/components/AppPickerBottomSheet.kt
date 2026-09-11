@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -47,6 +48,12 @@ private val MultiTargetPalette = listOf(
     "#FFCC00"  // iOS Yellow
 )
 
+enum class AppCategoryFilter(val label: String) {
+    USER("用户应用"),
+    ALL("全部应用"),
+    SYSTEM("系统应用")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppPickerBottomSheet(
@@ -63,6 +70,10 @@ fun AppPickerBottomSheet(
     var customUserIdText by remember { mutableStateOf("999") }
     var isLoading by remember { mutableStateOf(true) }
     var allApps by remember { mutableStateOf<List<InstalledAppItem>>(emptyList()) }
+    var selectedCategory by remember { mutableStateOf(AppCategoryFilter.USER) }
+    var showManualInputDialog by remember { mutableStateOf(false) }
+    var manualPkgInput by remember { mutableStateOf("") }
+    var manualNameInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         isLoading = true
@@ -76,13 +87,29 @@ fun AppPickerBottomSheet(
         selectedUserId
     }
 
-    val filteredApps = remember(searchQuery, allApps) {
+    val userCount = remember(allApps) { allApps.count { !it.isSystem } }
+    val systemCount = remember(allApps) { allApps.count { it.isSystem } }
+    val allCount = remember(allApps) { allApps.size }
+
+    val filteredApps = remember(searchQuery, allApps, selectedCategory) {
+        val baseList = when (selectedCategory) {
+            AppCategoryFilter.USER -> allApps.filter { !it.isSystem }
+            AppCategoryFilter.SYSTEM -> allApps.filter { it.isSystem }
+            AppCategoryFilter.ALL -> allApps
+        }
         if (searchQuery.isBlank()) {
-            allApps
+            baseList
         } else {
             val q = searchQuery.trim().lowercase()
-            allApps.filter {
+            val matchedInBase = baseList.filter {
                 it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
+            }
+            if (matchedInBase.isNotEmpty()) {
+                matchedInBase
+            } else {
+                allApps.filter {
+                    it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
+                }
             }
         }
     }
@@ -209,13 +236,58 @@ fun AppPickerBottomSheet(
                 }
             }
 
+            // Category Filter: 用户应用 / 全部应用 / 系统应用
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = IosColors.TertiaryGroupedBackground,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AppCategoryFilter.values().forEach { cat ->
+                        val count = when (cat) {
+                            AppCategoryFilter.USER -> userCount
+                            AppCategoryFilter.ALL -> allCount
+                            AppCategoryFilter.SYSTEM -> systemCount
+                        }
+                        val isSelected = selectedCategory == cat
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(7.dp))
+                                .bouncyClickable { selectedCategory = cat },
+                            color = if (isSelected) IosColors.SecondaryGroupedBackground else Color.Transparent,
+                            shadowElevation = if (isSelected) 2.dp else 0.dp
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${cat.label} ($count)",
+                                    style = IosTypography.Caption1,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) IosColors.SystemBlue else IosColors.SecondaryLabel
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Search Bar
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = IosColors.TertiaryGroupedBackground,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 8.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -262,6 +334,47 @@ fun AppPickerBottomSheet(
                 }
             }
 
+            // Filter status & Manual Input Action
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "已筛选 ${filteredApps.size} 个应用",
+                    style = IosTypography.Caption1,
+                    color = IosColors.SecondaryLabel
+                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .bouncyClickable {
+                            manualPkgInput = searchQuery.trim()
+                            showManualInputDialog = true
+                        }
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = IosColors.SystemBlue,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = "手动输入包名",
+                        style = IosTypography.Caption1,
+                        color = IosColors.SystemBlue,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
             // Content List
             if (isLoading) {
                 Box(
@@ -282,11 +395,38 @@ fun AppPickerBottomSheet(
                         .height(240.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "未找到相关应用",
-                        style = IosTypography.Subheadline,
-                        color = IosColors.SecondaryLabel
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "未找到匹配应用",
+                            style = IosTypography.Subheadline,
+                            color = IosColors.SecondaryLabel
+                        )
+                        if (searchQuery.isNotBlank()) {
+                            Button(
+                                onClick = {
+                                    manualPkgInput = searchQuery.trim()
+                                    showManualInputDialog = true
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = IosColors.SystemBlue.copy(alpha = 0.15f),
+                                    contentColor = IosColors.SystemBlue
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("直接以包名添加 \"${searchQuery.take(20)}\"")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { showManualInputDialog = true },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("手动输入包名添加")
+                            }
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
@@ -326,6 +466,82 @@ fun AppPickerBottomSheet(
             }
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (showManualInputDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualInputDialog = false },
+            containerColor = IosColors.SecondaryGroupedBackground,
+            title = {
+                Text(
+                    text = "手动指定应用包名",
+                    style = IosTypography.Headline,
+                    color = IosColors.Label
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "适用于隐藏应用、分身容器或未在列表展示的应用。输入包名后将直接按目标接管其位置。",
+                        style = IosTypography.Caption1,
+                        color = IosColors.SecondaryLabel
+                    )
+                    OutlinedTextField(
+                        value = manualPkgInput,
+                        onValueChange = { manualPkgInput = it },
+                        label = { Text("应用包名 (Package Name)") },
+                        placeholder = { Text("例如 com.tencent.mm") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = manualNameInput,
+                        onValueChange = { manualNameInput = it },
+                        label = { Text("应用显示名称 (可选)") },
+                        placeholder = { Text("例如 微信分身") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "生效目标: ${if (finalUserId == 0) "主空间 (User 0)" else "应用分身 (User $finalUserId)"}",
+                        style = IosTypography.Caption2,
+                        color = IosColors.SystemOrange
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val pkg = manualPkgInput.trim()
+                        if (pkg.isNotBlank()) {
+                            val name = manualNameInput.trim().ifBlank { pkg }
+                            val assignedColor = MultiTargetPalette[existingRules.size % MultiTargetPalette.size]
+                            val newRule = MultiTargetRule(
+                                packageName = pkg,
+                                userId = finalUserId,
+                                appName = name,
+                                isEnabled = true,
+                                mode = TargetMockMode.STATIONARY,
+                                latitude = initialLatitude,
+                                longitude = initialLongitude,
+                                colorHex = assignedColor
+                            )
+                            onAppSelected(newRule)
+                            showManualInputDialog = false
+                            onDismissRequest()
+                        }
+                    },
+                    enabled = manualPkgInput.isNotBlank()
+                ) {
+                    Text("确认添加", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManualInputDialog = false }) {
+                    Text("取消", color = IosColors.SecondaryLabel)
+                }
+            }
+        )
     }
 }
 
@@ -394,6 +610,20 @@ private fun AppItemRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (item.isSystem) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = IosColors.SystemGray.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "系统",
+                                style = IosTypography.Caption2,
+                                color = IosColors.SecondaryLabel,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                     if (userId != 0) {
                         Spacer(Modifier.width(6.dp))
                         Surface(
