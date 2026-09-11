@@ -34,9 +34,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private var cachedLocation: SpoofLocation? = null
     private var lastCacheCheckTime: Long = 0L
     private var lastSpoofedLocation: Location? = null
+    @Volatile
+    private var currentProcessPackage: String = ""
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName ?: return
+        currentProcessPackage = pkg
 
         // If loaded in Fake GPS itself, hook XposedStatusHelper to report module active, then return
         if (pkg == "com.mockrun.app") {
@@ -213,7 +216,14 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lpmClass, "onReportLocation", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        loadMultiTargetRules()
+                        // If per-app multi-target rules exist, do NOT replace raw hardware location globally!
+                        // Allow raw location to reach LocationRegistration so each app can be routed independently.
+                        if (multiTargetCache.isNotEmpty()) {
+                            return
+                        }
+
+                        val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         val resultArg = param.args.getOrNull(0) ?: return
 
@@ -234,7 +244,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lpmClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation()
+                        val (targetPkg, targetUid) = extractIdentityFromArgs(param.args)
+                        val spoof = getActiveLocation(targetPkg, targetUid)
                         if (spoof != null && spoof.isActive) {
                             val providerName = runCatching {
                                 XposedHelpers.callMethod(param.thisObject, "getName") as? String
@@ -306,7 +317,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmsClass, "getLastLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation()
+                        val (targetPkg, targetUid) = extractIdentityFromArgs(param.args)
+                        val spoof = getActiveLocation(targetPkg, targetUid)
                         if (spoof != null && spoof.isActive) {
                             if (isCallingPackageSelf(param)) return
                             val provider = param.args.firstOrNull { it is String } as? String ?: LocationManager.GPS_PROVIDER
@@ -330,7 +342,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmsClass, "getCurrentLocation", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        val (targetPkg, targetUid) = extractIdentityFromArgs(param.args)
+                        val spoof = getActiveLocation(targetPkg, targetUid) ?: return
                         if (!spoof.isActive) return
                         if (isCallingPackageSelf(param)) return
 
@@ -345,7 +358,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmsClass, "reportLocation", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        loadMultiTargetRules()
+                        if (multiTargetCache.isNotEmpty()) return // Let per-app dispatch handle it
+                        val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         val originalLoc = param.args.firstOrNull { it is Location } as? Location
                         val provider = originalLoc?.provider ?: LocationManager.GPS_PROVIDER
@@ -363,7 +378,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 XposedBridge.hookAllMethods(lmsClass, "handleLocationChanged", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        loadMultiTargetRules()
+                        if (multiTargetCache.isNotEmpty()) return // Let per-app dispatch handle it
+                        val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         for (i in param.args.indices) {
                             if (param.args[i] is Location) {
@@ -387,7 +404,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             if (receiverClass != null) {
                 XposedBridge.hookAllMethods(receiverClass, "callLocationChangedLocked", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        val (targetPkg, targetUid) = extractIdentityFromObject(param.thisObject)
+                        val spoof = getActiveLocation(targetPkg, targetUid) ?: return
                         if (!spoof.isActive) return
                         val loc = param.args.firstOrNull { it is Location } as? Location ?: return
                         param.args[0] = createSpoofedLocation(loc.provider ?: LocationManager.GPS_PROVIDER, spoof)
@@ -407,7 +425,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 val hookDispatch = object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
+                        val (targetPkg, targetUid) = extractIdentityFromObject(param.thisObject)
+                        val spoof = getActiveLocation(targetPkg, targetUid) ?: return
                         if (!spoof.isActive) return
                         val arg = param.args.getOrNull(0) ?: return
                         val spoofedLoc = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
@@ -1174,6 +1193,52 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     private val uidPackageCache = java.util.concurrent.ConcurrentHashMap<Int, String>()
 
+    private fun extractIdentityFromObject(obj: Any?): Pair<String?, Int?> {
+        if (obj == null) return Pair(null, null)
+
+        // 1. Try getIdentity() or mIdentity (LocationRegistration in Android 11~15)
+        val identity = runCatching {
+            XposedHelpers.callMethod(obj, "getIdentity")
+        }.getOrNull() ?: runCatching {
+            XposedHelpers.getObjectField(obj, "mIdentity")
+        }.getOrNull()
+
+        if (identity != null) {
+            val uid = runCatching { XposedHelpers.callMethod(identity, "getUid") as? Int }.getOrNull()
+                ?: runCatching { XposedHelpers.getIntField(identity, "mUid") }.getOrNull()
+            val pkg = runCatching { XposedHelpers.callMethod(identity, "getPackageName") as? String }.getOrNull()
+                ?: runCatching { XposedHelpers.getObjectField(identity, "mPackageName") as? String }.getOrNull()
+            if (pkg != null || uid != null) {
+                return Pair(pkg, uid)
+            }
+        }
+
+        // 2. Direct fields on obj (e.g. LocationManagerService$Receiver or older LocationRegistration)
+        val uid = runCatching { XposedHelpers.getIntField(obj, "mUid") }.getOrNull()
+            ?: runCatching { XposedHelpers.callMethod(obj, "getUid") as? Int }.getOrNull()
+        val pkg = runCatching { XposedHelpers.getObjectField(obj, "mPackageName") as? String }.getOrNull()
+            ?: runCatching { XposedHelpers.callMethod(obj, "getPackageName") as? String }.getOrNull()
+
+        return Pair(pkg, uid)
+    }
+
+    private fun extractIdentityFromArgs(args: Array<Any?>?): Pair<String?, Int?> {
+        if (args == null || args.isEmpty()) return Pair(null, null)
+        for (arg in args) {
+            if (arg == null) continue
+            // Check for CallerIdentity
+            if (arg.javaClass.name.contains("Identity")) {
+                val pair = extractIdentityFromObject(arg)
+                if (pair.first != null || pair.second != null) return pair
+            }
+            // Check for Package name string
+            if (arg is String && arg.contains(".") && !arg.contains("provider") && !arg.contains("gps") && !arg.contains("network")) {
+                return Pair(arg, null)
+            }
+        }
+        return Pair(null, null)
+    }
+
     private fun getPackageForUid(uid: Int): String? {
         if (uid <= 1000) return "android"
         uidPackageCache[uid]?.let { return it }
@@ -1187,19 +1252,52 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     private fun loadMultiTargetRules() {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastMultiTargetReadTime < 800L) return
+        if (now - lastMultiTargetReadTime < 400L) return
         lastMultiTargetReadTime = now
 
-        val jsonText = runCatching {
+        // Channel 1: Native system_server directory (/data/system/fake_gps_multitarget.json)
+        var jsonText = runCatching {
             val file = java.io.File("/data/system/fake_gps_multitarget.json")
             if (file.exists() && file.canRead()) file.readText() else null
-        }.getOrNull() ?: runCatching {
-            val ctx = getAnyContext()
-            ctx?.let { android.provider.Settings.Global.getString(it.contentResolver, "fake_gps_multitarget") }
-        }.getOrNull() ?: runCatching {
-            val file = java.io.File("/data/local/tmp/fake_gps_multitarget.json")
-            if (file.exists() && file.canRead()) file.readText() else null
         }.getOrNull()
+
+        // Channel 2: Settings.Global ("fake_gps_multitarget")
+        if (jsonText.isNullOrEmpty()) {
+            jsonText = runCatching {
+                val ctx = getAnyContext()
+                ctx?.let { android.provider.Settings.Global.getString(it.contentResolver, "fake_gps_multitarget") }
+            }.getOrNull()
+        }
+
+        // Channel 3: HookConfigProvider via ContentResolver
+        if (jsonText.isNullOrEmpty()) {
+            jsonText = runCatching {
+                val ctx = getAnyContext()
+                if (ctx != null) {
+                    val uri = Uri.parse("content://com.mockrun.app.hook.provider")
+                    val bundle = ctx.contentResolver.call(uri, "getMultiTargetRules", null, null)
+                    bundle?.getString("json")
+                } else null
+            }.getOrNull()
+        }
+
+        // Channel 4: XSharedPreferences (key "multitarget_rules_json")
+        if (jsonText.isNullOrEmpty()) {
+            jsonText = xSharedPrefs?.let { sp ->
+                runCatching {
+                    sp.reload()
+                    sp.getString("multitarget_rules_json", null)
+                }.getOrNull()
+            }
+        }
+
+        // Channel 5: /data/local/tmp/fake_gps_multitarget.json
+        if (jsonText.isNullOrEmpty()) {
+            jsonText = runCatching {
+                val file = java.io.File("/data/local/tmp/fake_gps_multitarget.json")
+                if (file.exists() && file.canRead()) file.readText() else null
+            }.getOrNull()
+        }
 
         if (jsonText.isNullOrEmpty()) return
 
@@ -1223,18 +1321,36 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }
     }
 
-    private fun getActiveLocation(callingUid: Int = runCatching { Binder.getCallingUid() }.getOrDefault(0)): SpoofLocation? {
+    private fun getActiveLocation(
+        targetPackage: String? = null,
+        targetUid: Int? = null
+    ): SpoofLocation? {
         loadMultiTargetRules()
 
-        if (callingUid > 1000 && multiTargetCache.isNotEmpty()) {
-            val pkg = getPackageForUid(callingUid)
-            if (pkg != null) {
-                val userId = callingUid / 100000
-                val rule = multiTargetCache["${pkg}_$userId"] ?: multiTargetCache[pkg]
+        if (multiTargetCache.isNotEmpty()) {
+            val uid = targetUid ?: runCatching { Binder.getCallingUid() }.getOrDefault(0)
+            val resolvedPkg = targetPackage
+                ?: (if (uid > 1000) getPackageForUid(uid) else null)
+                ?: (if (currentProcessPackage.isNotEmpty() && currentProcessPackage != "android") currentProcessPackage else null)
+
+            if (resolvedPkg != null) {
+                val userId = if (uid > 1000) uid / 100000 else 0
+                val rule = multiTargetCache["${resolvedPkg}_$userId"]
+                    ?: multiTargetCache["${resolvedPkg}_0"]
+                    ?: multiTargetCache[resolvedPkg]
+
                 if (rule != null) {
                     if (!rule.isEnabled || rule.mode == "REAL_PASSTHROUGH") {
-                        // Pass through 100% real hardware location
-                        return null
+                        // Pass through 100% real hardware location (Do NOT spoof)
+                        return SpoofLocation(
+                            isActive = false,
+                            latitude = 0.0,
+                            longitude = 0.0,
+                            altitude = 0.0,
+                            bearing = 0f,
+                            speed = 0f,
+                            timestamp = 0L
+                        )
                     }
                     return SpoofLocation(
                         isActive = true,

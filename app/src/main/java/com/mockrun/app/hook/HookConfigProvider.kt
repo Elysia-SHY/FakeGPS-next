@@ -47,6 +47,14 @@ object HookStateBridge {
     @Volatile
     private var lastSyncedActive: Boolean? = null
 
+    @Volatile
+    var multiTargetRulesJson: String = ""
+        private set
+
+    fun setMultiTargetRules(json: String) {
+        multiTargetRulesJson = json
+    }
+
     fun recordSystemHookHeartbeat() {
         lastSystemHookHeartbeat = System.currentTimeMillis()
     }
@@ -207,6 +215,11 @@ class HookConfigProvider : ContentProvider() {
                 HookStateBridge.recordSystemHookHeartbeat()
                 Bundle().apply {
                     putBoolean("ack", true)
+                }
+            }
+            "getMultiTargetRules" -> {
+                Bundle().apply {
+                    putString("json", HookStateBridge.multiTargetRulesJson)
                 }
             }
             "isHookActive" -> {

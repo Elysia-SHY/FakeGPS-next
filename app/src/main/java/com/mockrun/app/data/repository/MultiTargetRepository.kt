@@ -57,6 +57,7 @@ class MultiTargetRepository @Inject constructor(
                 val type = object : TypeToken<List<MultiTargetRule>>() {}.type
                 val list: List<MultiTargetRule> = gson.fromJson(json, type)
                 _rules.value = list
+                com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
             }
         }
     }
@@ -102,25 +103,41 @@ class MultiTargetRepository @Inject constructor(
         _rules.value = list
         val json = gson.toJson(list)
 
-        // 1. SharedPreferences
+        // 1. In-process HookStateBridge (Instant for ContentProvider queries)
+        com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
+
+        // 2. Multi-target SharedPreferences
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_RULES_JSON, json)
             .apply()
 
-        // 2. Settings.Global (Zero-IPC fast channel)
+        // 3. XSharedPreferences compatible shared_prefs ("hook_config") with world-readable permissions
+        runCatching {
+            val hookSp = context.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
+            hookSp.edit()
+                .putString("multitarget_rules_json", json)
+                .putInt("multitarget_rules_count", list.size)
+                .apply()
+            val prefsFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
+            if (prefsFile.exists()) {
+                prefsFile.setReadable(true, false)
+            }
+        }
+
+        // 4. Settings.Global (Zero-IPC fast channel)
         runCatching {
             Settings.Global.putString(context.contentResolver, SETTINGS_GLOBAL_KEY, json)
         }
 
-        // 3. Local Cache File
+        // 5. Local Cache File
         runCatching {
             val cacheFile = java.io.File(context.cacheDir, "multitarget_rules.json")
             cacheFile.writeText(json)
             cacheFile.setReadable(true, false)
         }
 
-        // 4. Asynchronous Root push to system_server directories
+        // 6. Asynchronous Root push to system_server directories
         scope.launch {
             if (rootBridge.isRootAvailable()) {
                 val escapedJson = json.replace("'", "'\\''")
@@ -129,7 +146,8 @@ class MultiTargetRepository @Inject constructor(
                     append("chmod 666 $SYSTEM_FILE_PATH 2>/dev/null; ")
                     append("echo '$escapedJson' > $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
                     append("chmod 666 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
-                    append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null")
+                    append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null; ")
+                    append("setprop debug.fakegps.multitarget 1 2>/dev/null")
                 }
                 rootBridge.executeCommand(cmd)
             }
