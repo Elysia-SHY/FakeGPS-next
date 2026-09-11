@@ -17,8 +17,11 @@ import com.mockrun.app.location.SensorMockData
 import com.mockrun.app.location.SensorMockEngine
 import com.mockrun.app.location.SimulationStateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.mockrun.app.data.repository.MultiTargetRepository
+import com.mockrun.app.domain.model.MultiTargetRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,7 +29,8 @@ import javax.inject.Inject
 class SimulationViewModel @Inject constructor(
     private val stateRepo: SimulationStateRepository,
     val sensorEngine: SensorMockEngine,
-    val rootBridge: RootSuBridge
+    val rootBridge: RootSuBridge,
+    val multiTargetRepo: MultiTargetRepository
 ) : ViewModel() {
 
     val state: StateFlow<SimulationState> = stateRepo.state
@@ -37,6 +41,42 @@ class SimulationViewModel @Inject constructor(
     val selectedTargetLocation: StateFlow<com.mockrun.app.domain.model.WayPoint?> = stateRepo.selectedTargetLocation
     val realPhysicalLocation: StateFlow<com.mockrun.app.domain.model.WayPoint?> = stateRepo.realPhysicalLocation
     val sensorState: StateFlow<SensorMockData> = sensorEngine.sensorState
+
+    // Multi-tenant per-app virtualization rules
+    val multiTargetRules: StateFlow<List<MultiTargetRule>> = multiTargetRepo.rules
+
+    // Currently active / focused app rule on map (null = Global Default Aiming)
+    private val _activeTargetKey = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val activeTargetKey: StateFlow<String?> = _activeTargetKey.asStateFlow()
+
+    fun setActiveTargetKey(key: String?) {
+        _activeTargetKey.value = key
+    }
+
+    fun addOrUpdateMultiTargetRule(rule: MultiTargetRule) {
+        multiTargetRepo.addOrUpdateRule(rule)
+    }
+
+    fun removeMultiTargetRule(key: String) {
+        multiTargetRepo.removeRule(key)
+        if (_activeTargetKey.value == key) {
+            _activeTargetKey.value = null
+        }
+    }
+
+    fun toggleMultiTargetRule(key: String, isEnabled: Boolean) {
+        multiTargetRepo.toggleRule(key, isEnabled)
+    }
+
+    fun updateMultiTargetLocation(key: String, latitude: Double, longitude: Double) {
+        multiTargetRepo.updateCoordinates(key, latitude, longitude)
+    }
+
+    fun setMultiTargetRuleMode(key: String, mode: com.mockrun.app.domain.model.TargetMockMode) {
+        multiTargetRepo.setRuleMode(key, mode)
+    }
+
+    suspend fun getInstalledUserApps() = multiTargetRepo.getInstalledUserApps()
 
     fun setCadenceEnabled(enabled: Boolean, currentSpeedKmh: Float = 8f) {
         sensorEngine.setCadenceEnabled(enabled, currentSpeedKmh)

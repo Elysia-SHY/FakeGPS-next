@@ -21,7 +21,9 @@ import kotlin.math.*
  * 5. Vary speed ±5 % each tick for realism.
  */
 @Singleton
-class RouteSimulator @Inject constructor() {
+class RouteSimulator @Inject constructor(
+    private val kinematicsEngine: KinematicsEngine
+) {
 
     companion object {
         const val UPDATE_INTERVAL_MS = 1000L   // position update cadence
@@ -40,12 +42,34 @@ class RouteSimulator @Inject constructor() {
         val totalDistance = segments.last().endCumulative
         if (totalDistance <= 0.0) return@flow
 
-        val speedMs = speedKmh * 1000.0 / 3600.0
-        val baseDistPerTick = speedMs * (UPDATE_INTERVAL_MS / 1000.0)
+        val baseSpeedMs = speedKmh * 1000.0 / 3600.0
         var covered = totalDistance * startProgress.toDouble()
+        val initialAlt = route.waypoints.firstOrNull()?.altitude ?: 24.0
+        kinematicsEngine.resetElevation(initialAlt)
 
         while (covered < totalDistance) {
             val pt = interpolateAt(segments, covered)
+
+            // Lookahead curvature evaluation for physical corner deceleration
+            val lookahead1 = (covered + max(5.0, baseSpeedMs * 1.5)).coerceAtMost(totalDistance)
+            val lookahead2 = (covered + max(12.0, baseSpeedMs * 3.0)).coerceAtMost(totalDistance)
+            val ptNext = interpolateAt(segments, lookahead1)
+            val ptFar = interpolateAt(segments, lookahead2)
+
+            val radius = kinematicsEngine.calculateCircumradius(
+                WayPoint(pt.lat, pt.lon),
+                WayPoint(ptNext.lat, ptNext.lon),
+                WayPoint(ptFar.lat, ptFar.lon)
+            )
+            val safeSpeedMs = kinematicsEngine.computeCurvatureConstrainedSpeed(baseSpeedMs, radius)
+
+            // ±3% subtle micro-jitter in speed for physical biomechanical realism
+            val variation = 1.0 + kotlin.random.Random.nextDouble(-0.03, 0.03)
+            val currentSpeedMs = safeSpeedMs * variation
+            val distThisTick = currentSpeedMs * (UPDATE_INTERVAL_MS / 1000.0)
+
+            val dynAlt = kinematicsEngine.nextElevation(baseAltitude = pt.alt, deltaDistanceMeters = distThisTick)
+
             val noise = gaussianNoise2D()
 
             // Convert meter-level noise to degree offsets
@@ -55,17 +79,15 @@ class RouteSimulator @Inject constructor() {
             emit(SimulatedPoint(
                 latitude  = pt.lat + noiseLat,
                 longitude = pt.lon + noiseLon,
-                altitude  = pt.alt,
+                altitude  = dynAlt,
                 bearing   = pt.bearing,
-                speed     = speedMs.toFloat(),
+                speed     = currentSpeedMs.toFloat(),
                 progressPercent = (covered / totalDistance).toFloat(),
                 distanceTraveled = covered
             ))
 
             delay(UPDATE_INTERVAL_MS)
-            // ±5 % speed variation for realism using idiomatic Kotlin Random
-            val variation = 1.0 + kotlin.random.Random.nextDouble(-0.05, 0.05)
-            covered += baseDistPerTick * variation
+            covered += distThisTick
         }
 
         // Final point exactly at destination

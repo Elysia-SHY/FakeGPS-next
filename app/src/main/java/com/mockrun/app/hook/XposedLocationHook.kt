@@ -1,10 +1,12 @@
 package com.mockrun.app.hook
 
 import android.content.Context
+import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
+import android.os.Binder
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -112,6 +114,38 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
         // 1.5 Hook System-level TelephonyRegistry (Cut off Cell Tower updates)
         hookSystemTelephonyRegistry(lpparam)
+
+        // 1.6 Hook System-level GNSS Status (Synthesize BDS/GPS Constellation)
+        hookSystemGnssStatus(lpparam)
+    }
+
+    private fun hookSystemGnssStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+
+        val gnssClasses = listOfNotNull(
+            XposedHelpers.findClassIfExists("com.android.server.location.gnss.GnssStatusProvider", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.GnssStatusProvider", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.gnss.GnssManagerService", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.gnss.GnssLocationProvider", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.GnssLocationProvider", lpparam.classLoader)
+        )
+
+        for (cls in gnssClasses) {
+            runCatching {
+                XposedBridge.hookAllMethods(cls, "onReportGnssStatus", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        val synthetic = SyntheticGnssProvider.createSyntheticGnssStatus() ?: return
+                        for (i in param.args.indices) {
+                            if (param.args[i] is GnssStatus) {
+                                param.args[i] = synthetic
+                            }
+                        }
+                    }
+                })
+            }
+        }
     }
 
     private fun extractLocationFromResult(result: Any?): Location? {
@@ -641,6 +675,39 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 })
             }
         }
+
+        // 5. registerGnssStatusCallback(...) (Android 7.0 - 15+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            runCatching {
+                XposedBridge.hookAllMethods(lmClass, "registerGnssStatusCallback", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val spoof = getActiveLocation() ?: return
+                        if (!spoof.isActive) return
+
+                        for (arg in param.args) {
+                            if (arg != null && (arg is GnssStatus.Callback || arg.javaClass.name.contains("GnssStatus"))) {
+                                hookGnssStatusCallback(arg.javaClass)
+                            }
+                        }
+                    }
+                })
+            }
+        }
+
+        // 6. getGpsStatus (Legacy GpsStatus fix)
+        runCatching {
+            XposedBridge.hookAllMethods(lmClass, "getGpsStatus", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    val status = param.result ?: param.args.firstOrNull() ?: return
+                    runCatching {
+                        XposedHelpers.callMethod(status, "setTimeToFirstFix", 1200)
+                    }
+                    param.result = status
+                }
+            })
+        }
     }
 
     private val hookedListenerClasses = mutableSetOf<String>()
@@ -687,6 +754,35 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             )
+        }
+    }
+
+    private val hookedGnssCallbackClasses = mutableSetOf<String>()
+
+    private fun hookGnssStatusCallback(callbackClass: Class<*>) {
+        val className = callbackClass.name
+        if (hookedGnssCallbackClasses.contains(className)) return
+        hookedGnssCallbackClasses.add(className)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            runCatching {
+                XposedHelpers.findAndHookMethod(
+                    callbackClass,
+                    "onSatelliteStatusChanged",
+                    GnssStatus::class.java,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (!spoof.isActive) return
+
+                            val synthetic = SyntheticGnssProvider.createSyntheticGnssStatus()
+                            if (synthetic != null) {
+                                param.args[0] = synthetic
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -1061,7 +1157,102 @@ class XposedLocationHook : IXposedHookLoadPackage {
         return SpoofLocation(isActive, lat, lon, alt, bear, spd, time)
     }
 
-    private fun getActiveLocation(): SpoofLocation? {
+    private data class TargetAppRule(
+        val packageName: String,
+        val userId: Int,
+        val isEnabled: Boolean,
+        val mode: String,
+        val latitude: Double,
+        val longitude: Double,
+        val altitude: Double,
+        val speed: Float
+    )
+
+    private val multiTargetCache = java.util.concurrent.ConcurrentHashMap<String, TargetAppRule>()
+    @Volatile
+    private var lastMultiTargetReadTime = 0L
+
+    private val uidPackageCache = java.util.concurrent.ConcurrentHashMap<Int, String>()
+
+    private fun getPackageForUid(uid: Int): String? {
+        if (uid <= 1000) return "android"
+        uidPackageCache[uid]?.let { return it }
+        val ctx = getAnyContext() ?: return null
+        val pkg = runCatching { ctx.packageManager.getPackagesForUid(uid)?.firstOrNull() }.getOrNull()
+        if (pkg != null) {
+            uidPackageCache[uid] = pkg
+        }
+        return pkg
+    }
+
+    private fun loadMultiTargetRules() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastMultiTargetReadTime < 800L) return
+        lastMultiTargetReadTime = now
+
+        val jsonText = runCatching {
+            val file = java.io.File("/data/system/fake_gps_multitarget.json")
+            if (file.exists() && file.canRead()) file.readText() else null
+        }.getOrNull() ?: runCatching {
+            val ctx = getAnyContext()
+            ctx?.let { android.provider.Settings.Global.getString(it.contentResolver, "fake_gps_multitarget") }
+        }.getOrNull() ?: runCatching {
+            val file = java.io.File("/data/local/tmp/fake_gps_multitarget.json")
+            if (file.exists() && file.canRead()) file.readText() else null
+        }.getOrNull()
+
+        if (jsonText.isNullOrEmpty()) return
+
+        runCatching {
+            val array = org.json.JSONArray(jsonText)
+            multiTargetCache.clear()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val pkg = obj.optString("packageName")
+                val userId = obj.optInt("userId", 0)
+                val isEnabled = obj.optBoolean("isEnabled", true)
+                val mode = obj.optString("mode", "STATIONARY")
+                val lat = obj.optDouble("latitude", 39.9042)
+                val lon = obj.optDouble("longitude", 116.4074)
+                val alt = obj.optDouble("altitude", 20.0)
+                val spd = obj.optDouble("speedKmh", 0.0).toFloat()
+                val rule = TargetAppRule(pkg, userId, isEnabled, mode, lat, lon, alt, spd)
+                multiTargetCache["${pkg}_$userId"] = rule
+                multiTargetCache[pkg] = rule
+            }
+        }
+    }
+
+    private fun getActiveLocation(callingUid: Int = runCatching { Binder.getCallingUid() }.getOrDefault(0)): SpoofLocation? {
+        loadMultiTargetRules()
+
+        if (callingUid > 1000 && multiTargetCache.isNotEmpty()) {
+            val pkg = getPackageForUid(callingUid)
+            if (pkg != null) {
+                val userId = callingUid / 100000
+                val rule = multiTargetCache["${pkg}_$userId"] ?: multiTargetCache[pkg]
+                if (rule != null) {
+                    if (!rule.isEnabled || rule.mode == "REAL_PASSTHROUGH") {
+                        // Pass through 100% real hardware location
+                        return null
+                    }
+                    return SpoofLocation(
+                        isActive = true,
+                        latitude = rule.latitude,
+                        longitude = rule.longitude,
+                        altitude = rule.altitude,
+                        bearing = 0f,
+                        speed = rule.speed,
+                        timestamp = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+
+        return getGlobalActiveLocation()
+    }
+
+    private fun getGlobalActiveLocation(): SpoofLocation? {
         val now = SystemClock.elapsedRealtime()
         val nowMs = System.currentTimeMillis()
         if (now - lastCacheCheckTime < 60 && cachedLocation != null) {

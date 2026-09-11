@@ -1,0 +1,171 @@
+package com.mockrun.app.data.repository
+
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import android.provider.Settings
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.mockrun.app.domain.model.MultiTargetRule
+import com.mockrun.app.domain.model.TargetMockMode
+import com.mockrun.app.location.RootSuBridge
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
+
+data class InstalledAppItem(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable?,
+    val isSystem: Boolean = false,
+    val userId: Int = 0
+)
+
+@Singleton
+class MultiTargetRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val rootBridge: RootSuBridge
+) {
+    companion object {
+        private const val PREFS_NAME = "multi_target_prefs"
+        private const val KEY_RULES_JSON = "key_rules_json"
+        const val SETTINGS_GLOBAL_KEY = "fake_gps_multitarget"
+        const val SYSTEM_FILE_PATH = "/data/system/fake_gps_multitarget.json"
+        const val LOCAL_TMP_FILE_PATH = "/data/local/tmp/fake_gps_multitarget.json"
+    }
+
+    private val gson = Gson()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val _rules = MutableStateFlow<List<MultiTargetRule>>(emptyList())
+    val rules: StateFlow<List<MultiTargetRule>> = _rules.asStateFlow()
+
+    init {
+        loadRules()
+    }
+
+    private fun loadRules() {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val json = sp.getString(KEY_RULES_JSON, null)
+        if (!json.isNullOrEmpty()) {
+            runCatching {
+                val type = object : TypeToken<List<MultiTargetRule>>() {}.type
+                val list: List<MultiTargetRule> = gson.fromJson(json, type)
+                _rules.value = list
+            }
+        }
+    }
+
+    fun addOrUpdateRule(rule: MultiTargetRule) {
+        val current = _rules.value.toMutableList()
+        val index = current.indexOfFirst { it.key == rule.key }
+        if (index >= 0) {
+            current[index] = rule
+        } else {
+            current.add(rule)
+        }
+        persistRules(current)
+    }
+
+    fun removeRule(key: String) {
+        val current = _rules.value.filterNot { it.key == key }
+        persistRules(current)
+    }
+
+    fun toggleRule(key: String, isEnabled: Boolean) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(isEnabled = isEnabled) else it
+        }
+        persistRules(current)
+    }
+
+    fun updateCoordinates(key: String, lat: Double, lon: Double) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(latitude = lat, longitude = lon) else it
+        }
+        persistRules(current)
+    }
+
+    fun setRuleMode(key: String, mode: TargetMockMode) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(mode = mode) else it
+        }
+        persistRules(current)
+    }
+
+    private fun persistRules(list: List<MultiTargetRule>) {
+        _rules.value = list
+        val json = gson.toJson(list)
+
+        // 1. SharedPreferences
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_RULES_JSON, json)
+            .apply()
+
+        // 2. Settings.Global (Zero-IPC fast channel)
+        runCatching {
+            Settings.Global.putString(context.contentResolver, SETTINGS_GLOBAL_KEY, json)
+        }
+
+        // 3. Local Cache File
+        runCatching {
+            val cacheFile = java.io.File(context.cacheDir, "multitarget_rules.json")
+            cacheFile.writeText(json)
+            cacheFile.setReadable(true, false)
+        }
+
+        // 4. Asynchronous Root push to system_server directories
+        scope.launch {
+            if (rootBridge.isRootAvailable()) {
+                val escapedJson = json.replace("'", "'\\''")
+                val cmd = buildString {
+                    append("echo '$escapedJson' > $SYSTEM_FILE_PATH 2>/dev/null; ")
+                    append("chmod 666 $SYSTEM_FILE_PATH 2>/dev/null; ")
+                    append("echo '$escapedJson' > $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
+                    append("chmod 666 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
+                    append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null")
+                }
+                rootBridge.executeCommand(cmd)
+            }
+        }
+    }
+
+    /**
+     * Query all installed launchable applications to populate the application selector.
+     */
+    suspend fun getInstalledUserApps(): List<InstalledAppItem> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN, null).apply {
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+        val items = mutableListOf<InstalledAppItem>()
+        val seenPackages = mutableSetOf<String>()
+
+        for (resolve in resolveInfos) {
+            val pkg = resolve.activityInfo.packageName
+            if (pkg == context.packageName) continue // Skip Fake GPS itself
+            if (seenPackages.add(pkg)) {
+                val appName = resolve.loadLabel(pm).toString()
+                val icon = resolve.loadIcon(pm)
+                val isSystem = (resolve.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                items.add(
+                    InstalledAppItem(
+                        packageName = pkg,
+                        appName = appName,
+                        icon = icon,
+                        isSystem = isSystem,
+                        userId = 0
+                    )
+                )
+            }
+        }
+        items.sortedBy { it.appName.lowercase() }
+    }
+}

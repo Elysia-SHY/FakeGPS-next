@@ -64,6 +64,8 @@ import com.mockrun.app.location.RoadRouteResult
 import com.mockrun.app.location.SearchResultItem
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.MultiTargetRule
+import com.mockrun.app.ui.components.AppPickerBottomSheet
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -226,6 +228,18 @@ object MapPinHelper {
         )
         cachedDestinationPin = d
         return d
+    }
+
+    private val cachedAppPins = mutableMapOf<Int, BitmapDrawable>()
+
+    fun getAppPin(context: Context, color: Int): BitmapDrawable {
+        return cachedAppPins.getOrPut(color) {
+            createTeardropPin(
+                context = context,
+                primaryColor = color,
+                strokeColor = android.graphics.Color.WHITE
+            )
+        }
     }
 
     private var cachedRealLocationPuck: BitmapDrawable? = null
@@ -445,6 +459,9 @@ fun MapScreen(
     val isJoystickRunning by simulationViewModel.isJoystickActive.collectAsState()
     val selectedTargetLocation by simulationViewModel.selectedTargetLocation.collectAsState()
     val realPhysicalLocation by simulationViewModel.realPhysicalLocation.collectAsState()
+    val multiTargetRules by simulationViewModel.multiTargetRules.collectAsState()
+    val activeTargetKey by simulationViewModel.activeTargetKey.collectAsState()
+    var showMapAppPickerSheet by remember { mutableStateOf(false) }
 
     var showSaveDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("") }
@@ -570,7 +587,12 @@ fun MapScreen(
                                             centerGeo.latitude to centerGeo.longitude
                                         }
                                         centerAimingCoord = wgsLat to wgsLon
-                                        simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+                                        val activeKey = activeTargetKey
+                                        if (activeKey != null) {
+                                            simulationViewModel.updateMultiTargetLocation(activeKey, wgsLat, wgsLon)
+                                        } else {
+                                            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+                                        }
                                     }
                                 }
                                 return false
@@ -590,7 +612,12 @@ fun MapScreen(
                                     } else {
                                         mapViewRef?.controller?.animateTo(it)
                                         centerAimingCoord = wgsLat to wgsLon
-                                        simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+                                        val activeKey = activeTargetKey
+                                        if (activeKey != null) {
+                                            simulationViewModel.updateMultiTargetLocation(activeKey, wgsLat, wgsLon)
+                                        } else {
+                                            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+                                        }
                                     }
                                 }
                                 return true
@@ -685,6 +712,31 @@ fun MapScreen(
                         mapView.overlays.add(pMarker)
                     }
 
+                    // Multi-Tenant Per-App Target Markers (Vibrant Distinct Colors)
+                    multiTargetRules.filter { it.isEnabled }.forEach { rule ->
+                        val (appLat, appLon) = if (isGcjMap) {
+                            CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude)
+                        } else {
+                            rule.latitude to rule.longitude
+                        }
+                        val colorInt = runCatching { android.graphics.Color.parseColor(rule.colorHex) }
+                            .getOrDefault(android.graphics.Color.parseColor("#007AFF"))
+                        val appMarker = Marker(mapView).apply {
+                            position = GeoPoint(appLat, appLon)
+                            icon = MapPinHelper.getAppPin(context, colorInt)
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            title = "📍 ${rule.appName} · 分流定位"
+                            snippet = "坐标: ${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}"
+                            setOnMarkerClickListener { _, _ ->
+                                simulationViewModel.setActiveTargetKey(rule.key)
+                                centerAimingCoord = rule.latitude to rule.longitude
+                                mapView.controller.animateTo(GeoPoint(appLat, appLon))
+                                true
+                            }
+                        }
+                        mapView.overlays.add(appMarker)
+                    }
+
 
                     // Real Physical Location Puck (Apple Maps Signature Glowing Blue Puck)
                     val realLoc = userRealLocation
@@ -755,162 +807,287 @@ fun MapScreen(
                 }
             )
 
-            // 1. Top Floating Controls Bar (Zero empty gap, iOS Glass Header floating over Map)
-            Row(
+            // 1. Top Floating Controls Bar & Multi-Target App Capsules (iOS Frosted Floating Header)
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Address Pill (Clickable to center)
-                Surface(
+                Row(
                     modifier = Modifier
-                        .weight(1f, fill = false)
-                        .heightIn(max = 46.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(20.dp))
-                        .bouncyClickable {
-                            val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                            val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(activeCoord.first, activeCoord.second) else activeCoord
-                            mapViewRef?.controller?.apply {
-                                setZoom(16.5)
-                                animateTo(GeoPoint(tLat, tLon))
-                            }
-                        },
-                    color = IosFrostedCapsule,
-                    shadowElevation = 6.dp
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Left: Address Pill (Clickable to center)
+                    val activeRule = multiTargetRules.find { it.key == activeTargetKey }
+                    val activeRuleColor = activeRule?.let {
+                        runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }.getOrNull()
+                    } ?: IosBlue
+
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .heightIn(max = 46.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(20.dp))
+                            .bouncyClickable {
+                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(activeCoord.first, activeCoord.second) else activeCoord
+                                mapViewRef?.controller?.apply {
+                                    setZoom(16.5)
+                                    animateTo(GeoPoint(tLat, tLon))
+                                }
+                            },
+                        color = IosFrostedCapsule,
+                        shadowElevation = 6.dp
                     ) {
-                        Icon(
-                            Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = IosBlue,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Column(modifier = Modifier.weight(1f, fill = false)) {
-                            Text(
-                                text = "当前定位 · ${BuildConfig.VERSION_NAME}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = IosBlue,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = activeRuleColor,
+                                modifier = Modifier.size(16.dp)
                             )
-                            Text(
-                                text = currentAddressText,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = IosColors.Label,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
+                            Spacer(Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
+                                Text(
+                                    text = if (activeRule != null) "${activeRule.appName} 独立分流 · ${BuildConfig.VERSION_NAME}" else "全局模拟 · ${BuildConfig.VERSION_NAME}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = activeRuleColor,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = currentAddressText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = IosColors.Label,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    // Right: Floating Map Tools Pill (Map layer, GPX, Undo, Clear, Save)
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = IosFrostedCapsule,
+                        border = BorderStroke(0.5.dp, IosHairlineBorder),
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Road Route Planner Button
+                            IconButton(
+                                onClick = { showRoadRouteDialog = true },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Text(
+                                    text = "🛣️",
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            // Map Layer Selector (唯一的地图API底图切换入口)
+                            Box {
+                                IconButton(
+                                    onClick = { showMapTypeMenu = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Layers, contentDescription = "切换底图API", tint = IosBlue, modifier = Modifier.size(20.dp))
+                                }
+                                DropdownMenu(
+                                    expanded = showMapTypeMenu,
+                                    onDismissRequest = { showMapTypeMenu = false }
+                                ) {
+                                    MapSourceType.values().forEach { type ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    type.label,
+                                                    fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (type == currentMapType) IosBlue else IosColors.Label
+                                                )
+                                            },
+                                            onClick = {
+                                                currentMapType = type
+                                                showMapTypeMenu = false
+                                                mapViewRef?.let { map ->
+                                                    when (type) {
+                                                        MapSourceType.AUTONAVI_AUTO,
+                                                        MapSourceType.AUTONAVI_VECTOR,
+                                                        MapSourceType.AUTONAVI_DARK -> map.setTileSource(AutoNaviVectorTileSource)
+                                                        MapSourceType.AUTONAVI_SATELLITE -> map.setTileSource(AutoNaviSatelliteTileSource)
+                                                        MapSourceType.OPEN_STREET_MAP -> map.setTileSource(TileSourceFactory.MAPNIK)
+                                                    }
+                                                    map.invalidate()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // GPX Import Button
+                            IconButton(
+                                onClick = { gpxPickerLauncher.launch(arrayOf("*/*")) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "导入GPX", tint = IosBlue, modifier = Modifier.size(20.dp))
+                            }
+
+                            if (!isContinuousDrawMode && drawnWaypoints.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { mapViewModel.removeLastWaypoint() },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "撤回点", tint = IosGray, modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(
+                                    onClick = {
+                                        mapViewModel.clearWaypoints()
+                                        mapViewModel.clearRoadRoute()
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "清除路线", tint = IosRed, modifier = Modifier.size(18.dp))
+                                }
+                            }
+
+                            if (!isContinuousDrawMode && drawnWaypoints.size >= 2) {
+                                IconButton(
+                                    onClick = { showSaveDialog = true },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.Done, contentDescription = "保存路线", tint = IosGreen, modifier = Modifier.size(20.dp))
+                                }
+                            }
                         }
                     }
                 }
 
-                Spacer(Modifier.width(8.dp))
-
-                // Right: Floating Map Tools Pill (Map layer, GPX, Undo, Clear, Save)
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = IosFrostedCapsule,
-                    border = BorderStroke(0.5.dp, IosHairlineBorder),
-                    shadowElevation = 6.dp
+                // Horizontal App Capsule Selector Bar
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Road Route Planner Button
-                        IconButton(
-                            onClick = { showRoadRouteDialog = true },
-                            modifier = Modifier.size(36.dp)
+                    // Item 0: Global Default
+                    item {
+                        val isSelected = activeTargetKey == null
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) IosColors.SystemBlue else IosFrostedCapsule,
+                            border = BorderStroke(0.5.dp, if (isSelected) IosColors.SystemBlue else IosHairlineBorder),
+                            shadowElevation = if (isSelected) 4.dp else 2.dp,
+                            modifier = Modifier.bouncyClickable {
+                                simulationViewModel.setActiveTargetKey(null)
+                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
+                                    ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
+                                    ?: centerAimingCoord
+                                centerAimingCoord = targetCoord
+                                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
+                                mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                            }
                         ) {
-                            Text(
-                                text = "🛣️",
-                                fontSize = 16.sp
-                            )
-                        }
-
-                        // Map Layer Selector (唯一的地图API底图切换入口)
-                        Box {
-                            IconButton(
-                                onClick = { showMapTypeMenu = true },
-                                modifier = Modifier.size(36.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Layers, contentDescription = "切换底图API", tint = IosBlue, modifier = Modifier.size(20.dp))
-                            }
-                            DropdownMenu(
-                                expanded = showMapTypeMenu,
-                                onDismissRequest = { showMapTypeMenu = false }
-                            ) {
-                                MapSourceType.values().forEach { type ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                type.label,
-                                                fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (type == currentMapType) IosBlue else IosColors.Label
-                                            )
-                                        },
-                                        onClick = {
-                                            currentMapType = type
-                                            showMapTypeMenu = false
-                                            mapViewRef?.let { map ->
-                                                when (type) {
-                                                    MapSourceType.AUTONAVI_AUTO,
-                                                    MapSourceType.AUTONAVI_VECTOR,
-                                                    MapSourceType.AUTONAVI_DARK -> map.setTileSource(AutoNaviVectorTileSource)
-                                                    MapSourceType.AUTONAVI_SATELLITE -> map.setTileSource(AutoNaviSatelliteTileSource)
-                                                    MapSourceType.OPEN_STREET_MAP -> map.setTileSource(TileSourceFactory.MAPNIK)
-                                                }
-                                                map.invalidate()
-                                            }
-                                        }
-                                    )
-                                }
+                                Text(
+                                    text = "🌐 全局通用",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else IosColors.Label
+                                )
                             }
                         }
+                    }
 
-                        // GPX Import Button
-                        IconButton(
-                            onClick = { gpxPickerLauncher.launch(arrayOf("*/*")) },
-                            modifier = Modifier.size(36.dp)
+                    // Item 1..N: Per-App Rules
+                    items(
+                        items = multiTargetRules,
+                        key = { r: MultiTargetRule -> r.key }
+                    ) { rule ->
+                        val isSelected = activeTargetKey == rule.key
+                        val ruleColor = remember(rule.colorHex) {
+                            runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+                                .getOrDefault(IosColors.SystemBlue)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) ruleColor else IosFrostedCapsule,
+                            border = BorderStroke(0.5.dp, if (isSelected) ruleColor else IosHairlineBorder),
+                            shadowElevation = if (isSelected) 4.dp else 2.dp,
+                            modifier = Modifier.bouncyClickable {
+                                simulationViewModel.setActiveTargetKey(rule.key)
+                                centerAimingCoord = rule.latitude to rule.longitude
+                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
+                                mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                            }
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "导入GPX", tint = IosBlue, modifier = Modifier.size(20.dp))
-                        }
-
-                        if (!isContinuousDrawMode && drawnWaypoints.isNotEmpty()) {
-                            IconButton(
-                                onClick = { mapViewModel.removeLastWaypoint() },
-                                modifier = Modifier.size(32.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "撤回点", tint = IosGray, modifier = Modifier.size(18.dp))
-                            }
-                            IconButton(
-                                onClick = {
-                                    mapViewModel.clearWaypoints()
-                                    mapViewModel.clearRoadRoute()
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = "清除路线", tint = IosRed, modifier = Modifier.size(18.dp))
+                                Surface(
+                                    modifier = Modifier.size(8.dp),
+                                    shape = CircleShape,
+                                    color = if (isSelected) Color.White else ruleColor
+                                ) {}
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (rule.userId != 0) "${rule.appName} (${rule.userId})" else rule.appName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else IosColors.Label
+                                )
                             }
                         }
+                    }
 
-                        if (!isContinuousDrawMode && drawnWaypoints.size >= 2) {
-                            IconButton(
-                                onClick = { showSaveDialog = true },
-                                modifier = Modifier.size(32.dp)
+                    // Item N+1: Add App Capsule
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = IosFrostedCapsule,
+                            border = BorderStroke(0.5.dp, IosHairlineBorder),
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.bouncyClickable { showMapAppPickerSheet = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Done, contentDescription = "保存路线", tint = IosGreen, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "添加分流",
+                                    tint = IosBlue,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "添加分流",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = IosBlue
+                                )
                             }
                         }
                     }
@@ -1337,6 +1514,25 @@ fun MapScreen(
                     animateTo(GeoPoint(tLat, tLon))
                 }
             }
+        )
+    }
+
+    if (showMapAppPickerSheet) {
+        AppPickerBottomSheet(
+            onDismissRequest = { showMapAppPickerSheet = false },
+            existingRules = multiTargetRules,
+            initialLatitude = centerAimingCoord.first,
+            initialLongitude = centerAimingCoord.second,
+            onAppSelected = { newRule ->
+                simulationViewModel.addOrUpdateMultiTargetRule(newRule)
+                simulationViewModel.setActiveTargetKey(newRule.key)
+                centerAimingCoord = newRule.latitude to newRule.longitude
+                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(newRule.latitude, newRule.longitude) else (newRule.latitude to newRule.longitude)
+                mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                Toast.makeText(context, "已为 ${newRule.appName} 添加独立定位分流", Toast.LENGTH_SHORT).show()
+            },
+            loadInstalledApps = { simulationViewModel.getInstalledUserApps() }
         )
     }
 

@@ -48,6 +48,10 @@ import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
+import androidx.compose.ui.text.style.TextAlign
+import com.mockrun.app.domain.model.MultiTargetRule
+import com.mockrun.app.domain.model.TargetMockMode
+import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import kotlinx.coroutines.launch
@@ -67,6 +71,8 @@ fun LocationMockScreen(
     val pointMockLocation by simulationViewModel.pointMockLocation.collectAsState()
     val joystickLocation by simulationViewModel.joystickLocation.collectAsState()
     val selectedTargetLocation by simulationViewModel.selectedTargetLocation.collectAsState()
+    val multiTargetRules by simulationViewModel.multiTargetRules.collectAsState()
+    var showAppPickerSheet by remember { mutableStateOf(false) }
 
     var joystickSizeDp by remember { mutableFloatStateOf(140f) }
     var realLocationCoord by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -379,6 +385,87 @@ fun LocationMockScreen(
                     }
                 }
             )
+        }
+
+        // =====================================================================
+        // 2.5 Multi-Target Per-App Virtualization Routing (iOS Inset Group Card)
+        // =====================================================================
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "多应用独立分流 (${multiTargetRules.size})".uppercase(),
+                style = IosTypography.Footnote,
+                color = IosColors.SecondaryLabel,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = "+ 添加分流应用",
+                style = IosTypography.Footnote,
+                color = IosColors.SystemBlue,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.bouncyClickable { showAppPickerSheet = true }
+            )
+        }
+
+        IosInsetGroupCard {
+            if (multiTargetRules.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "暂无独立分流应用",
+                        style = IosTypography.Headline,
+                        color = IosColors.Label
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "所有调用定位的应用默认走上方的主控模拟位置。添加应用后可让钉钉、微信等分别驻留不同位置，未添加的应用可选择使用硬件真实定位。",
+                        style = IosTypography.Footnote,
+                        color = IosColors.SecondaryLabel,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { showAppPickerSheet = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("+ 添加分流应用", style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            } else {
+                multiTargetRules.forEachIndexed { index, rule ->
+                    if (index > 0) {
+                        IosHairlineDivider(startIndent = 58.dp)
+                    }
+                    MultiTargetRuleItemRow(
+                        rule = rule,
+                        onToggle = { isChecked ->
+                            simulationViewModel.toggleMultiTargetRule(rule.key, isChecked)
+                        },
+                        onSetLocationOnMap = {
+                            simulationViewModel.setActiveTargetKey(rule.key)
+                            simulationViewModel.updateSelectedTarget(rule.latitude, rule.longitude)
+                            onNavigateToMap()
+                        },
+                        onModeChange = { newMode ->
+                            simulationViewModel.setMultiTargetRuleMode(rule.key, newMode)
+                        },
+                        onDelete = {
+                            simulationViewModel.removeMultiTargetRule(rule.key)
+                        }
+                    )
+                }
+            }
         }
 
         // =====================================================================
@@ -951,10 +1038,232 @@ fun LocationMockScreen(
         )
     }
 
+    if (showAppPickerSheet) {
+        AppPickerBottomSheet(
+            onDismissRequest = { showAppPickerSheet = false },
+            existingRules = multiTargetRules,
+            initialLatitude = activeLat,
+            initialLongitude = activeLon,
+            onAppSelected = { newRule ->
+                simulationViewModel.addOrUpdateMultiTargetRule(newRule)
+                Toast.makeText(context, "已为 ${newRule.appName} 添加独立分流规则", Toast.LENGTH_SHORT).show()
+            },
+            loadInstalledApps = { simulationViewModel.getInstalledUserApps() }
+        )
+    }
+
     permissionIssueDialogType?.let { issue ->
         PermissionGuideDialog(
             issueType = issue,
             onDismissRequest = { permissionIssueDialogType = null }
         )
+    }
+}
+
+@Composable
+private fun MultiTargetRuleItemRow(
+    rule: MultiTargetRule,
+    onToggle: (Boolean) -> Unit,
+    onSetLocationOnMap: () -> Unit,
+    onModeChange: (TargetMockMode) -> Unit,
+    onDelete: () -> Unit
+) {
+    val ruleColor = remember(rule.colorHex) {
+        runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+            .getOrDefault(IosColors.SystemBlue)
+    }
+
+    var showModeMenu by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = ruleColor.copy(alpha = 0.18f),
+                border = BorderStroke(1.dp, ruleColor.copy(alpha = 0.5f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = rule.appName.take(1),
+                        style = IosTypography.Headline,
+                        color = ruleColor
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = rule.appName,
+                        style = IosTypography.Headline,
+                        color = if (rule.isEnabled) IosColors.Label else IosColors.SecondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (rule.userId != 0) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = IosColors.SystemOrange.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "分身 · UID ${rule.userId}",
+                                style = IosTypography.Caption2,
+                                fontWeight = FontWeight.Bold,
+                                color = IosColors.SystemOrange,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = rule.packageName,
+                    style = IosTypography.Footnote,
+                    color = IosColors.SecondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            IosSwitch(
+                checked = rule.isEnabled,
+                onCheckedChange = onToggle
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Place,
+                    contentDescription = null,
+                    tint = ruleColor,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}",
+                    style = IosTypography.Caption1,
+                    color = IosColors.SecondaryLabel
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when (rule.mode) {
+                            TargetMockMode.STATIONARY -> IosColors.SystemBlue.copy(alpha = 0.12f)
+                            TargetMockMode.ROUTE -> IosColors.SystemGreen.copy(alpha = 0.12f)
+                            TargetMockMode.REAL_PASSTHROUGH -> IosColors.SystemGray.copy(alpha = 0.15f)
+                        },
+                        modifier = Modifier.bouncyClickable { showModeMenu = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = when (rule.mode) {
+                                    TargetMockMode.STATIONARY -> "定点驻留 ▾"
+                                    TargetMockMode.ROUTE -> "路径漫游 ▾"
+                                    TargetMockMode.REAL_PASSTHROUGH -> "物理透传 ▾"
+                                },
+                                style = IosTypography.Caption2,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when (rule.mode) {
+                                    TargetMockMode.STATIONARY -> IosColors.SystemBlue
+                                    TargetMockMode.ROUTE -> IosColors.SystemGreen
+                                    TargetMockMode.REAL_PASSTHROUGH -> IosColors.SecondaryLabel
+                                }
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showModeMenu,
+                        onDismissRequest = { showModeMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("📍 定点驻留 (锁定假坐标)") },
+                            onClick = {
+                                onModeChange(TargetMockMode.STATIONARY)
+                                showModeMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("🛣️ 路径漫游 (跟随路线巡航)") },
+                            onClick = {
+                                onModeChange(TargetMockMode.ROUTE)
+                                showModeMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("🟢 物理透传 (放行真实 GPS)") },
+                            onClick = {
+                                onModeChange(TargetMockMode.REAL_PASSTHROUGH)
+                                showModeMenu = false
+                            }
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = IosColors.SystemBlue.copy(alpha = 0.12f),
+                    modifier = Modifier.bouncyClickable { onSetLocationOnMap() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = IosColors.SystemBlue,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "地图选点",
+                            style = IosTypography.Caption2,
+                            fontWeight = FontWeight.SemiBold,
+                            color = IosColors.SystemBlue
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "删除规则",
+                        tint = IosColors.SecondaryLabel,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
     }
 }
