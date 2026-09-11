@@ -4,19 +4,27 @@
 
 ---
 
-## [1.2.1] - 2026-09-11
+## [1.2.2] - 2026-09-11
+
+### 修复 (Fixed)
+- **MapView 内存泄漏**：在 Compose `AndroidView` 中补齐 `onRelease` 回调，并在离开组合与前后台切换时正确绑定 `onResume` / `onPause` / `onDetach`，彻底清理地图图层与渲染监听器。
+- **大路线跨进程传输异常**：由单例状态仓库维护路由对象，避免长航点路线经由 `Intent` 序列化引发 `TransactionTooLargeException` 崩溃。
+- **硬件定位监听器超时清理**：为单次真实物理位置请求引入 15 秒超时自动清理机制，避免在弱信号或无定位环境下系统监听器长期残留。
+- **悬浮摇杆与传感器状态同步**：摇杆归中静止时同步发送速度为 0 的传感器心跳，并在服务销毁时重置计步仿真引擎。
+
+### 优化 (Changed)
+- **构建体积精简**：在 Release 构建中配置生产级 R8 代码混淆与资源缩减（`isMinifyEnabled` 与 `isShrinkResources`），安装包体积由 56.2 MB 降至 **3.53 MB**（缩减约 93.7%）。
+- **反射调用开销优化**：对 `XposedLocationHook` 中的 `LocationResult` 构造方法引入方法缓存，减少系统进程内的高频反射开销。
+
+---
+
+## [1.2.1] - 2026-09-10
 
 ### 修复 (Fixed)
 - **退出后定位残留问题**：停止模拟后主动向系统请求一次网络与 GPS 真实位置更新，加速刷新 `system_server` 的 `mLastLocation` 缓存；调整硬件扫描设置逻辑，不再篡改系统级辅助扫描开关。
 - **Android 12+ 缓存清理适配**：在 `LocationProviderManager.getLastLocation` 中兼容 `LocationResult` 包装对象，停止模拟时置空底层分发的假坐标缓存。
-- **MapView 内存泄漏**：在 Compose `AndroidView` 中补齐 `onRelease` 回调，并在离开组合与前后台切换时正确绑定 `onResume` / `onPause` / `onDetach`，清理地图图层与监听器。
-- **大路线跨进程传输异常**：由单例状态仓库维护路由对象，避免长航点路线经由 `Intent` 序列化引发 `TransactionTooLargeException`。
-- **硬件定位监听器超时清理**：为单次真实位置请求引入 15 秒超时机制，避免在弱信号或无定位环境下系统监听器长期残留。
-- **悬浮摇杆与传感器状态同步**：摇杆归中静止时同步发送速度为 0 的传感器心跳，并在服务销毁时重置计步仿真状态。
 
 ### 优化 (Changed)
-- **构建体积精简**：配置生产级 R8 代码混淆与资源缩减（`isMinifyEnabled` 与 `isShrinkResources`），安装包体积由 56.2 MB 降至 3.53 MB（缩减约 93.7%）。
-- **反射调用开销优化**：对 `XposedLocationHook` 中的 `LocationResult` 构造方法引入方法缓存，减少系统进程内的高频反射开销。
 - **界面文本规范化**：规范化应用内各模块提示与排查指南文案，去除夸大表述，提升表述准确度。
 
 ---
