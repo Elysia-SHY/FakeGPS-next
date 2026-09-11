@@ -141,13 +141,15 @@ class MultiTargetRepository @Inject constructor(
         scope.launch {
             if (rootBridge.isRootAvailable()) {
                 val escapedJson = json.replace("'", "'\\''")
+                val ver = System.currentTimeMillis()
                 val cmd = buildString {
                     append("echo '$escapedJson' > $SYSTEM_FILE_PATH 2>/dev/null; ")
                     append("chmod 666 $SYSTEM_FILE_PATH 2>/dev/null; ")
                     append("echo '$escapedJson' > $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
                     append("chmod 666 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
                     append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null; ")
-                    append("setprop debug.fakegps.multitarget 1 2>/dev/null")
+                    append("setprop debug.fakegps.multitarget 1 2>/dev/null; ")
+                    append("setprop debug.fakegps.rules_ver $ver 2>/dev/null")
                 }
                 rootBridge.executeCommand(cmd)
             }

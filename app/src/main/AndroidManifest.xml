@@ -120,5 +120,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <provider
+            android:name=".hook.HookConfigProvider"
+            android:authorities="com.mockrun.app.hook.provider"
+            android:exported="true"
+            android:multiprocess="false" />
+
     </application>
 </manifest>

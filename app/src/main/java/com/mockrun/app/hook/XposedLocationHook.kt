@@ -171,11 +171,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private var cachedLocationResultMethod: java.lang.reflect.Method? = null
 
     private fun createLocationResult(resultClass: Class<*>, location: Location): Any? {
-        val method = if (cachedResultClass === resultClass) {
+        val method: java.lang.reflect.Method? = if (cachedResultClass === resultClass && cachedLocationResultMethod != null) {
             cachedLocationResultMethod
         } else {
             val lookedUp = runCatching {
-                XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
+                XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Location::class.java)
+                    ?: XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
@@ -185,23 +186,29 @@ class XposedLocationHook : IXposedHookLoadPackage {
             lookedUp
         }
 
-        method?.let { m ->
-            return runCatching {
-                if (m.parameterTypes.firstOrNull() == List::class.java) {
-                    m.invoke(null, listOf(location))
-                } else {
-                    m.invoke(null, arrayOf(location))
+        if (method != null) {
+            val res = runCatching {
+                val paramType = method.parameterTypes.firstOrNull()
+                when {
+                    paramType == Location::class.java -> method.invoke(null, location)
+                    paramType == List::class.java -> method.invoke(null, listOf(location))
+                    else -> method.invoke(null, arrayOf(location))
                 }
             }.getOrNull()
+            if (res != null) return res
         }
 
         // Fallback for non-standard framework derivatives
         return runCatching {
-            XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
+            XposedHelpers.callStaticMethod(resultClass, "wrap", location)
         }.getOrElse {
             runCatching {
-                XposedHelpers.callStaticMethod(resultClass, "create", listOf(location))
-            }.getOrNull()
+                XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
+            }.getOrElse {
+                runCatching {
+                    XposedHelpers.callStaticMethod(resultClass, "create", listOf(location))
+                }.getOrNull()
+            }
         }
     }
 
@@ -416,10 +423,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
         // Android 11~16+ LocationRegistration dispatchers
         val locRegClasses = listOfNotNull(
+            XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$Registration", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$LocationRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$LocationListenerRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$LocationPendingIntentRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager\$GetCurrentLocationListenerRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$Registration", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$LocationRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$LocationListenerRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$LocationPendingIntentRegistration", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager\$GetCurrentLocationListenerRegistration", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.location.LocationManagerService\$LocationRegistration", lpparam.classLoader)
-        )
+        ).distinct()
 
         for (locRegClass in locRegClasses) {
             runCatching {
@@ -427,9 +442,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val (targetPkg, targetUid) = extractIdentityFromObject(param.thisObject)
                         val spoof = getActiveLocation(targetPkg, targetUid) ?: return
-                        if (!spoof.isActive) return
+                        if (!spoof.isActive) {
+                            // Target is in REAL_PASSTHROUGH mode or rule disabled:
+                            // Do NOT modify anything, pass through 100% genuine hardware location!
+                            return
+                        }
                         val arg = param.args.getOrNull(0) ?: return
-                        val spoofedLoc = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
+                        val providerName = runCatching {
+                            val owner = XposedHelpers.callMethod(param.thisObject, "getOwner")
+                            XposedHelpers.callMethod(owner, "getName") as? String
+                        }.getOrNull() ?: LocationManager.GPS_PROVIDER
+
+                        val spoofedLoc = createSpoofedLocation(providerName, spoof)
                         if (arg is Location) {
                             param.args[0] = spoofedLoc
                         } else if (arg.javaClass.name.contains("LocationResult")) {
@@ -438,10 +462,27 @@ class XposedLocationHook : IXposedHookLoadPackage {
                                 param.args[0] = newResult
                             }
                         }
+
+                        // Prevent AOSP smallestDisplacement drop filter when stationary
+                        runCatching {
+                            val req = XposedHelpers.callMethod(param.thisObject, "getRequest")
+                            if (req != null) {
+                                val minDistance = runCatching {
+                                    XposedHelpers.callMethod(req, "getMinUpdateDistanceMeters") as? Float
+                                }.getOrNull() ?: 0f
+                                if (minDistance > 0f) {
+                                    val builderClass = XposedHelpers.findClass("android.location.LocationRequest\$Builder", lpparam.classLoader)
+                                    val builder = XposedHelpers.findConstructorExact(builderClass, req.javaClass).newInstance(req)
+                                    XposedHelpers.callMethod(builder, "setMinUpdateDistanceMeters", 0.0f)
+                                    val zeroDistReq = XposedHelpers.callMethod(builder, "build")
+                                    XposedHelpers.setObjectField(param.thisObject, "mProviderLocationRequest", zeroDistReq)
+                                }
+                            }
+                        }
                     }
                 }
-                XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", hookDispatch)
                 XposedBridge.hookAllMethods(locRegClass, "acceptLocationChange", hookDispatch)
+                XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", hookDispatch)
             }
         }
     }
@@ -1196,7 +1237,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private fun extractIdentityFromObject(obj: Any?): Pair<String?, Int?> {
         if (obj == null) return Pair(null, null)
 
-        // 1. Try getIdentity() or mIdentity (LocationRegistration in Android 11~15)
+        // 0. If obj is CallerIdentity itself
+        if (obj.javaClass.name.contains("CallerIdentity") || obj.javaClass.name.contains("Identity")) {
+            val uid = runCatching { XposedHelpers.callMethod(obj, "getUid") as? Int }.getOrNull()
+                ?: runCatching { XposedHelpers.getIntField(obj, "mUid") }.getOrNull()
+            val pkg = runCatching { XposedHelpers.callMethod(obj, "getPackageName") as? String }.getOrNull()
+                ?: runCatching { XposedHelpers.getObjectField(obj, "mPackageName") as? String }.getOrNull()
+            if (pkg != null || uid != null) {
+                return Pair(pkg, uid)
+            }
+        }
+
+        // 1. Try getIdentity() or mIdentity (LocationRegistration in Android 11~16)
         val identity = runCatching {
             XposedHelpers.callMethod(obj, "getIdentity")
         }.getOrNull() ?: runCatching {
@@ -1232,9 +1284,14 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 if (pair.first != null || pair.second != null) return pair
             }
             // Check for Package name string
-            if (arg is String && arg.contains(".") && !arg.contains("provider") && !arg.contains("gps") && !arg.contains("network")) {
-                return Pair(arg, null)
+            if (arg is String && arg.contains(".") && !arg.contains("provider") && !arg.contains("gps") && !arg.contains("network") && !arg.contains("passive") && !arg.contains("fused")) {
+                val callingUid = runCatching { Binder.getCallingUid() }.getOrNull()
+                return Pair(arg, if (callingUid != null && callingUid > 1000) callingUid else null)
             }
+        }
+        val callingUid = runCatching { Binder.getCallingUid() }.getOrNull()
+        if (callingUid != null && callingUid > 1000) {
+            return Pair(getPackageForUid(callingUid), callingUid)
         }
         return Pair(null, null)
     }
@@ -1250,10 +1307,18 @@ class XposedLocationHook : IXposedHookLoadPackage {
         return pkg
     }
 
+    @Volatile
+    private var lastMultiTargetVersion: String = ""
+
     private fun loadMultiTargetRules() {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastMultiTargetReadTime < 400L) return
+        val currentVer = runCatching { getSystemProperty("debug.fakegps.rules_ver") }.getOrDefault("")
+        if (currentVer.isNotEmpty() && currentVer == lastMultiTargetVersion && (now - lastMultiTargetReadTime < 2000L) && multiTargetCache.isNotEmpty()) {
+            return
+        }
+        if (now - lastMultiTargetReadTime < 350L && multiTargetCache.isNotEmpty()) return
         lastMultiTargetReadTime = now
+        lastMultiTargetVersion = currentVer
 
         // Channel 1: Native system_server directory (/data/system/fake_gps_multitarget.json)
         var jsonText = runCatching {
