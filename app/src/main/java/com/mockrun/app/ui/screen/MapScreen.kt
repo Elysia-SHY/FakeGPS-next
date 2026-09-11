@@ -542,8 +542,7 @@ fun MapScreen(
                         isClickable = true
                         isFocusable = true
                         zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
-                        controller.setZoom(16.0)
-                        currentZoom = 16.0
+                        controller.setZoom(currentZoom)
 
                         // Center on initial aiming coordinate
                         val initCoord = centerAimingCoord

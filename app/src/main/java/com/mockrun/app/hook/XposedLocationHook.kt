@@ -129,27 +129,31 @@ class XposedLocationHook : IXposedHookLoadPackage {
     }
 
     @Volatile
-    private var cachedLocationResultMethod: java.lang.reflect.Method? = null
+    private var cachedResultClass: Class<*>? = null
     @Volatile
-    private var cachedLocationResultMethodChecked = false
+    private var cachedLocationResultMethod: java.lang.reflect.Method? = null
 
     private fun createLocationResult(resultClass: Class<*>, location: Location): Any? {
-        if (!cachedLocationResultMethodChecked) {
-            cachedLocationResultMethod = runCatching {
+        val method = if (cachedResultClass === resultClass) {
+            cachedLocationResultMethod
+        } else {
+            val lookedUp = runCatching {
                 XposedHelpers.findMethodExactIfExists(resultClass, "wrap", Array<Location>::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
             }.getOrNull()
-            cachedLocationResultMethodChecked = true
+            cachedResultClass = resultClass
+            cachedLocationResultMethod = lookedUp
+            lookedUp
         }
 
-        cachedLocationResultMethod?.let { method ->
+        method?.let { m ->
             return runCatching {
-                if (method.parameterTypes.firstOrNull() == List::class.java) {
-                    method.invoke(null, listOf(location))
+                if (m.parameterTypes.firstOrNull() == List::class.java) {
+                    m.invoke(null, listOf(location))
                 } else {
-                    method.invoke(null, arrayOf(location))
+                    m.invoke(null, arrayOf(location))
                 }
             }.getOrNull()
         }
