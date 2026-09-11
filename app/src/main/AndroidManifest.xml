@@ -36,7 +36,7 @@
             android:value="true" />
         <meta-data
             android:name="xposeddescription"
-            android:value="Fake GPS v1.2 系统级底层Hook模块：深度接管系统框架 (system_server)，全局分发纯净虚拟位置，彻底杜绝闪回与防作弊检测" />
+            android:value="Fake GPS 系统级定位模块：接管系统框架 (system_server)，提供位置分发与防闪回支持" />
         <meta-data
             android:name="xposedminversion"
             android:value="54" />
