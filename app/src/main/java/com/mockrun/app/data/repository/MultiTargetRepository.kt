@@ -10,6 +10,8 @@ import com.google.gson.reflect.TypeToken
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
 import com.mockrun.app.location.RootSuBridge
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,7 @@ class MultiTargetRepository @Inject constructor(
     private val rootBridge: RootSuBridge
 ) {
     companion object {
+        private const val TAG = "MultiTargetRepo"
         private const val PREFS_NAME = "multi_target_prefs"
         private const val KEY_RULES_JSON = "key_rules_json"
         const val SETTINGS_GLOBAL_KEY = "fake_gps_multitarget"
@@ -58,7 +61,10 @@ class MultiTargetRepository @Inject constructor(
                 val list: List<MultiTargetRule> = gson.fromJson(json, type)
                 _rules.value = list
                 com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
-            }
+            }.logFailure(
+                TAG,
+                "parse saved multi-target rules — stored routing config not applied, list will look empty"
+            )
         }
     }
 
@@ -121,21 +127,23 @@ class MultiTargetRepository @Inject constructor(
                 .apply()
             val prefsFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
             if (prefsFile.exists()) {
+                // Readable by others on purpose (the hook reads it from arbitrary processes).
+                // Writable by others is not granted — see HookConfigProvider for the same reasoning.
                 prefsFile.setReadable(true, false)
             }
-        }
+        }.logFailure(TAG, "write multi-target rules into XSharedPreferences (hook_config)", Diag.Level.DEBUG)
 
         // 4. Settings.Global (Zero-IPC fast channel)
         runCatching {
             Settings.Global.putString(context.contentResolver, SETTINGS_GLOBAL_KEY, json)
-        }
+        }.logFailure(TAG, "write multi-target rules into Settings.Global", Diag.Level.DEBUG)
 
         // 5. Local Cache File
         runCatching {
             val cacheFile = java.io.File(context.cacheDir, "multitarget_rules.json")
             cacheFile.writeText(json)
             cacheFile.setReadable(true, false)
-        }
+        }.logFailure(TAG, "write multi-target rules cache file", Diag.Level.DEBUG)
 
         // 6. Asynchronous Root push to system_server directories
         scope.launch {
@@ -144,9 +152,11 @@ class MultiTargetRepository @Inject constructor(
                 val ver = System.currentTimeMillis()
                 val cmd = buildString {
                     append("echo '$escapedJson' > $SYSTEM_FILE_PATH 2>/dev/null; ")
-                    append("chmod 666 $SYSTEM_FILE_PATH 2>/dev/null; ")
+                    // 0644 rather than 0666: the hook must be able to READ these from any process,
+                    // but with 0666 any app on the device could rewrite the routing rules.
+                    append("chmod 644 $SYSTEM_FILE_PATH 2>/dev/null; ")
                     append("echo '$escapedJson' > $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
-                    append("chmod 666 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
+                    append("chmod 644 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
                     append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null; ")
                     append("setprop debug.fakegps.multitarget 1 2>/dev/null; ")
                     append("setprop debug.fakegps.rules_ver $ver 2>/dev/null")
@@ -171,15 +181,20 @@ class MultiTargetRepository @Inject constructor(
         }
         val resolveInfos = runCatching {
             pm.queryIntentActivities(mainIntent, 0)
-        }.getOrDefault(emptyList())
+        }.logFailure(TAG, "query launchable activities for the app picker", Diag.Level.DEBUG)
+            .getOrDefault(emptyList())
 
         for (resolve in resolveInfos) {
             val pkg = resolve.activityInfo?.packageName ?: continue
             if (pkg == context.packageName) continue // Skip Fake GPS itself
             if (seenPackages.add(pkg)) {
-                val appName = runCatching { resolve.loadLabel(pm).toString() }.getOrNull()
+                val appName = runCatching { resolve.loadLabel(pm).toString() }
+                    .logFailure(TAG, "load app label for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
                     ?.takeIf { it.isNotBlank() } ?: pkg
-                val icon = runCatching { resolve.loadIcon(pm) }.getOrNull()
+                val icon = runCatching { resolve.loadIcon(pm) }
+                    .logFailure(TAG, "load app icon for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
                 val appInfo = resolve.activityInfo?.applicationInfo
                 val isSystem = if (appInfo != null) {
                     ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0) &&
@@ -201,7 +216,8 @@ class MultiTargetRepository @Inject constructor(
         // 2. Query all installed applications to discover apps without standard launcher entry
         val allInstalled = runCatching {
             pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        }.getOrDefault(emptyList())
+        }.logFailure(TAG, "enumerate installed applications", Diag.Level.DEBUG)
+            .getOrDefault(emptyList())
 
         for (appInfo in allInstalled) {
             val pkg = appInfo.packageName ?: continue
@@ -209,9 +225,13 @@ class MultiTargetRepository @Inject constructor(
             if (seenPackages.add(pkg)) {
                 val isSystem = ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0) &&
                         ((appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0)
-                val appName = runCatching { pm.getApplicationLabel(appInfo).toString() }.getOrNull()
+                val appName = runCatching { pm.getApplicationLabel(appInfo).toString() }
+                    .logFailure(TAG, "load application label for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
                     ?.takeIf { it.isNotBlank() } ?: pkg
-                val icon = runCatching { pm.getApplicationIcon(appInfo) }.getOrNull()
+                val icon = runCatching { pm.getApplicationIcon(appInfo) }
+                    .logFailure(TAG, "load application icon for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
 
                 items.add(
                     InstalledAppItem(
