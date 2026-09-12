@@ -1403,6 +1403,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
         val pkg = runCatching { XposedHelpers.getObjectField(obj, "mPackageName") as? String }.getOrNull()
             ?: runCatching { XposedHelpers.callMethod(obj, "getPackageName") as? String }.getOrNull()
 
+        if (pkg == null && uid == null) {
+            // Every strategy failed. The caller then falls back to global routing, so per-app
+            // rules silently stop applying for this dispatch. Naming the class is what makes
+            // this fixable when a ROM changes its registration internals.
+            Diag.d(
+                TAG,
+                "could not resolve caller identity from ${obj.javaClass.name} — falling back to global routing"
+            )
+        }
         return Pair(pkg, uid)
     }
 
@@ -1432,7 +1441,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
         if (uid <= 1000) return "android"
         uidPackageCache[uid]?.let { return it }
         val ctx = getAnyContext() ?: return null
-        val pkg = runCatching { ctx.packageManager.getPackagesForUid(uid)?.firstOrNull() }.getOrNull()
+        val pkg = runCatching { ctx.packageManager.getPackagesForUid(uid)?.firstOrNull() }
+            .logFailure(TAG, "resolve package name for uid $uid", Diag.Level.DEBUG)
+            .getOrNull()
         if (pkg != null) {
             uidPackageCache[uid] = pkg
         }
@@ -1456,14 +1467,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
         var jsonText = runCatching {
             val file = java.io.File("/data/system/fake_gps_multitarget.json")
             if (file.exists() && file.canRead()) file.readText() else null
-        }.getOrNull()
+        }.logFailure(TAG, "channel 1: read /data/system/fake_gps_multitarget.json", Diag.Level.DEBUG)
+            .getOrNull()
 
         // Channel 2: Settings.Global ("fake_gps_multitarget")
         if (jsonText.isNullOrEmpty()) {
             jsonText = runCatching {
                 val ctx = getAnyContext()
                 ctx?.let { android.provider.Settings.Global.getString(it.contentResolver, "fake_gps_multitarget") }
-            }.getOrNull()
+            }.logFailure(TAG, "channel 2: Settings.Global fake_gps_multitarget", Diag.Level.DEBUG)
+                .getOrNull()
         }
 
         // Channel 3: HookConfigProvider via ContentResolver
@@ -1475,7 +1488,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     val bundle = ctx.contentResolver.call(uri, "getMultiTargetRules", null, null)
                     bundle?.getString("json")
                 } else null
-            }.getOrNull()
+            }.logFailure(TAG, "channel 3: ContentProvider IPC for multi-target rules", Diag.Level.DEBUG)
+                .getOrNull()
         }
 
         // Channel 4: XSharedPreferences (key "multitarget_rules_json")
@@ -1484,7 +1498,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 runCatching {
                     sp.reload()
                     sp.getString("multitarget_rules_json", null)
-                }.getOrNull()
+                }.logFailure(TAG, "channel 4: XSharedPreferences multitarget_rules_json", Diag.Level.DEBUG)
+                    .getOrNull()
             }
         }
 
@@ -1493,10 +1508,17 @@ class XposedLocationHook : IXposedHookLoadPackage {
             jsonText = runCatching {
                 val file = java.io.File("/data/local/tmp/fake_gps_multitarget.json")
                 if (file.exists() && file.canRead()) file.readText() else null
-            }.getOrNull()
+            }.logFailure(TAG, "channel 5: read /data/local/tmp/fake_gps_multitarget.json", Diag.Level.DEBUG)
+                .getOrNull()
         }
 
-        if (jsonText.isNullOrEmpty()) return
+        if (jsonText.isNullOrEmpty()) {
+            // All five channels came up empty. Previously this returned silently, which made
+            // "per-app routing is not configured" indistinguishable from "every channel is
+            // broken" — and the difference matters a lot when routing appears to do nothing.
+            Diag.d(TAG, "no multi-target rules from any of the 5 channels — routing inactive")
+            return
+        }
 
         runCatching {
             val array = org.json.JSONArray(jsonText)
@@ -1515,7 +1537,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 multiTargetCache["${pkg}_$userId"] = rule
                 multiTargetCache[pkg] = rule
             }
-        }
+        }.logFailure(TAG, "parse multi-target rules JSON — routing rules NOT applied")
     }
 
     private fun getActiveLocation(
@@ -1617,7 +1639,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 cachedLocation = inactive
                 return inactive
             }
-        }
+        }.logFailure(TAG, "channel 1: SystemProperties debug.fakegps.*", Diag.Level.DEBUG)
 
         // 2. Channel 2: /data/system/fake_gps_hook.json (Native system_server directory, owned by system:system)
         runCatching {
@@ -1732,8 +1754,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     return inactive
                 }
             }
-        }
+        }.logFailure(TAG, "channel 6: ContentProvider IPC getLocation", Diag.Level.DEBUG)
 
+        // Every one of the six channels failed to produce a location. The hook then returns null,
+        // callers read that as "no spoof", and the device quietly keeps reporting its real
+        // position. This is the most consequential silent zero in the file.
+        Diag.w(TAG, "no spoof config from any of the 6 channels — reporting real location")
         cachedLocation = null
         return null
     }
@@ -1760,13 +1786,17 @@ class XposedLocationHook : IXposedHookLoadPackage {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 loc.isMock = false
             }
-        }
+        }.logFailure(TAG, "clear Location.isMock", Diag.Level.DEBUG)
         runCatching {
             XposedHelpers.callMethod(loc, "setIsFromMockProvider", false)
-        }
+        }.logFailure(TAG, "clear via setIsFromMockProvider()", Diag.Level.DEBUG)
         runCatching {
             XposedHelpers.setBooleanField(loc, "mIsFromMockProvider", false)
-        }
+        }.logFailure(
+            TAG,
+            "clear Location.mIsFromMockProvider field — mock flag left set on this ROM",
+            Diag.Level.DEBUG
+        )
 
         lastSpoofedLocation = loc
         return loc
