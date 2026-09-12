@@ -21,8 +21,11 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 
 /**
  * CompositionLocal providing global Liquid Glass effect toggle state.
@@ -75,8 +78,24 @@ fun Modifier.liquidGlass(
     val isDark = isSystemInDarkTheme()
 
     if (isLiquidGlass) {
-        val useAgslShader = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        val glassPaint = if (useAgslShader) remember { LiquidGlassPaint() } else null
+        val canUseAgsl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+        // RuntimeShader compiles the AGSL source in its constructor, and that compile can fail
+        // on a device whose GPU driver does not implement every feature the shader uses.
+        // There is no way to probe support up front, so the construction itself is guarded:
+        // a failure degrades to the gradient path instead of taking the whole screen down.
+        val glassPaint = if (canUseAgsl) {
+            remember {
+                runCatching { LiquidGlassPaint() }
+                    .logFailure(
+                        "LiquidGlass",
+                        "AGSL RuntimeShader unavailable - degrading to gradient glass",
+                        Diag.Level.WARN
+                    )
+                    .getOrNull()
+            }
+        } else null
+
         val params = when {
             containerColor != null -> LiquidGlassPresets.tinted(containerColor, isDark)
             isDark -> LiquidGlassPresets.dark
@@ -97,7 +116,7 @@ fun Modifier.liquidGlass(
 
         if (glassPaint != null) {
             // ---- AGSL path (Android 13+): the real glass material ----
-            val rimWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { 2.5.dp.toPx() }
+            val rimWidthPx = with(LocalDensity.current) { 2.5.dp.toPx() }
             baseModifier.drawBehind {
                 val outline = shape.createOutline(size, layoutDirection, this)
                 val cornerPx = (outline as? Outline.Rounded)
