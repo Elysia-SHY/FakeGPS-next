@@ -2,6 +2,39 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，版本命名采用 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [1.4.0] - 2026-09-12
+
+> 本版为**可观测性专项**：不改变任何业务逻辑分支，不新增特权能力，只让原本静默失败的路径留下记录。
+
+### 新增 (Added)
+
+- **统一诊断出口 `Diag`**（`com.mockrun.app.util`）：
+  - 同时适配两种运行形态 —— App 进程用 `android.util.Log`，被注入进程（`system_server` 与各被 Hook 应用）额外镜像到 `XposedBridge` 日志；
+  - 因 Xposed API 声明为 `compileOnly`，`XposedBridge` 在 App 进程不在 classpath，故通过**反射惰性解析**，缺失时静默降级；
+  - **内置按标签限流**（10 秒窗口 / 5 条）：这些站点大多位于「每次位置分发」的高频路径且运行在 `system_server`，不限流会刷爆日志并实际消耗 CPU；
+  - 全程异常包裹，诊断失败绝不向宿主进程传播。
+- **`Result<T>.logFailure(tag, what, level)` 扩展**：以**纯增量**方式接入既有 `runCatching` 调用链，不改变控制流。
+
+### 修复 (Fixed)
+
+- **在线更新误报「有新版本」**：`VersionSyncManager.extractVersionCode` 原先在 Release 说明中找不到 `versionCode:` 时，会退化成「把版本标签按十进制拼接」——`v1.3.9` 被算成 `139`，再与 `versionCode`(15) 直接比较，`139 > 15` 恒为真，导致**每次启动都弹出更新提示**。现改为返回未知哨兵并由语义化版本比较兜底。
+- **更新包完整性缺失**：下载的 APK 此前仅校验「文件大于 1MB」就交给系统安装器，而下载源包含第三方镜像。现新增签名证书比对，与已安装应用签名不一致即拒绝安装（fail-closed）。
+
+### 优化 (Changed)
+
+- **静默失败路径系统性收口**：`XposedLocationHook` 中 94 个 `runCatching` 站点已有 63 个携带失败记录，其余 31 处为**刻意保留的静默**（有合理默认值、或属可选能力的探测），逐条理由见提交说明。重点覆盖：
+  - `createLocationResult` —— 坐标包装失败会让伪造坐标静默不生效，现在会打出具体类名；
+  - `getGlobalActiveLocation` —— 6 个配置通道全部失败时此前无任何输出，设备只是安静地继续上报真实位置，现已在终点告警；
+  - Hook 安装路径 —— 新增「静默零」守卫，当全部候选类名都未命中时显式告警，不再让「ROM 改了类名」与「无事可做」无法区分。
+- **仓库整理**：取消跟踪根目录 `FakeGPS-next-v1.3.7-release.apk`（本地文件保留），并将 `.workbuddy/` 加入忽略列表。
+
+### 说明 (Notes)
+
+- **本版未经真机验证**：改动均为纯增量的日志与异常记录，编译验证通过，但效果需在真机上确认。
+- 已知未处理项：`HookConfigProvider` 与 `AdbCommandReceiver` 仍为 `exported=true` 且无权限保护；`HookStateBridge` 中的 `chmod 666` 未收敛。这两项需先做 IPC 设计确认，未纳入本版。
+
+---
+
 ## [1.3.7] - 2026-09-12
 
 ### 优化与突破 (Highlights)
