@@ -2,6 +2,7 @@ package com.mockrun.app.data.repository
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -66,6 +67,14 @@ sealed class DownloadStatus {
 object VersionSyncManager {
     private const val GITHUB_OWNER = "Elysia-SHY"
     private const val GITHUB_REPO = "FakeGPS-next"
+
+    /**
+     * Sentinel returned by [extractVersionCode] when a release does not declare a
+     * `versionCode`. Callers must treat it as "unknown" and fall back to SemVer.
+     */
+    private const val UNKNOWN_VERSION_CODE = -1
+
+    private val VERSION_CODE_REGEX = Regex("(?i)versionCode\\s*[:=]\\s*(\\d+)")
 
     private const val GITHUB_RELEASE_API =
         "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
@@ -226,7 +235,7 @@ object VersionSyncManager {
                 }
             }
 
-            val remoteCode = extractVersionCode(tagName, body)
+            val remoteCode = extractVersionCode(body)
             val releaseInfo = RemoteReleaseInfo(
                 tagName = tagName,
                 versionName = tagName,
@@ -325,6 +334,16 @@ object VersionSyncManager {
                     }
 
                     if (tempFile.exists() && tempFile.length() > 1_000_000L) {
+                        // Refuse anything not signed by our own certificate BEFORE it can
+                        // reach the system installer. See isApkSignedBySameCertificate().
+                        if (!isApkSignedBySameCertificate(context, tempFile)) {
+                            tempFile.delete()
+                            _downloadStatus.value = DownloadStatus.Error(
+                                "安装包签名校验失败：该文件并非由本应用的签名密钥签发，已拒绝安装"
+                            )
+                            return@launch
+                        }
+
                         if (targetFile.exists()) targetFile.delete()
                         tempFile.renameTo(targetFile)
                         downloadSuccess = true
@@ -359,6 +378,48 @@ object VersionSyncManager {
         downloadJob = null
         _downloadStatus.value = DownloadStatus.Idle
     }
+
+    /**
+     * Verify that [apkFile] is signed by the same certificate(s) as the running app.
+     *
+     * ## Why this matters
+     *
+     * The updater resolves its download URL from a **public** GitHub repository and pulls
+     * the payload through third-party mirrors (`cdn.jsdelivr.net`, `ghproxy.net`,
+     * `gh-proxy.com`, `gh.llkk.cc`). Before this check the only gate on the downloaded
+     * file was `length() > 1_000_000L`, after which it was handed straight to the system
+     * installer — and this app holds `REQUEST_INSTALL_PACKAGES`, `SYSTEM_ALERT_WINDOW`,
+     * `QUERY_ALL_PACKAGES` and can invoke `su`.
+     *
+     * That combination meant a compromised release, or any one hijacked mirror, could
+     * push a trojaned build to every installed user through the in-app "update" prompt.
+     * Comparing signer certificates against the installed app closes that path: the
+     * system installer already refuses cross-signature updates, so anything that fails
+     * here could never have installed legitimately anyway.
+     *
+     * Fails closed — any error, missing signer, or package-name mismatch returns false.
+     */
+    private fun isApkSignedBySameCertificate(context: Context, apkFile: File): Boolean = runCatching {
+        val pm = context.packageManager
+        val flags = PackageManager.GET_SIGNING_CERTIFICATES
+
+        val installed = pm.getPackageInfo(context.packageName, flags)
+        val archive = pm.getPackageArchiveInfo(apkFile.absolutePath, flags)
+
+        // Not our package at all → never installable as an update.
+        if (archive == null || archive.packageName != context.packageName) {
+            return@runCatching false
+        }
+
+        val installedSigners = installed.signingInfo?.apkContentsSigners?.toSet()
+        val archiveSigners = archive.signingInfo?.apkContentsSigners?.toSet()
+
+        if (installedSigners.isNullOrEmpty() || archiveSigners.isNullOrEmpty()) {
+            return@runCatching false
+        }
+
+        installedSigners == archiveSigners
+    }.getOrDefault(false)
 
     /**
      * Launch Android PackageInstaller with FileProvider and Unknown Sources permission handling.
@@ -440,10 +501,12 @@ object VersionSyncManager {
     }
 
     private fun isRemoteNewer(remote: RemoteReleaseInfo): Boolean {
-        if (remote.remoteVersionCode > 0 && BuildConfig.VERSION_CODE > 0) {
-            if (remote.remoteVersionCode > BuildConfig.VERSION_CODE) return true
-            if (remote.remoteVersionCode < BuildConfig.VERSION_CODE) return false
+        val remoteCode = remote.remoteVersionCode
+        if (remoteCode > 0 && BuildConfig.VERSION_CODE > 0) {
+            if (remoteCode > BuildConfig.VERSION_CODE) return true
+            if (remoteCode < BuildConfig.VERSION_CODE) return false
         }
+        // versionCode absent ([UNKNOWN_VERSION_CODE]) or equal → decide by SemVer on the tag.
         return compareSemver(remote.tagName, BuildConfig.VERSION_NAME) > 0
     }
 
@@ -459,18 +522,23 @@ object VersionSyncManager {
         return 0
     }
 
-    private fun extractVersionCode(tag: String, body: String): Int {
-        val bodyRegex = Regex("(?i)versionCode\\s*[:=]\\s*(\\d+)")
-        val match = bodyRegex.find(body)
-        if (match != null) {
-            return match.groupValues[1].toIntOrNull() ?: 0
-        }
-
-        val parts = tag.trim().removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
-        var code = 0
-        for (p in parts) {
-            code = code * 10 + p
-        }
-        return code
+    /**
+     * Parse the Android `versionCode` declared in a release body, e.g. `versionCode: 15`.
+     *
+     * Returns [UNKNOWN_VERSION_CODE] when the release does not declare one.
+     *
+     * ## Why the old fallback was wrong
+     *
+     * This used to fall back to flattening the tag name into a number by decimal
+     * concatenation, which turned `v1.3.9` into `139`. That value was then compared
+     * against `BuildConfig.VERSION_CODE` (currently 15) inside [isRemoteNewer], so
+     * `139 > 15` was always true and **every single check reported a phantom update**.
+     *
+     * A tag name and an Android `versionCode` are different things and are not
+     * comparable — hence the explicit sentinel instead of a derived number.
+     */
+    private fun extractVersionCode(body: String): Int {
+        val match = VERSION_CODE_REGEX.find(body) ?: return UNKNOWN_VERSION_CODE
+        return match.groupValues[1].toIntOrNull()?.takeIf { it > 0 } ?: UNKNOWN_VERSION_CODE
     }
 }

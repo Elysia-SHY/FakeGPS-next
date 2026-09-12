@@ -24,3 +24,6 @@ app/build/
 outputs/
 build/
 *.log
+
+# Local agent workspace (per-machine state, not shared source)
+.workbuddy/

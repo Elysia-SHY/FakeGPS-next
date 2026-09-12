@@ -125,7 +125,11 @@ chmod 666 $pkgDir/shared_prefs/hook_config.xml
 
 **`version-tracker.md` 结构已经坏掉**：文件头部写「当前真实基准版本 1.2.1」，但正文历史里混入了 `2.9.0 / 2.8.0 / … / 2.0.0`（2026-09-09），而 `2.9.0` 的 `versionCode=209` 又排在 `1.2.1`（`versionCode=4`）之后——版本号与时间戳双重倒挂。这个文件目前不具备可追溯性，需要重建。
 
-**根目录散落 3 个 APK（约 75MB+）**，且 `outputs/` 下另有一份，仓库被构建产物污染。应加入 `.gitignore`（当前项目**没有 `.gitignore`**，`local.properties` 与 `app/build/` 也会一并入库）。
+**根目录散落 3 个 APK**，其中 `FakeGPS-next-v1.3.7-release.apk`（3.87 MB）**已被 git 跟踪并进入提交历史**——`.gitignore` 里的 `*.apk` 只对未跟踪的新文件生效，无法自动解除已跟踪文件。`local.properties` 与 `app/build/` 均未入库，这部分是干净的。
+
+**更正**：本报告初版称「项目没有 `.gitignore`」，经 `git ls-files` 与实际文件核对，该结论**有误**——`.gitignore` 存在且规则完整。此处已修正。
+
+建议：`git rm --cached FakeGPS-next-v1.3.7-release.apk`（保留本地文件），并把 `.workbuddy/` 补进忽略列表。
 
 ---
 
@@ -258,7 +262,7 @@ wakeLock?.acquire(24 * 60 * 60 * 1000L)   // :502
 | 依赖管理 | `haze:0.7.3`、`material-icons-extended`（**无版本号**）、`xposed:api:82` 都硬编码在 `build.gradle.kts` | 已建了 `libs.versions.toml` 却没用全，应统一收编 |
 | AGP / Gradle | AGP 8.2.2 / Gradle 8.4 / Kotlin 1.9.22 / Compose Compiler 1.5.8 | 版本组合自洽，但 AGP 8.2.2 已落后，升级需同步评估 Compose Compiler 兼容性 |
 | `minSdk = 29` | — | 合理，覆盖了绝大多数在役设备 |
-| `.gitignore` | **缺失** | 必须补：`local.properties`、`*.apk`、`app/build/`、`.gradle/`、`outputs/` |
+| `.gitignore` | ✅ **存在且覆盖完整** | 已含 `local.properties`、`*.apk`、`app/build/`、`outputs/`、`build/`、`*.log`。待补 `.workbuddy/` |
 | `allowBackup="true"` | 开启 | 备份会导出坐标与分流规则，涉及位置隐私，建议评估后关闭或加 `dataExtractionRules` |
 | `QUERY_ALL_PACKAGES` | 已声明 | 属 Google Play 政策敏感权限，上架需申报 |
 
