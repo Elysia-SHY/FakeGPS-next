@@ -54,6 +54,7 @@ import com.mockrun.app.domain.model.TargetMockMode
 import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -155,15 +156,24 @@ fun LocationMockScreen(
     var showHelpSheet by remember { mutableStateOf(false) }
     var showWeChatGuideSheet by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(IosColors.SystemGroupedBackground)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 100.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    val hazeState = LocalHazeState.current ?: remember { HazeState() }
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
+        FrostedAmbientBackground(hazeState = hazeState)
+
+        Column(
+            modifier = Modifier
+                .widthIn(max = 680.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 140.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
         // =====================================================================
         // 1. Apple Large Title Navigation Header
         // =====================================================================
@@ -224,10 +234,16 @@ fun LocationMockScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .bouncyClickable { showWeChatGuideSheet = true },
-            shape = RoundedCornerShape(14.dp),
-            color = IosColors.SystemOrange.copy(alpha = 0.12f),
-            border = BorderStroke(0.5.dp, IosColors.SystemOrange.copy(alpha = 0.35f))
+                .bouncyClickable { showWeChatGuideSheet = true }
+                .liquidGlass(
+                    isLiquidGlass = isLiquidGlass,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = 6.dp,
+                    containerColor = IosColors.SystemOrange.copy(alpha = 0.16f),
+                    hazeState = hazeState
+                ),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Transparent
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -752,7 +768,9 @@ fun LocationMockScreen(
             color = IosColors.SecondaryLabel,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
         )
+        Spacer(Modifier.height(20.dp))
     }
+}
 
     // iOS Style Guide Dialog: 防闪回与使用指南
     if (showHelpSheet) {

@@ -42,6 +42,8 @@ import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.data.repository.DownloadStatus
 import com.mockrun.app.data.repository.VersionSyncStatus
 import com.mockrun.app.ui.theme.*
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -139,12 +141,13 @@ fun AboutScreen(
         )
     }
 
+    val hazeState = LocalHazeState.current ?: remember { HazeState() }
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(if (isDark) Color(0xFF000000) else IosColors.SystemGroupedBackground),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
+        FrostedAmbientBackground(hazeState = hazeState)
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)

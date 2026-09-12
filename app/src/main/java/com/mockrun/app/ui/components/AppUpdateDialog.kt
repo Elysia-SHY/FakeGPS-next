@@ -69,7 +69,7 @@ fun AppUpdateDialog(
                     elevation = 16.dp
                 ),
             shape = RoundedCornerShape(28.dp),
-            color = if (isDark) Color(0xF21C1C1E) else Color(0xFAFFFFFF)
+            color = if (isLiquidGlass) Color.Transparent else if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
         ) {
             Column(
                 modifier = Modifier

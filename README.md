@@ -9,7 +9,7 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.6)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.7)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
 ---
 
@@ -139,6 +139,7 @@ cd FakeGPS-next
 
 完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.3.7]** (2026-09-12) — 极致通透液态毛玻璃升级（彻底重构玻璃拟态管线，引入高透光率多阶微偏光晶体渐变底衬、135° 菲涅尔全反射微棱镜边框、物理厚度微倒角高光内沿及表面镜面掠射弧光，底层地图道路地标清晰穿透，质感晶莹流光溢彩）、纯净前景色渲染保护（折射高光与棱镜光影下沉至 drawBehind，100% 保持文字图标高对比度与纯净锐利度）、更新弹窗背景通透化适配。
 - **[v1.3.6]** (2026-09-12) — 全新 GitHub Release + jsDelivr CDN 在线更新机制（官方 API 检查、jsDelivr CDN 高速分发、全局启动弹窗与实时下载安装、Android 8~15 深度适配）、集成 Chris Banes Haze 现代液态毛玻璃渲染库（实现真高斯背景模糊质感）、关于页新增完整开源致谢与依赖项目清单（支持一键访问各开源项目 GitHub）。
 - **[v1.3.5]** (2026-09-12) — 代理加速网络全节点兼容（多源高可用并发竞速，彻底解决挂加速器/VPN无法拉取最新版问题）、APP 内直接极速下载与自动安装 APK（毛玻璃实时进度/速度、断点容灾轮询、Android 8~15 自动拉起安装器）、彻底修复路线模拟与定位搜索框文字上下截断裁切。
 - **[v1.3.4]** (2026-09-12) — 路线模拟全面支持 POI / 地名搜索（选点阶段新增毛玻璃搜索栏与联想下拉卡片，支持一键对齐与定点）、路线模式 UI 极简解叠降重（移除顶部巨幅横幅与冗余按钮、右侧浮动按钮上浮解耦避让）、分流控制面板纵向结构优化。

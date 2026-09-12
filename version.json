@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.6",
-  "versionCode": 12,
+  "versionName": "v1.3.7",
+  "versionCode": 13,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. ⚡ 全新 GitHub Release + jsDelivr CDN 在线更新：采用官方 GitHub Release API 检查最新发布版本，并深度整合 jsDelivr CDN 高速下载通道，辅以多节点容灾自动降级，保障全球及加速器网络极速直达。\n2. 🚀 应用内全局启动更新弹窗与原生静默安装：APP 启动与关于页自动比对 versionCode，发现新版本即刻弹出液态玻璃更新卡片；内嵌流式进度条与实时下载网速，下载完毕自动唤起 Android 原生安装器（深度适配 Android 8.0~15 未知来源安装权限与 FileProvider 规范）。\n3. 🌊 Chris Banes Haze 液态毛玻璃拟态升级：全面集成业内顶级 Haze 渲染引擎，实现悬浮底栏、控制面板及更新弹窗对底层地图与图层的实时高斯折射模糊，带来前所未有的 iOS 风格沉浸感。\n4. 💖 关于页开源致谢与许可协议：新增致谢专栏，完整列出 Haze、OSMDroid、LSPosed、Compose 等全部底层支撑开源项目与官方 GitHub 仓库直达通道。",
+  "releaseNotes": "1. 💎 极致通透液态毛玻璃（Liquid Glass Refraction）：彻底重构玻璃拟态着色管线，摒弃扁平半透明遮罩，引入高透光率多阶微偏光晶体渐变底衬、135° 菲涅尔全反射微棱镜边框、物理厚度微倒角高光内沿及顶部镜面掠射弧光，底层地图道路地标清晰穿透，质感晶莹流光溢彩。\n2. 🛡️ 纯净前景色渲染保护：将折射高光与棱镜光影下沉至 drawBehind 专用底层，100% 保持前景文字、图标与交互控件的原生锐利度与高对比度，彻底根除白屏或文字隐形隐患。\n3. 🚀 GitHub Release + jsDelivr CDN 极速更新通道：官方 Release API 智能判定，jsDelivr 全球加速分发与多节点容灾，内置流式下载面板与 Android 8~15 原生安装器全自动化唤起。\n4. 💖 致谢与开源生态：关于页面内置完整开源致谢专栏（Haze、OSMDroid、LSPosed、Compose 等）。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.6/FakeGPS-next-v1.3.6-release.apk"
+  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.7/FakeGPS-next-v1.3.7-release.apk"
 }

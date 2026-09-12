@@ -44,23 +44,42 @@ fun IosSectionHeader(
 }
 
 /**
- * Apple Inset Grouped Card (16dp rounded corner, secondary background)
+ * Apple Inset Grouped Card (with authentic Liquid Glass / Haze support)
  */
 @Composable
 fun IosInsetGroupCard(
     modifier: Modifier = Modifier,
+    isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(20.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = IosColors.SecondaryGroupedBackground,
-        border = BorderStroke(0.5.dp, IosColors.Separator.copy(alpha = 0.4f)),
-        shadowElevation = 0.5.dp
-    ) {
-        Column(content = content)
+    if (isLiquidGlass) {
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .liquidGlass(
+                    isLiquidGlass = true,
+                    shape = shape,
+                    elevation = 8.dp
+                ),
+            shape = shape,
+            color = Color.Transparent
+        ) {
+            Column(content = content)
+        }
+    } else {
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = IosColors.SecondaryGroupedBackground,
+            border = BorderStroke(0.5.dp, IosColors.Separator.copy(alpha = 0.4f)),
+            shadowElevation = 0.5.dp
+        ) {
+            Column(content = content)
+        }
     }
 }
 
