@@ -853,7 +853,7 @@ fun MapScreen(
                             Spacer(Modifier.width(6.dp))
                             Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
-                                    text = if (activeRule != null) "${activeRule.appName} 独立分流 · ${BuildConfig.VERSION_NAME}" else "全局模拟 · ${BuildConfig.VERSION_NAME}",
+                                    text = if (activeMapTab == MapTab.ROUTE) "全局路线巡航 · ${BuildConfig.VERSION_NAME}" else if (activeRule != null) "${activeRule.appName} 独立分流 · ${BuildConfig.VERSION_NAME}" else "全局模拟 · ${BuildConfig.VERSION_NAME}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = activeRuleColor,
                                     fontWeight = FontWeight.SemiBold,
@@ -947,68 +947,11 @@ fun MapScreen(
                                     Icon(Icons.Default.Add, contentDescription = "导入GPX", tint = IosBlue, modifier = Modifier.size(20.dp))
                                 }
                             }
-
-                            if (!isContinuousDrawMode && drawnWaypoints.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { mapViewModel.removeLastWaypoint() },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "撤回点", tint = IosGray, modifier = Modifier.size(18.dp))
-                                }
-                                IconButton(
-                                    onClick = {
-                                        mapViewModel.clearWaypoints()
-                                        mapViewModel.clearRoadRoute()
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "清除路线", tint = IosRed, modifier = Modifier.size(18.dp))
-                                }
-                            }
-
-                            if (!isContinuousDrawMode && drawnWaypoints.size >= 2) {
-                                IconButton(
-                                    onClick = { showSaveDialog = true },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Default.Done, contentDescription = "保存路线", tint = IosGreen, modifier = Modifier.size(20.dp))
-                                }
-                            }
                         }
                     }
                 }
 
-                if (activeMapTab == MapTab.ROUTE) {
-                    // Route Simulation Mode: Strictly Global
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        color = IosFrostedCapsule,
-                        border = BorderStroke(0.5.dp, IosHairlineBorder),
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Navigation,
-                                contentDescription = null,
-                                tint = IosColors.SystemGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "🚗 全局路线巡航模式 · 真实道路拓扑模拟 (不与应用分流冲突)",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSystemDark) Color.White else Color.Black
-                            )
-                        }
-                    }
-                } else {
+                if (activeMapTab == MapTab.LOCATION) {
                     // Location Mode: Per-App Diversion & Global Capsules
                     LazyRow(
                         modifier = Modifier
@@ -1264,7 +1207,7 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = bottomBarPadding + 140.dp, end = 14.dp),
+                    .padding(bottom = if (activeMapTab == MapTab.ROUTE) bottomBarPadding + 190.dp else bottomBarPadding + 145.dp, end = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1441,6 +1384,21 @@ fun MapScreen(
                     selectedSpeed = selectedSpeed,
                     isLiquidGlass = isLiquidGlass,
                     bottomBarPadding = bottomBarPadding,
+                    searchQuery = searchQuery,
+                    searchResults = searchResults,
+                    isSearching = isSearching,
+                    onSearchQueryChange = { mapViewModel.performSearch(it) },
+                    onSearchResultSelect = { item ->
+                        val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                        val (dispLat, dispLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(item.latitude, item.longitude) else (item.latitude to item.longitude)
+                        mapViewRef?.controller?.apply {
+                            setZoom(16.5)
+                            animateTo(GeoPoint(dispLat, dispLon))
+                        }
+                        centerAimingCoord = item.latitude to item.longitude
+                        mapViewModel.clearSearch()
+                    },
+                    onClearSearch = { mapViewModel.clearSearch() },
                     onAddWaypoint = {
                         mapViewModel.addWaypoint(activeCoord.first, activeCoord.second)
                     },

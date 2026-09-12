@@ -146,25 +146,25 @@ fun LocationControlPanel(
             )
         }
 
-        // 2. Search Bar + Master Action Capsule Pill
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(dragGestureModifier),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Search Box (styled with Liquid Glass or Solid)
+        // 2. Master Action & Search Rows
+        if (activeRule != null) {
+            val activeRuleColor = remember(activeRule.colorHex) {
+                runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
+                    .getOrDefault(IosColors.SystemBlue)
+            }
+
+            // A. Search Box (Full Width)
             Surface(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .then(dragGestureModifier)
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(26.dp),
+                        shape = RoundedCornerShape(24.dp),
                         elevation = 6.dp
                     ),
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = Color.Transparent
             ) {
                 Row(
@@ -177,7 +177,7 @@ fun LocationControlPanel(
                         imageVector = Icons.Default.Search,
                         contentDescription = "搜索",
                         tint = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     TextField(
@@ -185,8 +185,8 @@ fun LocationControlPanel(
                         onValueChange = onSearchQueryChange,
                         placeholder = {
                             Text(
-                                "搜索地点 / POI / 道路",
-                                fontSize = 14.sp,
+                                "搜索【${activeRule.appName}】分流地点",
+                                fontSize = 13.5.sp,
                                 color = if (isDark) Color.White.copy(0.5f) else IosColors.SecondaryLabel
                             )
                         },
@@ -216,190 +216,320 @@ fun LocationControlPanel(
                 }
             }
 
-            // High-Visibility Master Capsule Buttons
-            if (activeRule != null) {
-                val activeRuleColor = remember(activeRule.colorHex) {
-                    runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
-                        .getOrDefault(IosColors.SystemBlue)
-                }
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            // B. App Diversion Status Card with Inline Switch
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.45f) else (if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA))
+                ),
+                modifier = Modifier.fillMaxWidth().then(dragGestureModifier)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // 1. Sleek App Diversion Status Card with Inline Switch
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.45f) else (if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA))
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemGray,
+                            modifier = Modifier.size(28.dp)
                         ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = activeRule.appName.take(1),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                        Column {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.weight(1f, fill = false)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Text(
+                                    text = activeRule.appName,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemGray,
-                                    modifier = Modifier.size(28.dp)
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else IosColors.SystemGray.copy(alpha = 0.2f)
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = activeRule.appName.take(1),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
-                                Column {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = activeRule.appName,
-                                            fontSize = 13.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isDark) Color.White else Color.Black
-                                        )
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else IosColors.SystemGray.copy(alpha = 0.2f)
-                                        ) {
-                                            Text(
-                                                text = if (activeRule.isEnabled) "分流运行中" else "分流已暂停",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (activeRule.isEnabled) activeRuleColor else IosColors.SecondaryLabel,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                            )
-                                        }
-                                    }
                                     Text(
-                                        text = if (activeRule.isEnabled) "独立虚拟定位生效中" else "暂停后使用全局或物理定位",
-                                        fontSize = 10.5.sp,
-                                        color = IosColors.SecondaryLabel
+                                        text = if (activeRule.isEnabled) "分流运行中" else "分流已暂停",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (activeRule.isEnabled) activeRuleColor else IosColors.SecondaryLabel,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                     )
                                 }
                             }
-
-                            // Switch to turn diversion on / off for this app!
-                            Switch(
-                                checked = activeRule.isEnabled,
-                                onCheckedChange = { isChecked ->
-                                    onToggleTargetRule?.invoke(activeRule, isChecked)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = activeRuleColor,
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = if (isDark) Color(0xFF3A3A3C) else Color(0xFFD1D1D6)
-                                )
+                            Text(
+                                text = if (activeRule.isEnabled) "独立虚拟定位生效中" else "暂停后使用全局或物理定位",
+                                fontSize = 10.5.sp,
+                                color = IosColors.SecondaryLabel
                             )
                         }
                     }
 
-                    // 2. Main Action Row: [ 确定设为该应用分流定位点 ] & [ 切回全局 ]
+                    Switch(
+                        checked = activeRule.isEnabled,
+                        onCheckedChange = { isChecked ->
+                            onToggleTargetRule?.invoke(activeRule, isChecked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = activeRuleColor,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF3A3A3C) else Color(0xFFD1D1D6)
+                        )
+                    )
+                }
+            }
+
+            // C. Main Action Row: [ 确定设为该应用分流定位点 ] & [ 切回全局 ]
+            Row(
+                modifier = Modifier.fillMaxWidth().then(dragGestureModifier),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .liquidGlass(
+                            isLiquidGlass = isLiquidGlass,
+                            shape = RoundedCornerShape(24.dp),
+                            elevation = 8.dp,
+                            containerColor = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemBlue
+                        )
+                        .clickable {
+                            onSetTargetLocation?.invoke(activeRule)
+                        },
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Transparent
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(19.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (activeRule.isEnabled) "更新【${activeRule.appName}】定位点" else "开启并设为【${activeRule.appName}】定位点",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .height(48.dp)
+                        .liquidGlass(
+                            isLiquidGlass = isLiquidGlass,
+                            shape = RoundedCornerShape(24.dp),
+                            elevation = 4.dp
+                        )
+                        .clickable { onClearActiveTarget?.invoke() },
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Transparent
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "切回全局",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = IosColors.SystemBlue
+                        )
+                    }
+                }
+            }
+        } else {
+            // Global Mode: Search Bar + Master Action Capsule Pill
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(dragGestureModifier),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Search Box (styled with Liquid Glass or Solid)
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .liquidGlass(
+                            isLiquidGlass = isLiquidGlass,
+                            shape = RoundedCornerShape(26.dp),
+                            elevation = 6.dp
+                        ),
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜索",
+                            tint = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = {
+                                Text(
+                                    "搜索地点 / POI / 道路",
+                                    fontSize = 14.sp,
+                                    color = if (isDark) Color.White.copy(0.5f) else IosColors.SecondaryLabel
+                                )
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = IosColors.SystemBlue
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = onClearSearch,
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "清除",
+                                    tint = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isMockActive) {
+                    // Dual Capsule when active: [ 移动到此 ] & [ 停止模拟 ]
+                    Row(
+                        modifier = Modifier.height(52.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp)
+                                .height(52.dp)
                                 .liquidGlass(
                                     isLiquidGlass = isLiquidGlass,
-                                    shape = RoundedCornerShape(25.dp),
+                                    shape = RoundedCornerShape(26.dp),
                                     elevation = 8.dp,
-                                    containerColor = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemBlue
+                                    containerColor = IosColors.SystemBlue.copy(0.92f)
                                 )
-                                .clickable {
-                                    onSetTargetLocation?.invoke(activeRule)
-                                },
-                            shape = RoundedCornerShape(25.dp),
+                                .clickable { onStartMock() },
+                            shape = RoundedCornerShape(26.dp),
                             color = Color.Transparent
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 14.dp),
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.CheckCircle,
+                                    imageVector = Icons.Default.Place,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(19.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(3.dp))
                                 Text(
-                                    text = if (activeRule.isEnabled) "更新【${activeRule.appName}】定位点" else "开启并设为【${activeRule.appName}】定位点",
+                                    text = "移动",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.5.sp
+                                    fontSize = 13.sp
                                 )
                             }
                         }
 
                         Surface(
                             modifier = Modifier
-                                .height(50.dp)
+                                .height(52.dp)
                                 .liquidGlass(
                                     isLiquidGlass = isLiquidGlass,
-                                    shape = RoundedCornerShape(25.dp),
-                                    elevation = 4.dp
+                                    shape = RoundedCornerShape(26.dp),
+                                    elevation = 8.dp,
+                                    containerColor = IosColors.SystemRed.copy(0.92f)
                                 )
-                                .clickable { onClearActiveTarget?.invoke() },
-                            shape = RoundedCornerShape(25.dp),
+                                .clickable { onStopMock() },
+                            shape = RoundedCornerShape(26.dp),
                             color = Color.Transparent
                         ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxHeight()
-                                    .padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.Center
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
                                 Text(
-                                    text = "切回全局",
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.SystemBlue
+                                    text = "停止",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
                                 )
                             }
                         }
                     }
-                }
-            } else if (isMockActive) {
-                // Dual Capsule when active: [ 移动到此 ] & [ 停止模拟 ]
-                Row(
-                    modifier = Modifier.height(52.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                } else {
                     Surface(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
+                            .height(52.dp)
                             .liquidGlass(
                                 isLiquidGlass = isLiquidGlass,
                                 shape = RoundedCornerShape(26.dp),
                                 elevation = 8.dp,
-                                containerColor = IosColors.SystemBlue.copy(0.92f)
+                                containerColor = IosColors.SystemBlue.copy(0.95f)
                             )
                             .clickable { onStartMock() },
                         shape = RoundedCornerShape(26.dp),
@@ -407,98 +537,25 @@ fun LocationControlPanel(
                     ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 12.dp),
+                                .fillMaxHeight()
+                                .padding(horizontal = 18.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Place,
+                                imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(5.dp))
                             Text(
-                                text = "移动到此",
+                                text = "开启定位",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp
+                                fontSize = 14.sp
                             )
                         }
-                    }
-
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .liquidGlass(
-                                isLiquidGlass = isLiquidGlass,
-                                shape = RoundedCornerShape(26.dp),
-                                elevation = 8.dp,
-                                containerColor = IosColors.SystemRed.copy(0.92f)
-                            )
-                            .clickable { onStopMock() },
-                        shape = RoundedCornerShape(26.dp),
-                        color = Color.Transparent
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stop,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "停止模拟",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp
-                            )
-                        }
-                    }
-                }
-            } else {
-                Surface(
-                    modifier = Modifier
-                        .height(52.dp)
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(26.dp),
-                            elevation = 8.dp,
-                            containerColor = IosColors.SystemBlue.copy(0.95f)
-                        )
-                        .clickable { onStartMock() },
-                    shape = RoundedCornerShape(26.dp),
-                    color = Color.Transparent
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(horizontal = 22.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "开启定位",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.5.sp
-                        )
                     }
                 }
             }

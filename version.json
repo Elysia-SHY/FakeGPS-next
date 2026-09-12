@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.3",
-  "versionCode": 9,
+  "versionName": "v1.3.4",
+  "versionCode": 10,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 独立应用分流选点交互重构：地图选点准心挂载应用浮动徽标与品牌色，底部面板自适应呈现「确定设为【应用】分流定位点」，分流应用与全局定位操作彻底明确清晰。\n2. 路线巡航纯全局解耦：路线规划与道路巡航彻底设为全局模式，底层广播 is_route 属性，巡航时所有非透传应用无缝跟随路线漫游，停止后即刻恢复各自独立分流，双模零冲突运作。\n3. 分流规则模式精简：移除歧义的路径漫游选项，精简为「📍 独立定点分流」与「🛰️ 真实物理透传」。\n4. 选点按需保存机制：移除地图滑动时的频繁静默写盘与 Root 广播，用户在面板点击确认时精准落盘。",
+  "releaseNotes": "1. 路线模拟全面支持 POI / 地点搜索：路线规划阶段新增毛玻璃搜索栏与联想结果浮层，支持地名、POI、道路及经纬度搜索，点击自动平移对齐并一键定为航点。\n2. 路线规划 UI 极简解叠降重：移除顶部全宽提示横幅与重复按钮，顶部工具栏精简为沿路规划、底图切换、GPX导入3个核心图标；右侧浮动定位按钮与底栏解耦上浮，彻底杜绝元素堆叠。\n3. 定位控制面板布局优化：分流应用独立卡片、开关与搜索栏纵向解构，避免横向挤压变形。\n4. 单点定位与路线巡航状态互斥：开启路线巡航自动关闭单点定位及摇杆，互不干扰。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.3/FakeGPS-v1.3.3.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.4/FakeGPS-v1.3.4.apk"
 }
