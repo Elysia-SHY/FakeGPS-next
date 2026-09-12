@@ -113,104 +113,63 @@ fun Modifier.liquidGlass(
             )
         }
 
-        // 2. High-Contrast Fresnel Rim Light (135° 菲涅尔全反射微棱镜双光边框)
+        // 1. Subtle, clean glass border (VisionOS single hairline rim)
         val borderBrush = Brush.linearGradient(
             colors = if (containerColor != null) {
                 listOf(
-                    Color.White.copy(alpha = 0.85f),
-                    Color.White.copy(alpha = 0.45f),
-                    Color.White.copy(alpha = 0.18f),
-                    Color.White.copy(alpha = 0.60f)
+                    containerColor.copy(alpha = 0.60f),
+                    containerColor.copy(alpha = 0.25f)
                 )
             } else if (isDark) {
                 listOf(
-                    Color.White.copy(alpha = 0.80f), // 顶角锐利折射高光
-                    Color.White.copy(alpha = 0.35f),
-                    Color.White.copy(alpha = 0.08f),
-                    Color(0x507090B0)                // 底角微偏光反射
+                    Color.White.copy(alpha = 0.22f),
+                    Color.White.copy(alpha = 0.06f)
                 )
             } else {
                 listOf(
-                    Color.White.copy(alpha = 0.98f), // 98% 纯净高光棱镜光芒
                     Color.White.copy(alpha = 0.65f),
-                    Color.White.copy(alpha = 0.25f),
-                    Color(0x99B2CEE8)                // 晶体折射边缘光晕
+                    Color.White.copy(alpha = 0.20f)
                 )
             },
             start = Offset.Zero,
             end = Offset.Infinite
         )
 
-        // 3. Ambient Diffuse Shadow (空间悬浮柔光投影 - 偏深蓝调模拟透光阴影)
-        val spotColor = if (isDark) Color(0x8C000000) else Color(0x24001A33)
-        val ambientColor = if (isDark) Color(0x4D000000) else Color(0x12001020)
-
-        val baseModifier = this
-            .shadow(
-                elevation = elevation,
+        // 2. Base Modifier with soft clipping and subtle elevation
+        val baseModifier = if (elevation > 0.dp) {
+            this.shadow(
+                elevation = elevation.coerceAtMost(3.dp),
                 shape = shape,
-                spotColor = spotColor,
-                ambientColor = ambientColor
-            )
-            .clip(shape)
+                spotColor = if (isDark) Color(0x22000000) else Color(0x10001020),
+                ambientColor = Color.Transparent
+            ).clip(shape)
+        } else {
+            this.clip(shape)
+        }
 
+        // 3. Single-layer Frosted Blur or Crystal Base
         val blurredModifier = if (resolvedHaze != null) {
             baseModifier.hazeChild(
                 state = resolvedHaze,
                 shape = shape,
                 style = HazeDefaults.style(
                     tint = if (containerColor != null) {
-                        containerColor.copy(alpha = 0.28f)
+                        containerColor.copy(alpha = 0.25f)
                     } else if (isDark) {
-                        Color(0x38161B26)
+                        Color(0x221E2430) // Translucent obsidian tint, letting wallpaper shine through
                     } else {
-                        Color(0x44FFFFFF)
+                        Color(0x40FFFFFF)
                     },
-                    blurRadius = 24.dp,
-                    noiseFactor = 0.10f
+                    blurRadius = 20.dp,
+                    noiseFactor = 0.05f
                 )
             )
         } else {
             baseModifier.background(crystalBaseBrush, shape)
         }
 
-        blurredModifier
-            .border(borderWidth.coerceAtLeast(1.0.dp), borderBrush, shape)
-            .drawBehind {
-                // Top-Left Inner Specular Bevel (物理玻璃厚度立体内倒角高光)
-                val innerBevelBrush = Brush.linearGradient(
-                    colors = if (isDark) {
-                        listOf(
-                            Color.White.copy(alpha = 0.30f),
-                            Color.White.copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
-                    } else {
-                        listOf(
-                            Color.White.copy(alpha = 0.75f),
-                            Color.White.copy(alpha = 0.25f),
-                            Color.Transparent
-                        )
-                    },
-                    start = Offset.Zero,
-                    end = Offset(size.width * 0.65f, size.height * 0.45f)
-                )
-                drawRoundRect(
-                    brush = innerBevelBrush,
-                    size = size,
-                    style = Stroke(width = 1.2.dp.toPx())
-                )
-
-                // Top Specular Surface Sheen & Bottom Ambient Reflection (表面掠射弧光与环境反射)
-                val topSheenBrush = Brush.verticalGradient(
-                    0.0f to Color.White.copy(alpha = if (isDark) 0.16f else 0.42f),
-                    0.22f to Color.White.copy(alpha = if (isDark) 0.05f else 0.14f),
-                    0.55f to Color.Transparent,
-                    0.90f to Color.Transparent,
-                    1.0f to Color.White.copy(alpha = if (isDark) 0.04f else 0.10f)
-                )
-                drawRect(topSheenBrush)
-            }
+        // 4. Single crisp hairline border
+        blurredModifier.border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
     } else {
         val solidFill = containerColor ?: if (isDark) {
             Color(0xFF1E1E20)

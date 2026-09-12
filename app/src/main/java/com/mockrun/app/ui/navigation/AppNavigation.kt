@@ -81,14 +81,12 @@ fun AppNavigation(
         )
     }
 
-    // Dual-Haze Architecture:
-    // 1. cardHazeState: For all cards to blur the background wallpaper/ambient or map
-    // 2. bottomBarHazeState: For bottom floating bar to blur the entire screen (cards + text + background)
-    val cardHazeState = remember { HazeState() }
+    // Bottom bar haze state: For bottom floating bar to blur whatever is beneath it
     val bottomBarHazeState = remember { HazeState() }
 
     // Unified interactive tab position: 0.0f .. 3.0f
     val tabPosition = remember { Animatable(0f) }
+    val isSliding = abs(tabPosition.value - tabPosition.value.roundToInt()) > 0.008f
     var showLibrarySubScreen by remember { mutableStateOf(false) }
 
     val updateStatus by VersionSyncManager.status
@@ -112,7 +110,6 @@ fun AppNavigation(
 
     CompositionLocalProvider(
         LocalLiquidGlassEnabled provides isLiquidGlassEnabled,
-        LocalHazeState provides cardHazeState,
         LocalBottomBarHazeState provides bottomBarHazeState
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -122,51 +119,70 @@ fun AppNavigation(
                     .fillMaxSize()
                     .haze(bottomBarHazeState)
             ) {
-                for (i in 0..3) {
-                    val offsetFraction = i - tabPosition.value
-                    if (abs(offsetFraction) < 1.15f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    translationX = offsetFraction * size.width
-                                }
-                        ) {
-                            when (i) {
-                                0 -> MapScreen(
-                                    mapViewModel = mapViewModel,
-                                    simulationViewModel = simulationViewModel,
-                                    initialTab = MapTab.LOCATION,
-                                    isLiquidGlass = isLiquidGlassEnabled,
-                                    isTablet = isTablet,
-                                    bottomBarPadding = bottomBarPadding,
-                                    onNavigateToLibrary = { showLibrarySubScreen = true }
-                                )
-                                1 -> MapScreen(
-                                    mapViewModel = mapViewModel,
-                                    simulationViewModel = simulationViewModel,
-                                    initialTab = MapTab.ROUTE,
-                                    isLiquidGlass = isLiquidGlassEnabled,
-                                    isTablet = isTablet,
-                                    bottomBarPadding = bottomBarPadding,
-                                    onNavigateToLibrary = { showLibrarySubScreen = true }
-                                )
-                                2 -> LocationMockScreen(
-                                    simulationViewModel = simulationViewModel,
-                                    onNavigateToMap = {
-                                        coroutineScope.launch {
-                                            tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
-                                        }
-                                    }
-                                )
-                                3 -> AboutScreen(
-                                    isLiquidGlass = isLiquidGlassEnabled,
-                                    isTablet = isTablet,
-                                    onToggleLiquidGlass = { isLiquidGlassEnabled = it },
-                                    onNavigateToLibrary = { showLibrarySubScreen = true }
-                                )
+                // Page 0: MapScreen (Handles Tab 0: 定位 and Tab 1: 路线 on ONE single Tencent MapView instance)
+                val mapTab = if (tabPosition.value < 0.5f) MapTab.LOCATION else MapTab.ROUTE
+                val mapOffsetFraction = if (tabPosition.value <= 1.0f) 0f else (1.0f - tabPosition.value)
+                if (tabPosition.value < 2.05f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = mapOffsetFraction * size.width
                             }
+                    ) {
+                        CompositionLocalProvider(LocalHazeState provides null) {
+                            MapScreen(
+                                mapViewModel = mapViewModel,
+                                simulationViewModel = simulationViewModel,
+                                initialTab = mapTab,
+                                isLiquidGlass = isLiquidGlassEnabled,
+                                isTablet = isTablet,
+                                bottomBarPadding = bottomBarPadding,
+                                onNavigateToLibrary = { showLibrarySubScreen = true }
+                            )
                         }
+                    }
+                }
+
+                // Page 1: LocationMockScreen (Tab 2: 功能)
+                val featuresOffsetFraction = 2.0f - tabPosition.value
+                if (tabPosition.value in 0.95f..3.05f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = featuresOffsetFraction * size.width
+                            }
+                    ) {
+                        LocationMockScreen(
+                            simulationViewModel = simulationViewModel,
+                            isSliding = isSliding,
+                            onNavigateToMap = {
+                                coroutineScope.launch {
+                                    tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // Page 2: AboutScreen (Tab 3: 关于)
+                val aboutOffsetFraction = 3.0f - tabPosition.value
+                if (tabPosition.value > 1.95f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = aboutOffsetFraction * size.width
+                            }
+                    ) {
+                        AboutScreen(
+                            isLiquidGlass = isLiquidGlassEnabled,
+                            isTablet = isTablet,
+                            isSliding = isSliding,
+                            onToggleLiquidGlass = { isLiquidGlassEnabled = it },
+                            onNavigateToLibrary = { showLibrarySubScreen = true }
+                        )
                     }
                 }
             }

@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.8",
-  "versionCode": 14,
+  "versionName": "v1.3.9",
+  "versionCode": 15,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 📱 底栏拖拽与整屏页面 1:1 毫秒级平移联动：横向拖拽底栏滑块时整屏各页面实时无级平移，松手物理弹簧吸附，地图交互零手势冲突。\n2. 💎 全局卡片真毛玻璃：双层独立 HazeState 架构，全应用所有卡片均施加 24.dp 硬件高斯模糊，彻底告别半透明遮罩。\n3. 🎨 关于页个性化背景主题与自选壁纸：内置 5 套极光与黑曜主题，支持从系统相册选取任意照片作为全应用底衬。\n4. 🚀 极速在线更新：支持应用内检测、进度条流式下载与原生静默安装唤起。",
+  "releaseNotes": "1. 💎 彻底修复滑动界面时卡片模糊偏移与位移撕裂问题：引入滑动状态感知与双层晶体着色器，页面平移拖拽时卡片零偏移 120 FPS 丝滑过渡，驻留静止时呈现全通透硬件毛玻璃。\n2. 🗺️ 地图架构优化：统一合并单例 MapView 实例，消除底栏切换多余重绘，移除地图图层异常幽灵暗圈。\n3. 🎨 极简自选背景：精简预设主题，仅保留相册自定义壁纸与默认动态极光。\n4. 📱 界面布局重叠修复：抬高右侧物理定位悬浮按钮，彻底解决与「开启定位」按钮视觉碰撞。\n5. 🫧 卡片视觉减负：去除多层内倒角与深色暗影，呈现超薄灵动 VisionOS 纯净单层微光质感。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.8/FakeGPS-next-v1.3.8-release.apk"
+  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.9/FakeGPS-next-v1.3.9-release.apk"
 }

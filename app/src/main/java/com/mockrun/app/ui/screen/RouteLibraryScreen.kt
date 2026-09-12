@@ -53,10 +53,11 @@ fun RouteLibraryScreen(
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    val hazeState = LocalHazeState.current ?: remember { HazeState() }
+    val screenHazeState = remember { HazeState() }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        AppBackground(hazeState = hazeState)
+    CompositionLocalProvider(LocalHazeState provides screenHazeState) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AppBackground(hazeState = screenHazeState)
 
         Column(
             modifier = Modifier
@@ -544,5 +545,6 @@ fun RouteLibraryScreen(
             shape = RoundedCornerShape(18.dp)
         )
     }
+}
 }
 }

@@ -429,7 +429,6 @@ fun MapScreen(
     onNavigateToLibrary: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val hazeState = LocalHazeState.current ?: remember { HazeState() }
     var activeMapTab by remember { mutableStateOf(initialTab) }
     LaunchedEffect(initialTab) {
         activeMapTab = initialTab
@@ -554,9 +553,7 @@ fun MapScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .haze(hazeState)
+            modifier = Modifier.fillMaxSize()
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -1216,7 +1213,7 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = if (activeMapTab == MapTab.ROUTE) bottomBarPadding + 190.dp else bottomBarPadding + 145.dp, end = 14.dp),
+                    .padding(bottom = bottomBarPadding + 225.dp, end = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

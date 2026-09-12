@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LocationMockScreen(
     simulationViewModel: SimulationViewModel,
+    isSliding: Boolean = false,
     onNavigateToMap: () -> Unit
 ) {
     val context = LocalContext.current
@@ -157,14 +158,15 @@ fun LocationMockScreen(
     var showHelpSheet by remember { mutableStateOf(false) }
     var showWeChatGuideSheet by remember { mutableStateOf(false) }
 
-    val hazeState = LocalHazeState.current ?: remember { HazeState() }
+    val screenHazeState = remember { HazeState() }
     val isLiquidGlass = LocalLiquidGlassEnabled.current
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        AppBackground(hazeState = hazeState)
+    CompositionLocalProvider(LocalHazeState provides (if (isSliding) null else screenHazeState)) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            AppBackground(hazeState = screenHazeState)
 
         Column(
             modifier = Modifier
@@ -770,6 +772,7 @@ fun LocationMockScreen(
         )
         Spacer(Modifier.height(20.dp))
     }
+}
 }
 
     // iOS Style Guide Dialog: 防闪回与使用指南
