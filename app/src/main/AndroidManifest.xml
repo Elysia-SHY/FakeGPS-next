@@ -23,6 +23,7 @@
     <!-- System Alert Window for Floating Joystick -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android 11+ Package Visibility for Multi-Target App Routing -->
     <uses-permission

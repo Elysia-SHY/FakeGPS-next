@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.4",
-  "versionCode": 10,
+  "versionName": "v1.3.5",
+  "versionCode": 11,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 路线模拟全面支持 POI / 地点搜索：路线规划阶段新增毛玻璃搜索栏与联想结果浮层，支持地名、POI、道路及经纬度搜索，点击自动平移对齐并一键定为航点。\n2. 路线规划 UI 极简解叠降重：移除顶部全宽提示横幅与重复按钮，顶部工具栏精简为沿路规划、底图切换、GPX导入3个核心图标；右侧浮动定位按钮与底栏解耦上浮，彻底杜绝元素堆叠。\n3. 定位控制面板布局优化：分流应用独立卡片、开关与搜索栏纵向解构，避免横向挤压变形。\n4. 单点定位与路线巡航状态互斥：开启路线巡航自动关闭单点定位及摇杆，互不干扰。",
+  "releaseNotes": "1. 解决加速器/VPN下无法拉取最新版：版本检测引擎升级为多通道高可用竞速并发架构（涵盖 Fastly、ghproxy、raw.github、llkk 等多重海内外镜像源），配合 10s 弹性超时与全链路防缓存重定向，彻底无视代理出口限流。\n2. 应用内极速直接下载与自动安装：告别繁琐的跳出外部浏览器，APP 内直接在线下载新版 APK，提供实时毛玻璃进度条、速率展示、断点续传及自动拉起原生安装器（深度适配 Android 8~15 安装未知来源权限）。\n3. 修复路线与定位搜索框文字截断：重构为原生 BasicTextField 垂直居中架构，彻底消除 Material3 默认边距导致的上下汉字显示不全与裁切问题。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.4/FakeGPS-v1.3.4.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.5/FakeGPS-v1.3.5.apk"
 }

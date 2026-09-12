@@ -21,6 +21,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -180,26 +183,30 @@ fun LocationControlPanel(
                         modifier = Modifier.size(19.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        placeholder = {
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        if (searchQuery.isEmpty()) {
                             Text(
                                 "搜索【${activeRule.appName}】分流地点",
-                                fontSize = 13.5.sp,
-                                color = if (isDark) Color.White.copy(0.5f) else IosColors.SecondaryLabel
+                                fontSize = 14.sp,
+                                color = if (isDark) Color.White.copy(0.45f) else IosColors.SecondaryLabel
                             )
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = IosColors.SystemBlue
-                        ),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                        }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = if (isDark) Color.White else Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            cursorBrush = SolidColor(IosColors.SystemBlue),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     if (searchQuery.isNotEmpty()) {
                         IconButton(
                             onClick = onClearSearch,

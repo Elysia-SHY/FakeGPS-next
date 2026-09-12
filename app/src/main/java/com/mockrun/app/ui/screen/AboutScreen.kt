@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.mockrun.app.BuildConfig
 import com.mockrun.app.data.repository.RemoteVersionInfo
 import com.mockrun.app.data.repository.VersionSyncManager
+import com.mockrun.app.data.repository.DownloadStatus
 import com.mockrun.app.data.repository.VersionSyncStatus
 import com.mockrun.app.ui.theme.*
 import kotlinx.coroutines.launch
@@ -73,6 +74,7 @@ fun AboutScreen(
     val gitRepoUrl = "https://github.com/Elysia-SHY/FakeGPS-next"
 
     val syncState by VersionSyncManager.status
+    val downloadState by VersionSyncManager.downloadStatus
     var showChangelogDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Auto-sync version on screen launch
@@ -455,66 +457,223 @@ fun AboutScreen(
                         Spacer(Modifier.height(14.dp))
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color(0xFFFF9500).copy(alpha = 0.12f),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF9500).copy(alpha = 0.35f))
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Celebration, contentDescription = null, tint = Color(0xFFFF9500), modifier = Modifier.size(18.dp))
-                                    Text(
-                                        text = "发现新版本 ${info.versionName}",
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isDark) Color.White else Color.Black
-                                    )
-                                }
-
-                                if (info.releaseDate.isNotBlank()) {
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        text = "发布日期: ${info.releaseDate}",
-                                        fontSize = 11.sp,
-                                        color = IosColors.SecondaryLabel
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Celebration, contentDescription = null, tint = Color(0xFFFF9500), modifier = Modifier.size(20.dp))
+                                        Text(
+                                            text = "发现新版本 ${info.versionName}",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color.Black
+                                        )
+                                    }
+                                    if (info.releaseDate.isNotBlank()) {
+                                        Text(
+                                            text = info.releaseDate,
+                                            fontSize = 11.5.sp,
+                                            color = IosColors.SecondaryLabel
+                                        )
+                                    }
                                 }
 
                                 Spacer(Modifier.height(10.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            showChangelogDialog = Pair("${info.versionName} 更新说明", info.releaseNotes)
-                                        },
-                                        modifier = Modifier.weight(1f).height(38.dp),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) Color.White else Color.Black)
-                                    ) {
-                                        Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                // In-App Download Status & Action Rows
+                                when (downloadState) {
+                                    is DownloadStatus.Downloading -> {
+                                        val dl = downloadState as DownloadStatus.Downloading
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            LinearProgressIndicator(
+                                                progress = dl.progress,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(6.dp)
+                                                    .clip(RoundedCornerShape(3.dp)),
+                                                color = Color(0xFFFF9500),
+                                                trackColor = Color(0xFFFF9500).copy(alpha = 0.2f)
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${(dl.progress * 100).toInt()}% (${formatMb(dl.downloadedBytes)} / ${formatMb(dl.totalBytes)})",
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isDark) Color.White.copy(0.9f) else Color.Black
+                                                )
+                                                Text(
+                                                    text = formatSpeed(dl.speedBytesPerSec),
+                                                    fontSize = 11.5.sp,
+                                                    color = Color(0xFFFF9500),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            OutlinedButton(
+                                                onClick = { VersionSyncManager.cancelDownload() },
+                                                modifier = Modifier.fillMaxWidth().height(36.dp),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Text("取消下载", fontSize = 12.sp, color = IosColors.SystemRed)
+                                            }
+                                        }
                                     }
 
-                                    Button(
-                                        onClick = {
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "无法打开下载页面", Toast.LENGTH_SHORT).show()
+                                    is DownloadStatus.Success -> {
+                                        val file = (downloadState as DownloadStatus.Success).file
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
+                                                Text(
+                                                    text = "新版本已下载就绪 (${formatMb(file.length())})",
+                                                    fontSize = 12.sp,
+                                                    color = Color(0xFF34C759),
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
                                             }
-                                        },
-                                        modifier = Modifier.weight(1.2f).height(38.dp),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("立即升级", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        VersionSyncManager.startDownload(context, info)
+                                                    },
+                                                    modifier = Modifier.weight(1f).height(38.dp),
+                                                    shape = RoundedCornerShape(10.dp)
+                                                ) {
+                                                    Text("重新下载", fontSize = 12.sp)
+                                                }
+                                                Button(
+                                                    onClick = {
+                                                        VersionSyncManager.installApk(context, file)
+                                                    },
+                                                    modifier = Modifier.weight(1.3f).height(38.dp),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34C759))
+                                                ) {
+                                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Text("立即安装", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    is DownloadStatus.Error -> {
+                                        val errMsg = (downloadState as DownloadStatus.Error).message
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "下载失败: $errMsg",
+                                                fontSize = 11.5.sp,
+                                                color = IosColors.SystemRed
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = { VersionSyncManager.startDownload(context, info) },
+                                                    modifier = Modifier.weight(1f).height(38.dp),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
+                                                ) {
+                                                    Text("重试在线下载", fontSize = 12.sp, color = Color.White)
+                                                }
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        try {
+                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
+                                                            context.startActivity(intent)
+                                                        } catch (e: Exception) {
+                                                            Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    },
+                                                    modifier = Modifier.weight(1f).height(38.dp),
+                                                    shape = RoundedCornerShape(10.dp)
+                                                ) {
+                                                    Text("浏览器下载", fontSize = 12.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    DownloadStatus.Idle -> {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    showChangelogDialog = Pair("${info.versionName} 更新说明", info.releaseNotes)
+                                                },
+                                                modifier = Modifier.weight(1f).height(40.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) Color.White else Color.Black)
+                                            ) {
+                                                Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    VersionSyncManager.startDownload(context, info)
+                                                },
+                                                modifier = Modifier.weight(1.3f).height(40.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
+                                            ) {
+                                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                                Spacer(Modifier.width(5.dp))
+                                                Text("在线下载更新", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            }
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = "备用：在浏览器中直接下载",
+                                                fontSize = 11.sp,
+                                                color = IosColors.SystemBlue,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        try {
+                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
+                                                            context.startActivity(intent)
+                                                        } catch (e: Exception) {
+                                                            Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1181,5 +1340,20 @@ private fun FeatureItem(
                 color = IosColors.SecondaryLabel
             )
         }
+    }
+}
+
+private fun formatMb(bytes: Long): String {
+    if (bytes <= 0) return "0 MB"
+    return "%.1f MB".format(bytes / (1024.0 * 1024.0))
+}
+
+private fun formatSpeed(bytesPerSec: Long): String {
+    if (bytesPerSec <= 0) return "-- KB/s"
+    val kb = bytesPerSec / 1024.0
+    return if (kb >= 1024.0) {
+        "%.1f MB/s".format(kb / 1024.0)
+    } else {
+        "%.0f KB/s".format(kb)
     }
 }
