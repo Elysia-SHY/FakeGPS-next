@@ -10,6 +10,8 @@ import android.os.Binder
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XSharedPreferences
@@ -26,6 +28,9 @@ data class SpoofLocation(
     val speed: Float,
     val timestamp: Long = 0L
 )
+
+/** Logcat/Xposed tag for this hook. Kept short — it appears in `system_server` logs. */
+private const val TAG = "LocationHook"
 
 class XposedLocationHook : IXposedHookLoadPackage {
 
@@ -50,7 +55,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     "isModuleActive",
                     de.robv.android.xposed.XC_MethodReplacement.returnConstant(true)
                 )
-            }
+            }.logFailure(TAG, "hook XposedStatusHelper.isModuleActive")
             return
         }
 
@@ -60,7 +65,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 val sp = XSharedPreferences("com.mockrun.app", "hook_config")
                 sp.makeWorldReadable()
                 sp
-            }.getOrNull()
+            }
+                // When this fails the entire XSharedPreferences channel is dead. It used to be silent.
+                .logFailure(TAG, "init XSharedPreferences(hook_config) — config channel dead", Diag.Level.ERROR)
+                .getOrNull()
         }
 
         // Capture Application Context for ContentProvider IPC fallback
@@ -75,25 +83,25 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             )
-        }
+        }.logFailure(TAG, "hook Application.onCreate — context capture lost, IPC fallback degraded")
 
         // Universal Anti-Mock detection hook in all processes
         hookMockDetection(lpparam)
 
         // Eagerly resolve context from ActivityThread if available
-        runCatching { getAnyContext() }
+        runCatching { getAnyContext() }.logFailure(TAG, "eager getAnyContext()")
 
         if (pkg == "android") {
             // =========================================================================
             // 核心系统层 Hook (System Framework / system_server)
             // =========================================================================
-            XposedBridge.log("[FakeGPS] >>> Hooking Android System Framework (system_server) <<<")
+            Diag.i(TAG, ">>> hooked system framework (system_server) <<<")
             hookSystemServer(lpparam)
         } else {
             // =========================================================================
             // 客户端应用层 Hook (Client Application Fallback)
             // =========================================================================
-            XposedBridge.log("[FakeGPS] Injected into client application: $pkg")
+            Diag.i(TAG, "injected into client application: $pkg")
             hookClientApp(lpparam)
         }
     }
@@ -123,7 +131,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
     }
 
     private fun hookSystemGnssStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            Diag.d(TAG, "GNSS status hook skipped: SDK_INT < N")
+            return
+        }
 
         val gnssClasses = listOfNotNull(
             XposedHelpers.findClassIfExists("com.android.server.location.gnss.GnssStatusProvider", lpparam.classLoader),
@@ -132,6 +143,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
             XposedHelpers.findClassIfExists("com.android.server.location.gnss.GnssLocationProvider", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.location.GnssLocationProvider", lpparam.classLoader)
         )
+
+        // A silent zero here means the entire GNSS synthesis branch is inert on this ROM.
+        // Previously this produced no output at all, so "no satellites faked" and
+        // "class names changed upstream" were indistinguishable.
+        if (gnssClasses.isEmpty()) {
+            Diag.w(TAG, "GNSS status hook: none of the 5 candidate classes resolved on this ROM")
+        } else {
+            Diag.i(TAG, "GNSS status hook: ${gnssClasses.size} candidate class(es) resolved")
+        }
 
         for (cls in gnssClasses) {
             runCatching {
@@ -147,7 +167,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hookAllMethods(onReportGnssStatus) on ${cls.name}")
         }
     }
 
