@@ -45,6 +45,21 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+private const val BUILTIN_CHANGELOG = """【FakeGPS-next v1.3.2 更新日志】
+
+1. 🔄 云端版本与更新自动同步：
+   - 采用三级梯级容灾架构（jsdelivr CDN、GitHub Raw 及 Releases API）；
+   - 实时智能比对版本，支持一键热同步与应用内更新日志预览。
+
+2. 🎨 介绍页 UI 全景重构：
+   - 引入 FlowRow 自适应折行，修复多分辨率下技术标签挤压变形问题；
+   - 扩大底部安全边距，彻底避免底部浮动导航栏遮挡诊断面板；
+   - 新增设备环境与运行诊断面板（展示机型、系统版本、ABI 架构及模块建议）。
+
+3. 🔀 系统框架级多应用独立分流：
+   - 补全 HookConfigProvider 跨进程通信与底层派发拦截；
+   - 消除定点驻留模式下的 AOSP 最小位移丢包问题。"""
+
 @Composable
 fun AboutScreen(
     isLiquidGlass: Boolean,
@@ -58,7 +73,7 @@ fun AboutScreen(
     val gitRepoUrl = "https://github.com/Elysia-SHY/FakeGPS-next"
 
     val syncState by VersionSyncManager.status
-    var showChangelogDialog by remember { mutableStateOf<RemoteVersionInfo?>(null) }
+    var showChangelogDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Auto-sync version on screen launch
     LaunchedEffect(Unit) {
@@ -67,15 +82,15 @@ fun AboutScreen(
 
     // Changelog Dialog
     if (showChangelogDialog != null) {
-        val info = showChangelogDialog!!
+        val (dialogTitle, dialogContent) = showChangelogDialog!!
         AlertDialog(
             onDismissRequest = { showChangelogDialog = null },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.NewReleases, contentDescription = null, tint = IosColors.SystemBlue)
                     Text(
-                        text = "${info.versionName} 更新说明",
-                        fontSize = 18.sp,
+                        text = dialogTitle,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -88,18 +103,10 @@ fun AboutScreen(
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (info.releaseDate.isNotBlank()) {
-                        Text(
-                            text = "发布日期: ${info.releaseDate}",
-                            fontSize = 12.sp,
-                            color = IosColors.SecondaryLabel
-                        )
-                    }
-                    HorizontalDivider(color = if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f))
                     Text(
-                        text = if (info.releaseNotes.isNotBlank()) info.releaseNotes else "暂无详细更新说明",
-                        fontSize = 13.5.sp,
-                        lineHeight = 20.sp,
+                        text = dialogContent,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
                         color = if (isDark) Color(0xFFE0E0E0) else Color(0xFF2C2C2E)
                     )
                 }
@@ -108,21 +115,21 @@ fun AboutScreen(
                 Button(
                     onClick = {
                         try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Elysia-SHY/FakeGPS-next/releases"))
                             context.startActivity(intent)
                         } catch (e: Exception) {
-                            Toast.makeText(context, "无法打开下载链接", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "无法打开发布页面", Toast.LENGTH_SHORT).show()
                         }
                         showChangelogDialog = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
                 ) {
-                    Text("前往下载 / 查看 Release", color = Color.White)
+                    Text("前往 GitHub Release", color = Color.White, fontSize = 12.5.sp)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showChangelogDialog = null }) {
-                    Text("关闭", color = IosColors.SecondaryLabel)
+                    Text("关闭", color = IosColors.SecondaryLabel, fontSize = 12.5.sp)
                 }
             },
             shape = RoundedCornerShape(20.dp),
@@ -143,7 +150,7 @@ fun AboutScreen(
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                .padding(top = 16.dp, bottom = if (isTablet) 32.dp else 120.dp),
+                .padding(top = 16.dp, bottom = if (isTablet) 48.dp else 160.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             // =====================================================================
@@ -270,7 +277,6 @@ fun AboutScreen(
                 color = Color.Transparent
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
-                    // Header row with Sync button
                     val isChecking = syncState is VersionSyncStatus.Checking
 
                     val infiniteTransition = rememberInfiniteTransition(label = "spin")
@@ -427,7 +433,7 @@ fun AboutScreen(
                                 is VersionSyncStatus.UpToDate -> (syncState as VersionSyncStatus.UpToDate).info.versionName
                                 is VersionSyncStatus.HasUpdate -> (syncState as VersionSyncStatus.HasUpdate).info.versionName
                                 is VersionSyncStatus.Checking -> "检测中..."
-                                else -> "—"
+                                else -> BuildConfig.VERSION_NAME
                             }
                             Text(
                                 text = remoteName,
@@ -483,7 +489,9 @@ fun AboutScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     OutlinedButton(
-                                        onClick = { showChangelogDialog = info },
+                                        onClick = {
+                                            showChangelogDialog = Pair("${info.versionName} 更新说明", info.releaseNotes)
+                                        },
                                         modifier = Modifier.weight(1f).height(38.dp),
                                         shape = RoundedCornerShape(10.dp),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) Color.White else Color.Black)
@@ -513,37 +521,75 @@ fun AboutScreen(
                         }
                     }
 
-                    // Up to date banner
-                    if (syncState is VersionSyncStatus.UpToDate) {
-                        val info = (syncState as VersionSyncStatus.UpToDate).info
-                        val checkedAt = (syncState as VersionSyncStatus.UpToDate).checkedAt
+                    // Up to date banner with view changelog button
+                    if (syncState is VersionSyncStatus.UpToDate || syncState is VersionSyncStatus.Idle) {
+                        val checkedAt = (syncState as? VersionSyncStatus.UpToDate)?.checkedAt ?: System.currentTimeMillis()
                         val timeStr = remember(checkedAt) {
                             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(checkedAt))
                         }
+                        val remoteNotes = (syncState as? VersionSyncStatus.UpToDate)?.info?.releaseNotes?.takeIf { it.isNotBlank() } ?: BUILTIN_CHANGELOG
+
                         Spacer(Modifier.height(12.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0xFF34C759).copy(alpha = 0.1f))
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(15.dp))
                                 Text(
-                                    text = "已是最新版本，无需更新",
+                                    text = "已是最新版本 · $timeStr 已同步",
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = Color(0xFF34C759)
                                 )
                             }
-                            Text(
-                                text = "$timeStr 已同步",
-                                fontSize = 10.5.sp,
-                                color = IosColors.SecondaryLabel
-                            )
+
+                            TextButton(
+                                onClick = {
+                                    showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 最新特性日志", remoteNotes)
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("查看日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = IosColors.SystemBlue)
+                            }
+                        }
+                    }
+
+                    // Error banner
+                    if (syncState is VersionSyncStatus.Error) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFFF3B30).copy(alpha = 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF3B30), modifier = Modifier.size(15.dp))
+                                Text(
+                                    text = "网络离线或同步受阻",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFFF3B30)
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 本地特性说明", BUILTIN_CHANGELOG)
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("本地日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = IosColors.SystemBlue)
+                            }
                         }
                     }
                 }
@@ -595,7 +641,7 @@ fun AboutScreen(
                         icon = Icons.Default.PlayArrow,
                         iconTint = IosColors.SystemOrange,
                         title = "离线运动学物理仿真 (Kinematics Pro)",
-                        tags = listOf("三点外接圆向心减速", "双峰步频微动", "高斯地形海拔起伏"),
+                        tags = listOf("向心加速度减速", "双峰步频微动", "高斯地形海拔起伏"),
                         desc = "结合外接圆过弯向心减速约束 (v <= sqrt(a*R)) 杜绝急转弯超速异常；步频双峰微动模型拟真人体步态；高斯地形模型生成逼真海拔曲线。"
                     )
                     HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
@@ -645,7 +691,7 @@ fun AboutScreen(
                     HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
                     DiagnosticRow(label = "指令集架构", value = abi)
                     HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                    DiagnosticRow(label = "构建变体", value = "${BuildConfig.BUILD_TYPE.replaceFirstChar { it.uppercase() }} (R8 优化压缩)")
+                    DiagnosticRow(label = "构建变体", value = "${BuildConfig.BUILD_TYPE.replaceFirstChar { it.uppercase() }} (R8 混淆优化)")
 
                     Spacer(Modifier.height(4.dp))
                     Surface(
@@ -1006,7 +1052,7 @@ fun AboutScreen(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(20.dp))
         }
     }
 }
@@ -1065,6 +1111,7 @@ private fun CreditItem(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FeatureItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1101,29 +1148,32 @@ private fun FeatureItem(
             )
 
             if (tags.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                Spacer(Modifier.height(5.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    tags.take(3).forEach { tag ->
+                    tags.forEach { tag ->
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = iconTint.copy(alpha = 0.1f)
+                            shape = RoundedCornerShape(5.dp),
+                            color = iconTint.copy(alpha = 0.12f)
                         ) {
                             Text(
                                 text = tag,
-                                fontSize = 10.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = iconTint,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = desc,
                 fontSize = 12.sp,

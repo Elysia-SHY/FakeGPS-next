@@ -1,67 +1,75 @@
-﻿# FakeGPS-next
+# FakeGPS-next
 
-> **A high-precision Android location simulation and route cruising engine crafted with Apple Human Interface Guidelines and kernel-grade zero-leak interception.**
+> **基于 Apple Human Interface Guidelines 打造的高精度 Android 虚拟定位与道路巡航仿真引擎，支持系统级内核零特征注入拦截与多应用独立分流。**
 
-[![Release](https://img.shields.io/badge/Release-v1.2.1-007AFF.svg?style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.2.1)
-[![Android](https://img.shields.io/badge/Android-10_--_15_(API_29--34)-34C759.svg?style=flat-square)](https://developer.android.com)
+[![Latest Release](https://img.shields.io/github/v/release/Elysia-SHY/FakeGPS-next?color=007AFF&label=Latest%20Release&style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0_--_15_(API_26--35)-34C759.svg?style=flat-square)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose_·_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.2.1)](https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.2.1)
+[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.2)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
 ---
 
 ## 架构亮点与设计哲学 (Key Highlights)
 
-`mermaid
+```mermaid
 graph TD
     subgraph UI [Client Layer (Apple HIG)]
         A[MapScreen / RouteSimulation] -->|StateFlow| B[SimulationViewModel]
         B -->|Async Coroutines| C[MockLocationService]
+        B -->|Sync Engine| V[VersionSyncManager]
     end
 
     subgraph Core [Engine Layer]
         C --> D[MockLocationEngine]
         C --> E[SensorMockEngine]
+        C --> K[KinematicsEngine]
         C --> F[HookStateBridge]
     end
 
     subgraph SystemServer [Android OS system_server (LSPosed)]
-        F -.->|IPC / Property| G[XposedLocationHook]
+        F -.->|ContentProvider IPC / Property| G[XposedLocationHook]
+        G --> M[MultiTargetRouting]
         G --> H[LocationManagerService]
         G --> I[LocationProviderManager]
-        G --> J[WifiServiceImpl / TelephonyRegistry]
+        G --> S[SyntheticGnssProvider]
     end
 
-    subgraph Recovery [Hardware Auto-Recovery (v1.2.1)]
-        C -->|Stop Mock| K[CoordinateConverter.flushRealLocation]
-        K ==>|Single Request| L[NETWORK_PROVIDER / GPS_PROVIDER]
+    subgraph Recovery [Hardware Auto-Recovery]
+        C -->|Stop Mock| R[CoordinateConverter.flushRealLocation]
+        R ==>|Single Request| L[NETWORK_PROVIDER / GPS_PROVIDER]
         L ==>|200ms Fresh Fix| I
     end
-`
+```
 
-### 1. 🛡️ 零残留系统级拦截 (LSPosed System Server Hook)
-- **内核级接管**：直接挂钩 Android 系统核心进程 system_server（ndroid 系统框架），而非在各个 App 内部注入。
-- **全机统一分发**：所有应用（包括微信、高德、钉钉等）统一从系统底层获取经高斯抖动平滑处理的模拟坐标，宿主应用无任何注入痕迹。
-- **底层抹除 Mock 标志**：系统分发的坐标天然携带系统官方签名，isFromMockProvider 与 isMock() 恒定为 alse。
-- **内存级探针隔离**：在系统底层拦截 Wi-Fi AP 列表扫描 (WifiServiceImpl) 与蜂窝基站注册 (TelephonyRegistry)，无需修改 Android 系统全局设置即可杜绝网络辅助定位泄露。
+### 1. 🔀 多租户独立应用分流路由 (Multi-Instance Routing)
+- **多应用独立坐标**：每个应用可指派专属虚拟位置与航线（例如钉钉在上海、微信在北京、高德地图走真实物理定位）。
+- **多开分身与 Work Profile 隔离**：联合索引 `(PackageName, UserId)`，支持主号与分身（User 999）分别绑定不同假坐标。
+- **真实物理透传**：未添加至分流列表的应用无感知透传真实物理卫星定位，避免影响日常导航。
+- **高可用跨进程 IPC**：基于 `HookConfigProvider` 与系统属性双通道极速缓存，纳秒级并发分流无死锁。
 
-### 2. ⚡ 退出即时自愈冲刷 (Active Real-Fix Flushing, v1.2.1)
-- **绝不篡改系统全局配置**：彻底废弃破坏性 settings put 调控，保持系统高精度 Wi-Fi/蓝牙扫描畅通，杜绝室内无法搜星导致的假坐标死锁。
-- **Android 12~15 LocationResult 解包净化**：深度解包高版本系统返回的 LocationResult 结构，停止模拟时自动将系统级 mLastLocation 假缓存置空 (param.result = null)。
-- **200ms 硬件网络冲刷**：退出时并发唤醒 NETWORK_PROVIDER 与 GPS_PROVIDER，借助室内 Wi-Fi 在 300ms 内取得真实物理坐标，彻底告别“退出后必须重启手机”的痛点。
+### 2. 🛡️ 系统内核级集中拦截 (system_server Hook)
+- **内核集中接管**：在 LSPosed 中**仅需勾选「系统框架 (system)」**，无需在各个目标 App 内部注入代码。
+- **0 注入特征防作弊**：目标应用进程内无任何 Xposed 类加载与 Hook 痕迹，彻底免除第三方反作弊扫描。
+- **底层抹除 Mock 标志**：系统分发的坐标天然携带系统官方签名，`isFromMockProvider` 与 `isMock()` 恒定为 `false`。
+- **AOSP 最小位移过滤抑制**：针对定点驻留模式动态消除 `minUpdateDistanceMeters` 限制并注入单调时钟，杜绝底层位移过滤导致丢包。
 
-### 3. 🏃 运动生物力学与传感器拟真 (Sensor Simulation)
-- **步频与配速动态自适应**：内置健步（110 spm）、慢跑（160 spm）、跑马（180 spm）及自定义阶梯模型，根据即时航速智能换算步长与垂直颠簸加速度。
-- **高斯微漂移模型 (Box-Muller)**：拟真卫星信号自然摆动（±1.8m），避免机械直线轨迹被风控系统检测。
+### 3. 🏎️ 离线运动学物理仿真引擎 (Kinematics Pro Mode)
+- **三点外接圆向心加速度减速**：根据过弯曲率动态约束航速 ($v \le \sqrt{a_{\max}R}$)，杜绝机械直角转弯与急刹超速异常。
+- **步频双峰微动模型**：模拟人体行走/跑步时的双足落地周期加速度波动与轻微横向偏移。
+- **高斯地形起伏仿真**：结合路段距离与高斯扰动生成逼真道路海拔曲线，彻底消灭全平地瞬移痕迹。
 
-### 4. 🎨 Apple HIG 极简拟物设计语言
-- **完整 SF Pro 字阶系统**：严格遵循苹果设计规范（LargeTitle、Title 1-3、Headline、Body、Caption 1-2）。
-- **动态明暗双模 (Light / OLED Dark)**：浅色优雅微灰 (#F2F2F7)，深色纯粹 OLED 黑 (#000000) 搭配高架卡片 (#1C1C1E)。
-- **液态半透明毛玻璃**：悬浮桌面触控摇杆采用 32px 大圆角磨砂卡片，支持 80dp ~ 220dp 实时缩放与自适应防遮挡。
-- **平板与折叠屏自适应**：大屏横屏采用侧边栏分屏布局，操作面板与全景地图无缝并列。
+### 4. 🛰️ 动态多星座 GNSS 卫星星历合成 (Synthetic GNSS)
+- **16~24 颗动态卫星合成**：真实模拟北斗 (BDS)、GPS、GLONASS 多星座空间分布。
+- **天顶角仰角动态信噪比 (C/N0)**：依据星历仰角计算 24~42 dB-Hz 动态信噪比，并在室内/遮挡状态叠加多径衰减。
+- **规避静态反作弊封禁**：彻底解决“模拟定位开启后搜星数为 0、卫星信噪比全无”被风控平台识别封禁的问题。
+
+### 5. 🔄 云端版本与更新自动同步 (Version Sync Engine)
+- **三级梯级容灾链路**：结合 `jsdelivr CDN`、`raw.githubusercontent` 与 `GitHub Releases API`，国内免梯直连，无 60次/小时 速率限制。
+- **自动检测与语义化比对**：进入「关于」页自动静默检测云端最新版本，提供应用内直接查看更新日志与一键直达下载通道。
 
 ---
 
@@ -71,8 +79,9 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **设备门槛** | 无门槛，任何 Android 设备均可 | 需 Magisk / KernelSU / APatch | 需已激活 LSPosed 框架 |
 | **生效机制** | 开发者选项「模拟位置信息应用」 | AppOps 静默提权 + 传感器硬件注入 | system_server 系统级分发改写 |
-| **Mock 标志抹除** | ❌ 标志位显式保留 (isMock=true) | ❌ 依赖应用层规避 | ✅ 操作系统底层强制抹除为 alse |
-| **Wi-Fi / 基站探针压制** | ❌ 需依赖系统设置手动关闭 | ⚠️ 命令行辅助 | ✅ 内存级动态拦截，停止自动放行 |
+| **多应用独立分流** | ❌ 仅支持全局单点 | ❌ 仅支持全局单点 | ✅ 支持每应用独立绑定坐标与路线 |
+| **Mock 标志抹除** | ❌ 标志位显式保留 (isMock=true) | ❌ 依赖应用层规避 | ✅ 操作系统底层强制抹除为 false |
+| **宿主 0 注入特征** | ❌ 目标应用可直接检测 | ❌ 存在提权痕迹 | ✅ 仅勾选系统框架，目标应用 0 注入 |
 | **退出真机恢复速度** | 依赖系统卫星搜星 (15-60s) | 快速恢复 (<2s) | 瞬间自愈刷新 (<300ms) |
 | **步频与计步仿真** | ❌ 安全隐藏，不打扰使用 | ✅ 开放计步器传感器注入 | ✅ 开放计步器传感器注入 |
 
@@ -80,25 +89,26 @@ graph TD
 
 ## 快速上手 (Quick Start)
 
-### 方式一：免 Root 模式（开箱即用）
-1. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.2.1) 下载安装 FakeGPS-v1.2.1.apk；
-2. 打开手机 **【系统设置】➔【开发者选项】➔【选择模拟位置信息应用】**，选中 **Fake GPS**；
-3. 打开应用，在地图上长按选点或使用顶部搜索框，点击 **「开启单点定位」** 即可。
-
-### 方式二：LSPosed 系统级模式（推荐高级玩家）
+### 方式一：LSPosed 系统级模式（推荐高级用户）
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 安装 FakeGPS-v1.2.1.apk，在 LSPosed 管理器中启用本模块；
-3. **作用域选择**：务必勾选 **【系统框架 (Android / android)】**（如需定位特定应用，也可一并勾选）；
-4. 软重启手机或 system_server 后，底层拦截即可全机长效生效。
+2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-v1.3.2.apk**；
+3. **作用域选择**：在 LSPosed 管理器中启用模块，**务必仅勾选【系统框架 (Android / android)】**（普通目标应用无需勾选）；
+4. 重启设备或软重启 `system_server` 后即可长效生效。
+
+### 方式二：免 Root 模式（开箱即用）
+1. 安装 FakeGPS-v1.3.2.apk；
+2. 打开手机 **【系统设置】➔【开发者选项】➔【选择模拟位置信息应用】**，选中 **Fake GPS**；
+3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」** 即可。
 
 ---
 
 ## 核心交互功能 (Features)
 
-- **地图图层双引擎**：内置 **高德地图路网 (含 Apple Maps 深色夜间滤镜)** 与 **OpenStreetMap (OSM)**，无缝支持国内 GCJ-02 与国际 WGS-84 坐标精准换算。
+- **地图图层双引擎**：内置 **高德地图路网 (含 Apple Maps 深色夜间滤镜)** 与 **OpenStreetMap (OSM)**，国内 GCJ-02 与国际 WGS-84 坐标精准自动转换。
+- **多应用独立分流管理**：首页抽屉式卡片列表，自由添加应用并配置专属经纬度坐标，未配置应用保持真机物理定位。
 - **全路网真实道路巡航**：支持自选驾车、骑行、步行三种路网拓扑模型，沿真实街道路网平滑移动；支持导入 **GPX** 路线文件。
 - **全局桌面悬浮摇杆**：具备阻尼物理回弹与航向锁定的桌面悬浮球，支持实时调节配速（步行 5km/h、跑步 12km/h、骑行 25km/h、驾车 60km/h、瞬移）。
-- **物理真机发光光标**：地图常驻 Apple Maps 风格的高亮蓝环真实位置标记，随时一键复位至物理传感器位置。
+- **设备环境与运行诊断**：关于页面一键诊断显示设备型号、Android 系统 API 级别、CPU 架构与模块运行状态。
 
 ---
 
@@ -109,26 +119,30 @@ graph TD
 - **Android SDK**：API Level 34 (Android 14)
 - **Gradle**：8.4+
 
-`ash
+```bash
 # 1. 克隆代码仓库
 git clone https://github.com/Elysia-SHY/FakeGPS-next.git
 cd FakeGPS-next
 
 # 2. 编译 Release / Debug APK
 # Windows PowerShell:
-.\build.bat
+.\gradlew.bat assembleRelease
 # Linux / macOS:
-./gradlew assembleDebug
-`
+./gradlew assembleRelease
+```
 
-编译产物输出位置：pp/build/outputs/apk/debug/app-debug.apk。
+编译产物输出位置：`app/build/outputs/apk/release/app-release.apk`。
 
 ---
 
 ## 更新日志 (Changelog)
 
-完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md) 与 [version-tracker.md](version-tracker.md)。
+完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.3.2]** (2026-09-12) — 介绍页 UI 全景重构（解决标签挤压变形、扩充底部防遮挡安全边距）、三级高可用云端版本与更新日志自动同步、新增设备环境与运行诊断面板。
+- **[v1.3.1]** (2026-09-12) — 系统框架级独立分流全面闭环（补全 HookConfigProvider 导出、解决派发监听器真实 CallerIdentity 解析）、定点驻留 AOSP 丢包抑制。
+- **[v1.3.0]** (2026-09-11) — 多应用独立分流路由首发（Multi-Target Routing）、离线物理动力学仿真引擎（Kinematics Pro）、动态多星座 GNSS 星历合成（Synthetic GNSS）。
+- **[v1.2.2]** (2026-09-11) — R8 生产级混淆瘦身（安装包降至 3.6MB）、MapView 内存泄漏根除、长航点跨进程传输异常修复。
 - **[v1.2.1]** (2026-09-10) — 根除退出后定位残留、废除破坏性系统设置、实现室内高精度 Wi-Fi 自愈刷新、解包 Android 12~15 LocationResult。
 - **[v1.2.0]** (2026-09-10) — 消除开启卡顿 ANR 隐患、引入 20 秒心跳超时 TTL 机制、注销 Test Provider 强力复位。
 - **[v1.1.0]** (2026-09-09) — 全面适配 Apple HIG 暗黑模式、高德夜间色阶矩阵滤镜、平板 UI 分屏适配。
