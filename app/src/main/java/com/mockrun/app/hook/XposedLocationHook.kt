@@ -175,12 +175,17 @@ class XposedLocationHook : IXposedHookLoadPackage {
         if (result == null) return null
         if (result is Location) return result
         if (result.javaClass.name.contains("LocationResult")) {
+            // Both unwrap strategies failing means we could not read the framework's own
+            // location back out. Previously this returned null without a trace.
             return runCatching {
                 XposedHelpers.callMethod(result, "getLastLocation") as? Location
-            }.getOrNull() ?: runCatching {
-                val list = XposedHelpers.callMethod(result, "getLocations") as? List<*>
-                list?.lastOrNull() as? Location
-            }.getOrNull()
+            }.logFailure(TAG, "unwrap LocationResult.getLastLocation()", Diag.Level.DEBUG)
+                .getOrNull()
+                ?: runCatching {
+                    val list = XposedHelpers.callMethod(result, "getLocations") as? List<*>
+                    list?.lastOrNull() as? Location
+                }.logFailure(TAG, "unwrap LocationResult.getLocations()", Diag.Level.DEBUG)
+                    .getOrNull()
         }
         return null
     }
@@ -190,6 +195,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
     @Volatile
     private var cachedLocationResultMethod: java.lang.reflect.Method? = null
 
+    /**
+     * Wrap a [Location] into whatever `LocationResult`-shaped type this ROM's framework expects.
+     *
+     * **This is the single most failure-prone point in the whole hook.** Every caller does
+     * `if (result != null) param.result = result` / `param.args[0] = result`, so returning
+     * `null` means the spoof is silently *not applied* — no exception, no log, no symptom
+     * other than "the fake location didn't take". Each failure branch below therefore
+     * reports which class and which strategy gave up.
+     */
     private fun createLocationResult(resultClass: Class<*>, location: Location): Any? {
         val method: java.lang.reflect.Method? = if (cachedResultClass === resultClass && cachedLocationResultMethod != null) {
             cachedLocationResultMethod
@@ -200,7 +214,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "wrap", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", List::class.java)
                     ?: XposedHelpers.findMethodExactIfExists(resultClass, "create", Array<Location>::class.java)
-            }.getOrNull()
+            }.logFailure(TAG, "look up wrap()/create() factory on ${resultClass.name}", Diag.Level.DEBUG)
+                .getOrNull()
             cachedResultClass = resultClass
             cachedLocationResultMethod = lookedUp
             lookedUp
@@ -214,22 +229,36 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     paramType == List::class.java -> method.invoke(null, listOf(location))
                     else -> method.invoke(null, arrayOf(location))
                 }
-            }.getOrNull()
+            }.logFailure(TAG, "invoke ${method.name}() on ${resultClass.name}")
+                .getOrNull()
             if (res != null) return res
         }
 
         // Fallback for non-standard framework derivatives
-        return runCatching {
+        val fallback = runCatching {
             XposedHelpers.callStaticMethod(resultClass, "wrap", location)
-        }.getOrElse {
-            runCatching {
-                XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
-            }.getOrElse {
+        }.logFailure(TAG, "fallback callStaticMethod(wrap, Location) on ${resultClass.name}", Diag.Level.DEBUG)
+            .getOrElse {
                 runCatching {
-                    XposedHelpers.callStaticMethod(resultClass, "create", listOf(location))
-                }.getOrNull()
+                    XposedHelpers.callStaticMethod(resultClass, "wrap", arrayOf(location))
+                }.logFailure(TAG, "fallback callStaticMethod(wrap, Array<Location>) on ${resultClass.name}", Diag.Level.DEBUG)
+                    .getOrElse {
+                        runCatching {
+                            XposedHelpers.callStaticMethod(resultClass, "create", listOf(location))
+                        }.logFailure(TAG, "fallback callStaticMethod(create, List<Location>) on ${resultClass.name}", Diag.Level.DEBUG)
+                            .getOrNull()
+                    }
             }
+
+        if (fallback == null) {
+            // The whole purpose of this function is to hand the framework a spoofed location.
+            // Naming the offending class is exactly what is needed to fix it on a new ROM.
+            Diag.w(
+                TAG,
+                "could not wrap Location into ${resultClass.name} — spoof NOT applied for this provider"
+            )
         }
+        return fallback
     }
 
     private fun hookLocationProviderManager(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -237,6 +266,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
             XposedHelpers.findClassIfExists("com.android.server.location.provider.LocationProviderManager", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.location.LocationProviderManager", lpparam.classLoader)
         )
+
+        // Silent-zero guard: when every candidate name misses, LocationProviderManager is never
+        // hooked and the whole dispatch path is inert. This used to produce no output whatsoever,
+        // so "the ROM renamed the class" looked identical to "nothing to do here".
+        if (lpmClasses.isEmpty()) {
+            Diag.w(TAG, "LocationProviderManager hook: neither candidate class resolved on this ROM")
+        } else {
+            Diag.d(TAG, "LocationProviderManager hook: ${lpmClasses.size} candidate class(es) resolved")
+        }
 
         for (lpmClass in lpmClasses) {
             // onReportLocation(LocationResult locationResult)
@@ -265,7 +303,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hookAllMethods(onReportLocation) on ${lpmClass.simpleName}")
 
             // getLastLocation(...) - Critical fix for Android 12~16 LocationResult return type!
             runCatching {
@@ -304,7 +342,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hookAllMethods(getLastLocation) on ${lpmClass.simpleName}")
 
             // setLastLocation(...)
             runCatching {
@@ -329,7 +367,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hookAllMethods(setLastLocation) on ${lpmClass.simpleName}")
         }
     }
 
@@ -338,6 +376,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
             XposedHelpers.findClassIfExists("com.android.server.location.LocationManagerService", lpparam.classLoader),
             XposedHelpers.findClassIfExists("com.android.server.LocationManagerService", lpparam.classLoader)
         )
+
+        if (lmsClasses.isEmpty()) {
+            Diag.w(TAG, "LocationManagerService hook: neither candidate class resolved on this ROM")
+        } else {
+            Diag.d(TAG, "LocationManagerService hook: ${lmsClasses.size} candidate class(es) resolved")
+        }
 
         for (lmsClass in lmsClasses) {
             // 1. getLastLocation(...)
