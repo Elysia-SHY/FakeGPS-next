@@ -3,8 +3,12 @@ package com.mockrun.app.hook
 import android.location.GnssStatus
 import android.os.Build
 import androidx.annotation.RequiresApi
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import java.lang.reflect.Method
 import kotlin.random.Random
+
+private const val TAG = "SyntheticGnssProvider"
 
 /**
  * High-fidelity Synthetic GNSS Constellation Generator.
@@ -61,7 +65,7 @@ object SyntheticGnssProvider {
                 ?: methods.firstOrNull { it.name == "addSatellite" && it.parameterTypes.size == 9 }
                 ?: methods.firstOrNull { it.name == "addSatellite" && it.parameterTypes.size == 8 }
                 ?: methods.firstOrNull { it.name == "addSatellite" }
-        }.getOrNull()
+        }.logFailure(TAG, "reflect GnssStatus.Builder.addSatellite").getOrNull()
     }
 
     private fun addSatelliteUniversal(
@@ -206,6 +210,6 @@ object SyntheticGnssProvider {
             }
 
             builder.build()
-        }.getOrNull()
+        }.logFailure(TAG, "createSyntheticGnssStatus", Diag.Level.DEBUG).getOrNull()
     }
 }

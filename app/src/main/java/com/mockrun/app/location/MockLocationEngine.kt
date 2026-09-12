@@ -6,7 +6,8 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.Log
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import java.util.Collections
 
 /**
@@ -38,6 +39,7 @@ class MockLocationEngine(private val context: Context) {
             } else emptyList()
             (providers + fusedS).distinct().forEach { p ->
                 runCatching { lm.removeTestProvider(p) }
+                    .logFailure(TAG, "pre-clean removeTestProvider($p)", Diag.Level.DEBUG)
             }
         }
     }
@@ -123,7 +125,10 @@ class MockLocationEngine(private val context: Context) {
             try {
                 locationManager.setTestProviderEnabled(provider, false)
                 locationManager.removeTestProvider(provider)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                // Expected when the provider was never registered; the add below is the real step.
+                Diag.d(TAG, "pre-clean of $provider skipped: ${e.javaClass.simpleName}")
+            }
 
             locationManager.addTestProvider(
                 provider,
@@ -147,14 +152,13 @@ class MockLocationEngine(private val context: Context) {
                     null,
                     System.currentTimeMillis()
                 )
-            }
+            }.logFailure(TAG, "setTestProviderStatus($provider)", Diag.Level.DEBUG)
 
             activeProviders.add(provider)
-            Log.d(TAG, "Successfully registered $provider test provider")
+            Diag.d(TAG, "Successfully registered $provider test provider")
             true
-        }.onFailure { e ->
-            Log.w(TAG, "Failed to register $provider test provider: ${e.message}")
-        }.getOrDefault(false)
+        }.logFailure(TAG, "registerTestProvider($provider)")
+            .getOrDefault(false)
     }
 
     @Synchronized
@@ -163,7 +167,7 @@ class MockLocationEngine(private val context: Context) {
         for (p in allToClean) {
             runCatching {
                 locationManager.removeTestProvider(p)
-            }
+            }.logFailure(TAG, "unregister removeTestProvider($p)", Diag.Level.DEBUG)
         }
         activeProviders.clear()
         isRegistered = false
@@ -179,7 +183,7 @@ class MockLocationEngine(private val context: Context) {
     ) {
         // Boundary check: skip invalid coordinates
         if (latitude.isNaN() || longitude.isNaN() || latitude !in -90.0..90.0 || longitude !in -180.0..180.0) {
-            Log.w(TAG, "Ignored invalid coordinates: lat=$latitude, lon=$longitude")
+            Diag.w(TAG, "Ignored invalid coordinates: lat=$latitude, lon=$longitude")
             return
         }
 
@@ -225,12 +229,10 @@ class MockLocationEngine(private val context: Context) {
                         val mField = Location::class.java.getDeclaredField("mIsFromMockProvider")
                         mField.isAccessible = true
                         mField.setBoolean(this, false)
-                    }
+                    }.logFailure(TAG, "strip mIsFromMockProvider", Diag.Level.DEBUG)
                 }
                 locationManager.setTestProviderLocation(p, loc)
-            }.onFailure { e ->
-                Log.w(TAG, "Inject into $p failed: ${e.message}")
-            }
+            }.logFailure(TAG, "inject into $p")
         }
     }
 }

@@ -37,8 +37,10 @@ import com.mockrun.app.ui.screen.tabs.RouteBottomPanel
 import com.mockrun.app.ui.screen.tabs.RouteConfigDialog
 import com.mockrun.app.ui.screen.tabs.RouteStage
 import com.mockrun.app.ui.components.PermissionGuideDialog
+import com.mockrun.app.util.Diag
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
+import com.mockrun.app.util.logFailure
 import com.mockrun.app.ui.theme.LiquidGlassDefaults
 import com.mockrun.app.ui.theme.liquidGlass
 import androidx.compose.ui.Alignment
@@ -719,6 +721,7 @@ fun MapScreen(
                             rule.latitude to rule.longitude
                         }
                         val colorInt = runCatching { android.graphics.Color.parseColor(rule.colorHex) }
+                            .logFailure("MapScreen", "parse rule color (${rule.appName})", Diag.Level.DEBUG)
                             .getOrDefault(android.graphics.Color.parseColor("#007AFF"))
                         val appMarker = Marker(mapView).apply {
                             position = GeoPoint(appLat, appLon)
@@ -824,7 +827,9 @@ fun MapScreen(
                     // Left: Address Pill (Clickable to center)
                     val activeRule = multiTargetRules.find { it.key == activeTargetKey }
                     val activeRuleColor = activeRule?.let {
-                        runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }.getOrNull()
+                        runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }
+                            .logFailure("MapScreen", "parse active rule color", Diag.Level.DEBUG)
+                            .getOrNull()
                     } ?: IosBlue
 
                     Surface(
@@ -1005,6 +1010,7 @@ fun MapScreen(
                             val isSelected = activeTargetKey == rule.key
                             val ruleColor = remember(rule.colorHex) {
                                 runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+                                    .logFailure("MapScreen", "parse rule color chip", Diag.Level.DEBUG)
                                     .getOrDefault(IosColors.SystemBlue)
                             }
                             Surface(
@@ -1161,7 +1167,9 @@ fun MapScreen(
             ) {
                 val currentActiveRule = if (activeMapTab == MapTab.LOCATION) multiTargetRules.find { it.key == activeTargetKey } else null
                 val currentAimingColor = currentActiveRule?.let {
-                    runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }.getOrNull()
+                    runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }
+                        .logFailure("MapScreen", "parse aiming-color", Diag.Level.DEBUG)
+                        .getOrNull()
                 } ?: IosBlue
 
                 Column(

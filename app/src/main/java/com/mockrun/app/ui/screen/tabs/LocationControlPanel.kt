@@ -44,6 +44,8 @@ import com.mockrun.app.domain.model.Route
 import com.mockrun.app.location.SearchResultItem
 import com.mockrun.app.ui.theme.IosColors
 import com.mockrun.app.ui.theme.liquidGlass
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 
 enum class LocationPanelState {
     COLLAPSED,
@@ -151,10 +153,11 @@ fun LocationControlPanel(
 
         // 2. Master Action & Search Rows
         if (activeRule != null) {
-            val activeRuleColor = remember(activeRule.colorHex) {
-                runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
-                    .getOrDefault(IosColors.SystemBlue)
-            }
+val activeRuleColor = remember(activeRule.colorHex) {
+                   runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
+                       .logFailure("LocationControlPanel", "parse rule color", Diag.Level.DEBUG)
+                       .getOrDefault(IosColors.SystemBlue)
+               }
 
             // A. Search Box (Full Width)
             Surface(

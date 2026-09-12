@@ -2,6 +2,8 @@ package com.mockrun.app
 
 import android.app.Application
 import com.mockrun.app.location.RootSuBridge
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +24,7 @@ class MockRunApplication : Application() {
                 if (rootBridge.isRootAvailable()) {
                     rootBridge.restoreScanningHardware()
                 }
-            }
+            }.logFailure("MockRunApp", "startup auto-heal restoreScanningHardware", Diag.Level.DEBUG)
         }
     }
 }
