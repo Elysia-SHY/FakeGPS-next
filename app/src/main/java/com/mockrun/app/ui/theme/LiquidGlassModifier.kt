@@ -1,7 +1,6 @@
 package com.mockrun.app.ui.theme
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,15 +16,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.util.Diag
-import com.mockrun.app.util.logFailure
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -55,19 +48,15 @@ object LiquidGlassDefaults {
 }
 
 /**
- * High-performance Liquid Glass (液态玻璃) styling modifier.
+ * Liquid Glass (液态玻璃) styling modifier.
  * When [isLiquidGlass] is true:
- *   - On Android 13+ (API 33): rendered by an AGSL RuntimeShader (see [LiquidGlassShader]) —
- *     SDF silhouette → Fresnel rim with chromatic dispersion, diagonal specular sweep,
- *     frosted grain and a crisp hairline, over a translucent base gradient. This is the
- *     iOS-26-grade material. It deliberately does NOT sample the backdrop (the map is an
- *     Android View that Compose cannot capture, and backdrop capture is what caused the
- *     slide misalignment that removed Haze in v1.3.9).
- *   - On Android 10–12 (API 29–32): translucent crystal gradient + hairline border
- *     (no RuntimeShader available; graceful degradation).
- *   - Fully safe: rendered behind content to protect foreground text/icon sharpness.
- * When [isLiquidGlass] is false:
- *   - Crisp solid surface (pure material, zero blur/shader overhead, battery-saving).
+ *   - If a HazeState is provided (screens whose background is drawn by Compose):
+ *     cards apply real backdrop blur via Haze (the iOS-style frosted glass).
+ *   - Otherwise (MapScreen, where OSMDroid renders into its own View hierarchy and
+ *     the screen is under a horizontal-swipe translation that broke Haze's capture
+ *     alignment in v1.3.9): cards fall back to a translucent crystal gradient
+ *     so the map remains readable underneath.
+ *   - Solid surface when [isLiquidGlass] is false.
  *
  * The signature is frozen — 31 call sites across the app depend on it.
  */
@@ -80,148 +69,106 @@ fun Modifier.liquidGlass(
     hazeState: Any? = null
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
+    val resolvedHaze = LocalHazeState.current
 
     if (isLiquidGlass) {
-        val canUseAgsl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        val glassPaint = if (canUseAgsl) sharedLiquidGlassPaint else null
-
-        // Backdrop blur is available only where a HazeState is provided — i.e. on screens whose
-        // background is drawn by Compose. MapScreen deliberately provides null: OSMDroid renders
-        // into its own View hierarchy, which Compose's GraphicsLayer capture cannot see, which
-        // is exactly what produced the "ghost blur" removed in v1.3.9.
-        val hazeState = LocalHazeState.current
-
-        val params = when {
-            containerColor != null -> LiquidGlassPresets.tinted(containerColor, isDark)
-            isDark -> LiquidGlassPresets.dark
-            else -> LiquidGlassPresets.light
+        // Crystal Base Gradient - 底衬（让地图道路与图钉清晰穿透）
+        val crystalBaseBrush = if (containerColor != null) {
+            Brush.linearGradient(
+                colors = listOf(
+                    containerColor.copy(alpha = 0.88f),
+                    containerColor.copy(alpha = 0.68f),
+                    containerColor.copy(alpha = 0.82f)
+                ),
+                start = Offset.Zero,
+                end = Offset.Infinite
+            )
+        } else if (isDark) {
+            // Obsidian Smoked Crystal
+            Brush.linearGradient(
+                0.0f to Color(0x94262B38),
+                0.40f to Color(0x5212141A),
+                0.75f to Color(0x66181B22),
+                1.0f to Color(0x801F232D),
+                start = Offset.Zero,
+                end = Offset.Infinite
+            )
+        } else {
+            // Ultra-Clear Prismatic Crystal
+            Brush.linearGradient(
+                0.0f to Color(0xB8FFFFFF),
+                0.38f to Color(0x52E8F2FC),
+                0.78f to Color(0x66FFFFFF),
+                1.0f to Color(0x78D8E8F8),
+                start = Offset.Zero,
+                end = Offset.Infinite
+            )
         }
 
-        // Shadow + clip shared by every glass path
+        // VisionOS single hairline rim
+        val borderBrush = Brush.linearGradient(
+            colors = if (containerColor != null) {
+                listOf(
+                    containerColor.copy(alpha = 0.60f),
+                    containerColor.copy(alpha = 0.25f)
+                )
+            } else if (isDark) {
+                listOf(
+                    Color.White.copy(alpha = 0.22f),
+                    Color.White.copy(alpha = 0.06f)
+                )
+            } else {
+                listOf(
+                    Color.White.copy(alpha = 0.65f),
+                    Color.White.copy(alpha = 0.20f)
+                )
+            },
+            start = Offset.Zero,
+            end = Offset.Infinite
+        )
+
+        // Base modifier with soft clipping
         val baseModifier = if (elevation > 0.dp) {
             this.shadow(
-                elevation = elevation.coerceAtMost(3.dp),
+                elevation = elevation,
                 shape = shape,
-                spotColor = if (isDark) Color(0x22000000) else Color(0x10001020),
-                ambientColor = Color.Transparent
+                spotColor = if (isDark) Color(0x8C000000) else Color(0x24001A33),
+                ambientColor = if (isDark) Color(0x4D000000) else Color(0x12001020)
             ).clip(shape)
         } else {
             this.clip(shape)
         }
 
-        // Layer 1 — backdrop blur. Haze blurs whatever Compose drew beneath this card.
-        val hazedModifier = if (hazeState != null) {
+        // Path A: backdrop blur via Haze (real iOS-style frosted glass)
+        if (resolvedHaze != null) {
             baseModifier.hazeChild(
-                state = hazeState,
+                state = resolvedHaze,
                 shape = shape,
                 style = HazeDefaults.style(
                     tint = if (containerColor != null) {
-                        containerColor.copy(alpha = 0.20f)
+                        containerColor.copy(alpha = 0.28f)
                     } else if (isDark) {
                         Color(0x38161B26)
                     } else {
-                        Color(0x40FFFFFF)
+                        Color(0x44FFFFFF)
                     },
-                    blurRadius = 22.dp,
+                    blurRadius = 24.dp,
                     noiseFactor = 0.10f
                 )
+            ).border(
+                borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp),
+                borderBrush, shape
             )
         } else {
-            baseModifier
-        }
-
-        if (glassPaint != null) {
-            // ---- Layer 2 — AGSL edge optics (Android 13+) ----
-            // When Haze already supplies the frosted body, the shader's own base gradient is
-            // switched off (alpha 0) and only the light layers remain: rim + dispersion +
-            // specular + grain + hairline. Blur and optics then coexist instead of
-            // double-darkening the card.
-            val keepBase = hazeState == null
-            val rimWidthPx = with(LocalDensity.current) { 2.5.dp.toPx() }
-            hazedModifier.drawBehind {
-                val outline = shape.createOutline(size, layoutDirection, this)
-                val cornerPx = (outline as? Outline.Rounded)
-                    ?.roundRect?.topLeftCornerRadius?.x ?: 0f
-                glassPaint.configure(
-                    width = size.width,
-                    height = size.height,
-                    cornerPx = cornerPx,
-                    baseTop = if (keepBase) params.baseTop else params.baseTop.copy(alpha = 0f),
-                    baseBottom = if (keepBase) params.baseBottom else params.baseBottom.copy(alpha = 0f),
-                    edgeTint = params.edgeTint,
-                    rimWidthPx = rimWidthPx,
-                    dispersion = params.dispersion,
-                    specular = params.specular,
-                    grain = params.grain,
-                    hairline = params.hairline
-                )
-                drawContext.canvas.nativeCanvas.drawRect(
-                    0f, 0f, size.width, size.height, glassPaint.paint
-                )
-            }
-        } else if (hazeState != null) {
-            // No shader available, but Haze works: keep the old hairline border instead.
-            hazedModifier.border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), Color(0x40FFFFFF), shape)
-        } else {
-            // ---- Gradient fallback (Android 10–12) — previous implementation, kept verbatim ----
-            // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
-            val crystalBaseBrush = if (containerColor != null) {
-                Brush.linearGradient(
-                    colors = listOf(
-                        containerColor.copy(alpha = 0.88f),
-                        containerColor.copy(alpha = 0.68f),
-                        containerColor.copy(alpha = 0.82f)
-                    ),
-                    start = Offset.Zero,
-                    end = Offset.Infinite
-                )
-            } else if (isDark) {
-                // Obsidian Smoked Crystal (黑曜水晶通透深邃微光)
-                Brush.linearGradient(
-                    0.0f to Color(0x94262B38), // 58% top-left specular highlight
-                    0.40f to Color(0x5212141A), // 32% high-transparency cosmic dark
-                    0.75f to Color(0x66181B22), // 40% obsidian crystal body
-                    1.0f to Color(0x801F232D),  // 50% deep obsidian depth
-                    start = Offset.Zero,
-                    end = Offset.Infinite
-                )
-            } else {
-                // Ultra-Clear Prismatic Crystal (超白玻微偏光极度通透 - 拒绝乳白扁平塑料感)
-                Brush.linearGradient(
-                    0.0f to Color(0xB8FFFFFF), // 72% 入射光掠影
-                    0.38f to Color(0x52E8F2FC), // 32% 冰晶微偏光通透带 - 地图道路与图钉清晰穿透！
-                    0.78f to Color(0x66FFFFFF), // 40% 晶体本体高透光
-                    1.0f to Color(0x78D8E8F8),  // 47% 边缘微棱镜折射散色
-                    start = Offset.Zero,
-                    end = Offset.Infinite
-                )
-            }
-
-            // Subtle, clean glass border (VisionOS single hairline rim)
-            val borderBrush = Brush.linearGradient(
-                colors = if (containerColor != null) {
-                    listOf(
-                        containerColor.copy(alpha = 0.60f),
-                        containerColor.copy(alpha = 0.25f)
-                    )
-                } else if (isDark) {
-                    listOf(
-                        Color.White.copy(alpha = 0.22f),
-                        Color.White.copy(alpha = 0.06f)
-                    )
-                } else {
-                    listOf(
-                        Color.White.copy(alpha = 0.65f),
-                        Color.White.copy(alpha = 0.20f)
-                    )
-                },
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-
+            // Path B: gradient only (where the screen cannot provide a backdrop — MapScreen).
+            // This is what gave the "flat cellophane" reading. It is the best we can do
+            // when the underlying content is an Android View, not a Compose layer.
             baseModifier
                 .background(crystalBaseBrush, shape)
-                .border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
+                .border(
+                    borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp),
+                    borderBrush, shape
+                )
         }
     } else {
         val solidFill = containerColor ?: if (isDark) {
