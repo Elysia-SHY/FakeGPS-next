@@ -52,7 +52,7 @@ fun RouteLibraryScreen(
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    LiquidGlassBackdrop(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         AppBackground()
 
         Column(
