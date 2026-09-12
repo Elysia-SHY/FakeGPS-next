@@ -15,6 +15,18 @@
 local.properties
 
 # Built APKs & Bundles
+#
+# ⚠️ READ BEFORE "CLEANING UP": the *current* release APK is deliberately kept in the
+# tree via `git add -f`, despite the rule below. Do NOT remove it from tracking.
+#
+# Reason: the in-app updater's primary download URL is a jsDelivr path of the form
+#   https://cdn.jsdelivr.net/gh/{owner}/{repo}@{tag}/{file}.apk
+# and jsDelivr's /gh/ endpoint serves REPOSITORY files — it does NOT serve GitHub
+# Release assets. So that URL only resolves if the APK is actually present in the tree
+# at that tag. This was mistaken for a dirty habit, removed in b601159, and the primary
+# update path silently started returning 404 as a result (reverted going forward).
+#
+# Only the current version should be kept; older ones live on in git history.
 *.apk
 *.ap_
 *.aab
