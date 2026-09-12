@@ -766,7 +766,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook LocationManager.getLastKnownLocation")
 
         // 2. getLastLocation() (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -789,7 +789,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManager.getLastLocation")
         }
 
         // 3. requestLocationUpdates listener hook
@@ -806,7 +806,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook LocationManager.requestLocationUpdates")
 
         // 4. getCurrentLocation(...) (Android 11~16)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -832,7 +832,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManager.getCurrentLocation")
         }
 
         // 5. registerGnssStatusCallback(...) (Android 7.0 - 15+)
@@ -850,7 +850,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManager.registerGnssStatusCallback")
         }
 
         // 6. getGpsStatus (Legacy GpsStatus fix)
@@ -862,11 +862,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     val status = param.result ?: param.args.firstOrNull() ?: return
                     runCatching {
                         XposedHelpers.callMethod(status, "setTimeToFirstFix", 1200)
-                    }
+                    }.logFailure(TAG, "set GpsStatus timeToFirstFix", Diag.Level.DEBUG)
                     param.result = status
                 }
             })
-        }
+        }.logFailure(TAG, "hook LocationManager.getGpsStatus")
     }
 
     private val hookedListenerClasses = mutableSetOf<String>()
@@ -893,7 +893,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             )
-        }
+        }.logFailure(TAG, "hook ${className}.onLocationChanged(Location)")
 
         // Hook onLocationChanged(List<Location>) - Android 12~16
         runCatching {
@@ -913,7 +913,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             )
-        }
+        }.logFailure(TAG, "hook ${className}.onLocationChanged(List<Location>)")
     }
 
     private val hookedGnssCallbackClasses = mutableSetOf<String>()
@@ -958,7 +958,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook WifiManager.getScanResults")
 
         // getConnectionInfo() -> Mask BSSID
         runCatching {
@@ -970,15 +970,23 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         runCatching {
                             XposedHelpers.setObjectField(wifiInfo, "mBSSID", "02:00:00:00:00:00")
                             XposedHelpers.setObjectField(wifiInfo, "mMacAddress", "02:00:00:00:00:00")
-                        }
+                        }.logFailure(
+                            TAG,
+                            "mask WifiInfo BSSID/MAC — field names absent on this ROM, real BSSID leaked",
+                            Diag.Level.DEBUG
+                        )
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook WifiManager.getConnectionInfo")
     }
 
     private fun hookTelephonyManager(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val tmClass = XposedHelpers.findClassIfExists("android.telephony.TelephonyManager", lpparam.classLoader) ?: return
+        val tmClass = XposedHelpers.findClassIfExists("android.telephony.TelephonyManager", lpparam.classLoader)
+        if (tmClass == null) {
+            Diag.w(TAG, "android.telephony.TelephonyManager not found — cell tower masking inactive")
+            return
+        }
 
         runCatching {
             XposedBridge.hookAllMethods(tmClass, "getAllCellInfo", object : XC_MethodHook() {
@@ -989,7 +997,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook TelephonyManager.getAllCellInfo")
 
         runCatching {
             XposedBridge.hookAllMethods(tmClass, "getCellLocation", object : XC_MethodHook() {
@@ -1000,7 +1008,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook TelephonyManager.getCellLocation")
 
         runCatching {
             XposedBridge.hookAllMethods(tmClass, "getNeighboringCellInfo", object : XC_MethodHook() {
@@ -1011,7 +1019,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook TelephonyManager.getNeighboringCellInfo")
     }
 
     private fun hookProprietaryMapSdks(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -1044,7 +1052,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook AMapLocation getters (com.amap.api.location.AMapLocation)")
 
         // Baidu Location SDK
         runCatching {
@@ -1075,7 +1083,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook BDLocation getters (com.baidu.location.BDLocation)")
 
         // Tencent Location SDK (Used by WeChat com.tencent.mm, Tencent Map, QQ, Didi, Meituan)
         runCatching {
@@ -1207,7 +1215,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
             if (tencentListenerClass != null) {
                 hookTencentListenerClass(tencentListenerClass)
             }
-        }
+        }.logFailure(TAG, "hook Tencent Location SDK (TencentLocation / TencentLocationManager / listeners)")
     }
 
     private val hookedTencentListenerClasses = mutableSetOf<String>()
@@ -1227,7 +1235,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 }
             })
-        }
+        }.logFailure(TAG, "hook ${className}.onLocationChanged (Tencent listener)")
     }
 
     // =========================================================================
@@ -1243,19 +1251,29 @@ class XposedLocationHook : IXposedHookLoadPackage {
             if (arg != null && arg.javaClass.simpleName.contains("Identity")) {
                 val pkg = runCatching {
                     XposedHelpers.callMethod(arg, "getPackageName") as? String
-                }.getOrNull()
+                }.logFailure(TAG, "read getPackageName() off caller identity", Diag.Level.DEBUG)
+                    .getOrNull()
                 if (pkg == "com.mockrun.app") return true
             }
         }
         return false
     }
 
+    /**
+     * Read a system property via reflection.
+     *
+     * Note: this resolves the class and method on **every** call, and
+     * `getGlobalActiveLocation()` alone calls it seven times per location dispatch. That is
+     * a real cost in `system_server`, but it is pre-existing behaviour and out of scope for
+     * this instrumentation pass — recorded here so it is not lost.
+     */
     private fun getSystemProperty(key: String): String {
         return runCatching {
             val spClass = Class.forName("android.os.SystemProperties")
             val getMethod = spClass.getMethod("get", String::class.java, String::class.java)
             getMethod.invoke(null, key, "") as String
-        }.getOrDefault("")
+        }.logFailure(TAG, "read SystemProperties[\"$key\"]", Diag.Level.DEBUG)
+            .getOrDefault("")
     }
 
     private fun getSystemContext(): Context? {
