@@ -1,15 +1,38 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`1.2.1`  
-> **Android 内部版本**：`versionCode = 4`  
-> **Android 显示版本**：`versionName = "v1.2.1"`  
-> **交付存放目录**：`d:\Desktop\fake gps\`  
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-v1.2.1-LATEST.apk`  
-> **构建时间**：2026-09-10 17:55  
+> **当前真实基准版本**：`1.4.0`
+> **Android 内部版本**：`versionCode = 17`
+> **Android 显示版本**：`versionName = "v1.4.0"`
+> **交付存放目录**：`d:\Desktop\fake gps\`
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-next-v1.4.0-release.apk`
+> **构建时间**：2026-09-12 17:51
+> **构建命令**：`./gradlew assembleRelease --no-daemon`
+> **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+> **APK SHA-256**：`b84449f228467939ec51aacb179e35c58924c9c3f18260ff48b719f067130c56`
+
+> **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。本版已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.4.0] - 2026-09-12
+- **构建状态**：✅ `assembleRelease` 构建成功，R8 混淆与资源压缩通过，产物 3,883,552 bytes（3.7 MB）(`app/build/outputs/apk/release/app-release.apk`)。
+- **Android 配置**：`versionCode = 17`, `versionName = "v1.4.0"`
+- **本版定位**：**可观测性专项** —— 不改变任何业务逻辑分支、不新增特权能力，只让原本静默失败的路径留下记录。
+- **核心变更**：
+  1. **新增统一诊断出口 `Diag`**：同时适配 App 进程（`android.util.Log`）与被注入进程（额外镜像到 `XposedBridge`）；因 Xposed API 为 `compileOnly`，`XposedBridge` 用**反射惰性解析**，缺失即静默降级；**内置按标签限流**（10 秒 / 5 条），避免在 `system_server` 高频路径刷屏；全程异常包裹，诊断失败绝不向宿主传播。
+  2. **新增 `Result<T>.logFailure()` 扩展**：以纯增量方式接入既有 `runCatching` 链，不改变控制流。
+  3. **静默失败系统性收口**：`XposedLocationHook` 98→94 个 `runCatching` 站点中 **63 个**已携带失败记录（覆盖率经括号配平+链式行走扫描核验，非 grep 估算），其余 31 处为刻意保留的静默并逐条注明理由。重点覆盖 `createLocationResult`、`getGlobalActiveLocation`、Hook 安装路径，并新增 4 处「静默零」守卫。
+  4. **修复在线更新误报**：`extractVersionCode` 不再把版本标签按十进制拼接（`v1.3.9` 曾算成 `139` 并与 `versionCode` 比较，导致每次启动都误报更新）。
+  5. **新增更新包签名校验**：下载的 APK 必须与已安装应用签名证书一致，否则拒绝安装。
+  6. **仓库整理**：取消跟踪根目录 APK 产物（本地保留），`.workbuddy/` 加入忽略列表，`package.json` 由 `1.1.0` 校正为 `1.4.0`。
+- **⚠️ 验证状态**：**未经真机验证**。改动均为纯增量日志/异常记录，编译验证通过，效果待真机确认。
+- **⚠️ 已知未处理项**：`HookConfigProvider` 与 `AdbCommandReceiver` 仍 `exported=true` 且无权限保护；`HookStateBridge` 的 `chmod 666` 未收敛。两项均需先做 IPC 设计确认。
+
+### [1.3.7] - 2026-09-12
+- **构建状态**：✅ 已发布 GitHub Release（`versionCode = 16`, `versionName = "v1.3.7"`），产物 3.87 MB。
+- **核心变更**：彻底移除实时模糊/Haze 渲染，改用轻量晶体微光材质；解决滑动时卡片画面漂移与图层冲突；单例 MapView 合并；底栏手势平移与防遮挡布局。
 
 ### [1.2.1] - 2026-09-10
 - **构建状态**：根除退出后定位残留、解决篡改系统扫描配置导致室内无法定位等问题 (`outputs/app-debug.apk`)。

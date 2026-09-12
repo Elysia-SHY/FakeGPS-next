@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.7",
-  "versionCode": 16,
+  "versionName": "v1.4.0",
+  "versionCode": 17,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 移除卡片实时模糊渲染，全面采用轻量晶莹微光纯净材质，彻底解决多分辨率及滑动过程中的画面漂移与图层冲突。\n2. 保留相册自定义背景壁纸、底栏跟手动效、单例 MapView 合并与右下角防遮挡布局优化。\n3. 全局性能极大提升，全面适配 120Hz 高刷屏与低功耗常驻运行。",
+  "releaseNotes": "1. 全局诊断体系上线：新增统一诊断出口 Diag，同时输出到 logcat 与 LSPosed 日志，内置按标签限流（10 秒 5 条），避免在 system_server 高频路径上刷屏。\n2. 系统性收口静默失败：XposedLocationHook 中 94 个异常吞没点已为 63 个补上失败记录，重点覆盖坐标包装、Hook 安装、分流规则加载与坐标构造等关键链路；新增「静默零」守卫，当候选类名全部未命中时不再无声无息。\n3. 修复线上更新误报：extractVersionCode 不再把版本标签按十进制拼接（v1.3.9 曾被算成 139 并与 versionCode 直接比较），改为未知时回退语义化版本比较。\n4. 更新包签名校验：下载的 APK 必须与已安装应用的签名证书一致才会交给系统安装器，阻断被篡改的更新包。\n5. 仓库整理：取消跟踪根目录 APK 产物，忽略本机工作区目录。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.7/FakeGPS-next-v1.3.7-release.apk"
+  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.4.0/FakeGPS-next-v1.4.0-release.apk"
 }
