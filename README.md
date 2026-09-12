@@ -9,7 +9,7 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.2)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.3)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
 ---
 
@@ -139,6 +139,7 @@ cd FakeGPS-next
 
 完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.3.3]** (2026-09-12) — 独立应用分流选点交互重构（准心浮动指示气泡、底部面板专属保存确认、按需落盘）、路线巡航纯全局解耦（广播 is_route 属性、双模零冲突运作、分流模式精简）。
 - **[v1.3.2]** (2026-09-12) — 介绍页 UI 全景重构（解决标签挤压变形、扩充底部防遮挡安全边距）、三级高可用云端版本与更新日志自动同步、新增设备环境与运行诊断面板。
 - **[v1.3.1]** (2026-09-12) — 系统框架级独立分流全面闭环（补全 HookConfigProvider 导出、解决派发监听器真实 CallerIdentity 解析）、定点驻留 AOSP 丢包抑制。
 - **[v1.3.0]** (2026-09-11) — 多应用独立分流路由首发（Multi-Target Routing）、离线物理动力学仿真引擎（Kinematics Pro）、动态多星座 GNSS 星历合成（Synthetic GNSS）。
