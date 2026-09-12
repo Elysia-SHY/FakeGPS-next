@@ -1,6 +1,7 @@
 package com.mockrun.app.ui.theme
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -16,8 +17,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -45,16 +48,21 @@ object LiquidGlassDefaults {
 }
 
 /**
- * High-performance Liquid Glass (液态毛玻璃) styling modifier.
+ * High-performance Liquid Glass (液态玻璃) styling modifier.
  * When [isLiquidGlass] is true:
- *   - Ultra-translucent crystal prismatic gradient background (通透晶莹微棱镜折射底衬)
- *   - 135° Fresnel total reflection rim-light border (菲涅尔微棱镜双光边框)
- *   - Physical 3D inner bevel specular highlight (微倒角立体高光内沿)
- *   - Top-down glancing specular surface sheen & bottom ambient reflection (表面掠射弧光)
- *   - Soft diffuse floating ambient shadow (空间悬浮光晕)
- *   - Fully safe: rendered via drawBehind to protect foreground text/icon sharpness
+ *   - On Android 13+ (API 33): rendered by an AGSL RuntimeShader (see [LiquidGlassShader]) —
+ *     SDF silhouette → Fresnel rim with chromatic dispersion, diagonal specular sweep,
+ *     frosted grain and a crisp hairline, over a translucent base gradient. This is the
+ *     iOS-26-grade material. It deliberately does NOT sample the backdrop (the map is an
+ *     Android View that Compose cannot capture, and backdrop capture is what caused the
+ *     slide misalignment that removed Haze in v1.3.9).
+ *   - On Android 10–12 (API 29–32): translucent crystal gradient + hairline border
+ *     (no RuntimeShader available; graceful degradation).
+ *   - Fully safe: rendered behind content to protect foreground text/icon sharpness.
  * When [isLiquidGlass] is false:
- *   - Crisp solid surface (pure material, zero blur/shader overhead, battery-saving)
+ *   - Crisp solid surface (pure material, zero blur/shader overhead, battery-saving).
+ *
+ * The signature is frozen — 31 call sites across the app depend on it.
  */
 fun Modifier.liquidGlass(
     isLiquidGlass: Boolean,
@@ -67,62 +75,15 @@ fun Modifier.liquidGlass(
     val isDark = isSystemInDarkTheme()
 
     if (isLiquidGlass) {
-        // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
-        val crystalBaseBrush = if (containerColor != null) {
-            Brush.linearGradient(
-                colors = listOf(
-                    containerColor.copy(alpha = 0.88f),
-                    containerColor.copy(alpha = 0.68f),
-                    containerColor.copy(alpha = 0.82f)
-                ),
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-        } else if (isDark) {
-            // Obsidian Smoked Crystal (黑曜水晶通透深邃微光)
-            Brush.linearGradient(
-                0.0f to Color(0x94262B38), // 58% top-left specular highlight
-                0.40f to Color(0x5212141A), // 32% high-transparency cosmic dark
-                0.75f to Color(0x66181B22), // 40% obsidian crystal body
-                1.0f to Color(0x801F232D),  // 50% deep obsidian depth
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-        } else {
-            // Ultra-Clear Prismatic Crystal (超白玻微偏光极度通透 - 拒绝乳白扁平塑料感)
-            Brush.linearGradient(
-                0.0f to Color(0xB8FFFFFF), // 72% 入射光掠影
-                0.38f to Color(0x52E8F2FC), // 32% 冰晶微偏光通透带 - 地图道路与图钉清晰穿透！
-                0.78f to Color(0x66FFFFFF), // 40% 晶体本体高透光
-                1.0f to Color(0x78D8E8F8),  // 47% 边缘微棱镜折射散色
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
+        val useAgslShader = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        val glassPaint = if (useAgslShader) remember { LiquidGlassPaint() } else null
+        val params = when {
+            containerColor != null -> LiquidGlassPresets.tinted(containerColor, isDark)
+            isDark -> LiquidGlassPresets.dark
+            else -> LiquidGlassPresets.light
         }
 
-        // 1. Subtle, clean glass border (VisionOS single hairline rim)
-        val borderBrush = Brush.linearGradient(
-            colors = if (containerColor != null) {
-                listOf(
-                    containerColor.copy(alpha = 0.60f),
-                    containerColor.copy(alpha = 0.25f)
-                )
-            } else if (isDark) {
-                listOf(
-                    Color.White.copy(alpha = 0.22f),
-                    Color.White.copy(alpha = 0.06f)
-                )
-            } else {
-                listOf(
-                    Color.White.copy(alpha = 0.65f),
-                    Color.White.copy(alpha = 0.20f)
-                )
-            },
-            start = Offset.Zero,
-            end = Offset.Infinite
-        )
-
-        // 2. Base Modifier with soft clipping and subtle elevation
+        // Shadow + clip shared by both glass paths
         val baseModifier = if (elevation > 0.dp) {
             this.shadow(
                 elevation = elevation.coerceAtMost(3.dp),
@@ -134,10 +95,91 @@ fun Modifier.liquidGlass(
             this.clip(shape)
         }
 
-        // 3. Clean Translucent Crystal Base with Single Crisp Hairline Border
-        baseModifier
-            .background(crystalBaseBrush, shape)
-            .border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
+        if (glassPaint != null) {
+            // ---- AGSL path (Android 13+): the real glass material ----
+            val rimWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { 2.5.dp.toPx() }
+            baseModifier.drawBehind {
+                val outline = shape.createOutline(size, layoutDirection, this)
+                val cornerPx = (outline as? Outline.Rounded)
+                    ?.roundRect?.topLeftCornerRadius?.x ?: 0f
+                glassPaint.configure(
+                    width = size.width,
+                    height = size.height,
+                    cornerPx = cornerPx,
+                    baseTop = params.baseTop,
+                    baseBottom = params.baseBottom,
+                    edgeTint = params.edgeTint,
+                    rimWidthPx = rimWidthPx,
+                    dispersion = params.dispersion,
+                    specular = params.specular,
+                    grain = params.grain,
+                    hairline = params.hairline
+                )
+                drawContext.canvas.nativeCanvas.drawRect(
+                    0f, 0f, size.width, size.height, glassPaint.paint
+                )
+            }
+        } else {
+            // ---- Gradient fallback (Android 10–12) — previous implementation, kept verbatim ----
+            // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
+            val crystalBaseBrush = if (containerColor != null) {
+                Brush.linearGradient(
+                    colors = listOf(
+                        containerColor.copy(alpha = 0.88f),
+                        containerColor.copy(alpha = 0.68f),
+                        containerColor.copy(alpha = 0.82f)
+                    ),
+                    start = Offset.Zero,
+                    end = Offset.Infinite
+                )
+            } else if (isDark) {
+                // Obsidian Smoked Crystal (黑曜水晶通透深邃微光)
+                Brush.linearGradient(
+                    0.0f to Color(0x94262B38), // 58% top-left specular highlight
+                    0.40f to Color(0x5212141A), // 32% high-transparency cosmic dark
+                    0.75f to Color(0x66181B22), // 40% obsidian crystal body
+                    1.0f to Color(0x801F232D),  // 50% deep obsidian depth
+                    start = Offset.Zero,
+                    end = Offset.Infinite
+                )
+            } else {
+                // Ultra-Clear Prismatic Crystal (超白玻微偏光极度通透 - 拒绝乳白扁平塑料感)
+                Brush.linearGradient(
+                    0.0f to Color(0xB8FFFFFF), // 72% 入射光掠影
+                    0.38f to Color(0x52E8F2FC), // 32% 冰晶微偏光通透带 - 地图道路与图钉清晰穿透！
+                    0.78f to Color(0x66FFFFFF), // 40% 晶体本体高透光
+                    1.0f to Color(0x78D8E8F8),  // 47% 边缘微棱镜折射散色
+                    start = Offset.Zero,
+                    end = Offset.Infinite
+                )
+            }
+
+            // Subtle, clean glass border (VisionOS single hairline rim)
+            val borderBrush = Brush.linearGradient(
+                colors = if (containerColor != null) {
+                    listOf(
+                        containerColor.copy(alpha = 0.60f),
+                        containerColor.copy(alpha = 0.25f)
+                    )
+                } else if (isDark) {
+                    listOf(
+                        Color.White.copy(alpha = 0.22f),
+                        Color.White.copy(alpha = 0.06f)
+                    )
+                } else {
+                    listOf(
+                        Color.White.copy(alpha = 0.65f),
+                        Color.White.copy(alpha = 0.20f)
+                    )
+                },
+                start = Offset.Zero,
+                end = Offset.Infinite
+            )
+
+            baseModifier
+                .background(crystalBaseBrush, shape)
+                .border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
+        }
     } else {
         val solidFill = containerColor ?: if (isDark) {
             Color(0xFF1E1E20)
