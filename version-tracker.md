@@ -1,20 +1,32 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`1.4.0`
-> **Android 内部版本**：`versionCode = 17`
-> **Android 显示版本**：`versionName = "v1.4.0"`
+> **当前真实基准版本**：`1.4.1`
+> **Android 内部版本**：`versionCode = 18`
+> **Android 显示版本**：`versionName = "v1.4.1"`
 > **交付存放目录**：`d:\Desktop\fake gps\`
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-next-v1.4.0-release.apk`
-> **构建时间**：2026-09-12 17:51
+> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-next-v1.4.1-release.apk`
+> **构建时间**：2026-09-12 18:04
 > **构建命令**：`./gradlew assembleRelease --no-daemon`
 > **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
-> **APK SHA-256**：`b84449f228467939ec51aacb179e35c58924c9c3f18260ff48b719f067130c56`
+> **APK SHA-256**：`8c4ffa2264012f1c4f7a08a13cda37ab044412948b8e387756406db31e8985c0`
 
-> **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。本版已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
+> **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.4.1] - 2026-09-12
+- **构建状态**：✅ `assembleRelease` 成功，产物 3,884,308 bytes（3.7 MB）(`app/build/outputs/apk/release/app-release.apk`)。
+- **Android 配置**：`versionCode = 18`, `versionName = "v1.4.1"`
+- **本版定位**：**安全加固**，不新增功能、不改动业务逻辑分支。
+- **核心变更**：
+  1. **`HookConfigProvider` 按 uid 收闸**：该 Provider 必须保持 `exported` 才能服务 `system_server`（signature 权限会挡掉系统框架），但此前**任意第三方应用都可调用 `getLocation`** 读取当前伪造坐标并探测应用是否激活。现仅放行 自身/system/root/shell。
+  2. **配置文件 0666 → 0644**：世界可读是 hook 跨进程读取的设计必需，但世界可写毫无必要 —— 原权限下任何应用都能改写伪造坐标。现保留只读、去掉篡改通道。涉及 `/data/system/fake_gps_hook.json`、`/data/local/tmp/fake_gps_hook.json`、`shared_prefs/hook_config.xml`。
+  3. **`AdbCommandReceiver` 加 `WRITE_SECURE_SETTINGS` 权限**：adb shell 默认持有、普通应用没有，保留 adb 用法同时阻断任意应用驱动模拟。已确认应用自身不发这些广播（`SimulationViewModel` 直接 `startService`）。
+  4. 修复 `android.os.Process` 与 `java.lang.Process` 导入冲突导致的编译失败。
+- **⚠️ 验证状态**：**未经真机验证**。产物权限已用 `aapt2 dump xmltree` 反查确认写入 APK manifest。
+- **⚠️ 已知取舍**：hook 运行于第三方应用进程时，其 ContentProvider 兜底通道失效（该通道本就是末位兜底，且现会留痕）。
 
 ### [1.4.0] - 2026-09-12
 - **构建状态**：✅ `assembleRelease` 构建成功，R8 混淆与资源压缩通过，产物 3,883,552 bytes（3.7 MB）(`app/build/outputs/apk/release/app-release.apk`)。
