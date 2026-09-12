@@ -588,9 +588,7 @@ fun MapScreen(
                                         }
                                         centerAimingCoord = wgsLat to wgsLon
                                         val activeKey = activeTargetKey
-                                        if (activeKey != null) {
-                                            simulationViewModel.updateMultiTargetLocation(activeKey, wgsLat, wgsLon)
-                                        } else {
+                                        if (activeKey == null) {
                                             simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
                                         }
                                     }
@@ -613,9 +611,7 @@ fun MapScreen(
                                         mapViewRef?.controller?.animateTo(it)
                                         centerAimingCoord = wgsLat to wgsLon
                                         val activeKey = activeTargetKey
-                                        if (activeKey != null) {
-                                            simulationViewModel.updateMultiTargetLocation(activeKey, wgsLat, wgsLon)
-                                        } else {
+                                        if (activeKey == null) {
                                             simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
                                         }
                                     }
@@ -978,115 +974,190 @@ fun MapScreen(
                     }
                 }
 
-                // Horizontal App Capsule Selector Bar
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Item 0: Global Default
-                    item {
-                        val isSelected = activeTargetKey == null
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) IosColors.SystemBlue else IosFrostedCapsule,
-                            border = BorderStroke(0.5.dp, if (isSelected) IosColors.SystemBlue else IosHairlineBorder),
-                            shadowElevation = if (isSelected) 4.dp else 2.dp,
-                            modifier = Modifier.bouncyClickable {
-                                simulationViewModel.setActiveTargetKey(null)
-                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
-                                    ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
-                                    ?: centerAimingCoord
-                                centerAimingCoord = targetCoord
-                                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
-                                mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
-                            }
+                if (activeMapTab == MapTab.ROUTE) {
+                    // Route Simulation Mode: Strictly Global
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = IosFrostedCapsule,
+                        border = BorderStroke(0.5.dp, IosHairlineBorder),
+                        shadowElevation = 2.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Icon(
+                                Icons.Default.Navigation,
+                                contentDescription = null,
+                                tint = IosColors.SystemGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "🚗 全局路线巡航模式 · 真实道路拓扑模拟 (不与应用分流冲突)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSystemDark) Color.White else Color.Black
+                            )
+                        }
+                    }
+                } else {
+                    // Location Mode: Per-App Diversion & Global Capsules
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Item 0: Global Default
+                        item {
+                            val isSelected = activeTargetKey == null
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSelected) IosColors.SystemBlue else IosFrostedCapsule,
+                                border = BorderStroke(0.5.dp, if (isSelected) IosColors.SystemBlue else IosHairlineBorder),
+                                shadowElevation = if (isSelected) 4.dp else 2.dp,
+                                modifier = Modifier.bouncyClickable {
+                                    simulationViewModel.setActiveTargetKey(null)
+                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                    val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
+                                        ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
+                                        ?: centerAimingCoord
+                                    centerAimingCoord = targetCoord
+                                    val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
+                                    mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                                }
                             ) {
-                                Text(
-                                    text = "🌐 全局通用",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color.White else IosColors.Label
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "🌐 全局通用",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else IosColors.Label
+                                    )
+                                }
+                            }
+                        }
+
+                        // Item 1..N: Per-App Rules
+                        items(
+                            items = multiTargetRules,
+                            key = { r: MultiTargetRule -> r.key }
+                        ) { rule ->
+                            val isSelected = activeTargetKey == rule.key
+                            val ruleColor = remember(rule.colorHex) {
+                                runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+                                    .getOrDefault(IosColors.SystemBlue)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSelected) ruleColor else IosFrostedCapsule,
+                                border = BorderStroke(0.5.dp, if (isSelected) ruleColor else IosHairlineBorder),
+                                shadowElevation = if (isSelected) 4.dp else 2.dp,
+                                modifier = Modifier.bouncyClickable {
+                                    simulationViewModel.setActiveTargetKey(rule.key)
+                                    centerAimingCoord = rule.latitude to rule.longitude
+                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                    val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
+                                    mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(8.dp),
+                                        shape = CircleShape,
+                                        color = if (isSelected) Color.White else ruleColor
+                                    ) {}
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (rule.userId != 0) "${rule.appName} (${rule.userId})" else rule.appName,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else IosColors.Label
+                                    )
+                                }
+                            }
+                        }
+
+                        // Item N+1: Add App Capsule
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = IosFrostedCapsule,
+                                border = BorderStroke(0.5.dp, IosHairlineBorder),
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.bouncyClickable { showMapAppPickerSheet = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "添加分流",
+                                        tint = IosBlue,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "添加分流",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = IosBlue
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // Item 1..N: Per-App Rules
-                    items(
-                        items = multiTargetRules,
-                        key = { r: MultiTargetRule -> r.key }
-                    ) { rule ->
-                        val isSelected = activeTargetKey == rule.key
-                        val ruleColor = remember(rule.colorHex) {
-                            runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+                    // Clear prompt banner when an app is selected
+                    val currentActiveRule = multiTargetRules.find { it.key == activeTargetKey }
+                    if (currentActiveRule != null) {
+                        val currentRuleColor = remember(currentActiveRule.colorHex) {
+                            runCatching { Color(android.graphics.Color.parseColor(currentActiveRule.colorHex)) }
                                 .getOrDefault(IosColors.SystemBlue)
                         }
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) ruleColor else IosFrostedCapsule,
-                            border = BorderStroke(0.5.dp, if (isSelected) ruleColor else IosHairlineBorder),
-                            shadowElevation = if (isSelected) 4.dp else 2.dp,
-                            modifier = Modifier.bouncyClickable {
-                                simulationViewModel.setActiveTargetKey(rule.key)
-                                centerAimingCoord = rule.latitude to rule.longitude
-                                val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
-                                mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
-                            }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = currentRuleColor.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, currentRuleColor.copy(alpha = 0.45f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Surface(
-                                    modifier = Modifier.size(8.dp),
-                                    shape = CircleShape,
-                                    color = if (isSelected) Color.White else ruleColor
-                                ) {}
-                                Spacer(Modifier.width(6.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(shape = CircleShape, color = currentRuleColor, modifier = Modifier.size(8.dp)) {}
+                                    Text(
+                                        text = "正在为【${currentActiveRule.appName}】选择分流定位点",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSystemDark) Color.White else Color.Black
+                                    )
+                                }
                                 Text(
-                                    text = if (rule.userId != 0) "${rule.appName} (${rule.userId})" else rule.appName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color.White else IosColors.Label
-                                )
-                            }
-                        }
-                    }
-
-                    // Item N+1: Add App Capsule
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = IosFrostedCapsule,
-                            border = BorderStroke(0.5.dp, IosHairlineBorder),
-                            shadowElevation = 2.dp,
-                            modifier = Modifier.bouncyClickable { showMapAppPickerSheet = true }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "添加分流",
-                                    tint = IosBlue,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = "添加分流",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    text = "切回全局",
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosBlue
+                                    color = IosColors.SystemBlue,
+                                    modifier = Modifier.bouncyClickable { simulationViewModel.setActiveTargetKey(null) }
                                 )
                             }
                         }
@@ -1177,14 +1248,47 @@ fun MapScreen(
                 visible = activeMapTab == MapTab.LOCATION || (activeMapTab == MapTab.ROUTE && routeStage == RouteStage.SELECTING),
                 modifier = Modifier.align(Alignment.Center)
             ) {
+                val currentActiveRule = if (activeMapTab == MapTab.LOCATION) multiTargetRules.find { it.key == activeTargetKey } else null
+                val currentAimingColor = currentActiveRule?.let {
+                    runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }.getOrNull()
+                } ?: IosBlue
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = 28.dp)
+                    modifier = Modifier.padding(bottom = 32.dp)
                 ) {
+                    // Floating Aiming Label
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (currentActiveRule != null) currentAimingColor else Color(0xEB000000),
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (currentActiveRule != null) Icons.Default.AltRoute else Icons.Default.Place,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (currentActiveRule != null) "【${currentActiveRule.appName}】分流选点" else (if (activeMapTab == MapTab.ROUTE) "路线航点选点" else "全局目标定位点"),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
                     Icon(
                         imageVector = Icons.Rounded.AddLocationAlt,
                         contentDescription = "定位十字准心",
-                        tint = IosBlue,
+                        tint = currentAimingColor,
                         modifier = Modifier.size(38.dp)
                     )
                 }
@@ -1283,6 +1387,14 @@ fun MapScreen(
                     savedRoutes = savedRoutes,
                     isLiquidGlass = isLiquidGlass,
                     bottomBarPadding = bottomBarPadding,
+                    activeRule = multiTargetRules.find { it.key == activeTargetKey },
+                    onSetTargetLocation = { rule ->
+                        simulationViewModel.updateMultiTargetLocation(rule.key, activeCoord.first, activeCoord.second)
+                        Toast.makeText(context, "✅ 已将【${rule.appName}】分流定位点设为：$currentAddressText", Toast.LENGTH_SHORT).show()
+                    },
+                    onClearActiveTarget = {
+                        simulationViewModel.setActiveTargetKey(null)
+                    },
                     onSearchQueryChange = { mapViewModel.performSearch(it) },
                     onSearchResultSelect = { item ->
                         val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP

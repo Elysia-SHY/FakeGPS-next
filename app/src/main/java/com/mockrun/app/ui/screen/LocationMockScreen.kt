@@ -1172,9 +1172,8 @@ private fun MultiTargetRuleItemRow(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = when (rule.mode) {
-                            TargetMockMode.STATIONARY -> IosColors.SystemBlue.copy(alpha = 0.12f)
-                            TargetMockMode.ROUTE -> IosColors.SystemGreen.copy(alpha = 0.12f)
                             TargetMockMode.REAL_PASSTHROUGH -> IosColors.SystemGray.copy(alpha = 0.15f)
+                            else -> IosColors.SystemBlue.copy(alpha = 0.12f)
                         },
                         modifier = Modifier.bouncyClickable { showModeMenu = true }
                     ) {
@@ -1184,16 +1183,14 @@ private fun MultiTargetRuleItemRow(
                         ) {
                             Text(
                                 text = when (rule.mode) {
-                                    TargetMockMode.STATIONARY -> "定点驻留 ▾"
-                                    TargetMockMode.ROUTE -> "路径漫游 ▾"
                                     TargetMockMode.REAL_PASSTHROUGH -> "物理透传 ▾"
+                                    else -> "独立定点 ▾"
                                 },
                                 style = IosTypography.Caption2,
                                 fontWeight = FontWeight.SemiBold,
                                 color = when (rule.mode) {
-                                    TargetMockMode.STATIONARY -> IosColors.SystemBlue
-                                    TargetMockMode.ROUTE -> IosColors.SystemGreen
                                     TargetMockMode.REAL_PASSTHROUGH -> IosColors.SecondaryLabel
+                                    else -> IosColors.SystemBlue
                                 }
                             )
                         }
@@ -1204,21 +1201,14 @@ private fun MultiTargetRuleItemRow(
                         onDismissRequest = { showModeMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("📍 定点驻留 (锁定假坐标)") },
+                            text = { Text("📍 独立定点 (自定义分流坐标)") },
                             onClick = {
                                 onModeChange(TargetMockMode.STATIONARY)
                                 showModeMenu = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("🛣️ 路径漫游 (跟随路线巡航)") },
-                            onClick = {
-                                onModeChange(TargetMockMode.ROUTE)
-                                showModeMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("🟢 物理透传 (放行真实 GPS)") },
+                            text = { Text("🛰️ 物理透传 (放行真实物理定位)") },
                             onClick = {
                                 onModeChange(TargetMockMode.REAL_PASSTHROUGH)
                                 showModeMenu = false

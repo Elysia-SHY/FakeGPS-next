@@ -63,6 +63,17 @@ object HookStateBridge {
         return (System.currentTimeMillis() - lastSystemHookHeartbeat) < 60_000L
     }
 
+    @Volatile
+    var isRouteSimulation: Boolean = false
+        private set
+
+    fun setRouteSimulationMode(isRoute: Boolean) {
+        isRouteSimulation = isRoute
+        asyncScope.launch {
+            com.mockrun.app.location.RootSuBridge().executeCommand("setprop debug.fakegps.is_route ${if (isRoute) "1" else "0"}")
+        }
+    }
+
     private val asyncScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
 
     fun update(

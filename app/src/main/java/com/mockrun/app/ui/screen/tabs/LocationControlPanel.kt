@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.location.SearchResultItem
 import com.mockrun.app.ui.theme.IosColors
@@ -60,6 +61,9 @@ fun LocationControlPanel(
     savedRoutes: List<Route>,
     isLiquidGlass: Boolean,
     bottomBarPadding: Dp,
+    activeRule: MultiTargetRule? = null,
+    onSetTargetLocation: ((MultiTargetRule) -> Unit)? = null,
+    onClearActiveTarget: (() -> Unit)? = null,
     onSearchQueryChange: (String) -> Unit,
     onSearchResultSelect: (SearchResultItem) -> Unit,
     onClearSearch: () -> Unit,
@@ -212,7 +216,86 @@ fun LocationControlPanel(
             }
 
             // High-Visibility Master Capsule Buttons
-            if (isMockActive) {
+            if (activeRule != null) {
+                val activeRuleColor = remember(activeRule.colorHex) {
+                    runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
+                        .getOrDefault(IosColors.SystemBlue)
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = activeRuleColor.copy(alpha = 0.14f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, activeRuleColor.copy(alpha = 0.45f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Surface(shape = CircleShape, color = activeRuleColor, modifier = Modifier.size(8.dp)) {}
+                                Text(
+                                    text = "分流目标：【${activeRule.appName}】",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
+                            }
+                            Text(
+                                text = "切回全局",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = IosColors.SystemBlue,
+                                modifier = Modifier.clickable { onClearActiveTarget?.invoke() }
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .liquidGlass(
+                                isLiquidGlass = isLiquidGlass,
+                                shape = RoundedCornerShape(26.dp),
+                                elevation = 8.dp,
+                                containerColor = activeRuleColor
+                            )
+                            .clickable {
+                                onSetTargetLocation?.invoke(activeRule)
+                            },
+                        shape = RoundedCornerShape(26.dp),
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "确定设为【${activeRule.appName}】分流定位点",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            } else if (isMockActive) {
                 // Dual Capsule when active: [ 移动到此 ] & [ 停止模拟 ]
                 Row(
                     modifier = Modifier.height(52.dp),

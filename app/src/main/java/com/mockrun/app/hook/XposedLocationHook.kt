@@ -1417,6 +1417,13 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             timestamp = 0L
                         )
                     }
+
+                    // Route simulation is strictly global: if route cruising is running, all apps follow moving route
+                    val isRouteSimulating = runCatching { getSystemProperty("debug.fakegps.is_route") == "1" }.getOrDefault(false)
+                    if (isRouteSimulating) {
+                        return getGlobalActiveLocation()
+                    }
+
                     return SpoofLocation(
                         isActive = true,
                         latitude = rule.latitude,

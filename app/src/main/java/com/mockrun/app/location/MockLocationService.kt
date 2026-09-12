@@ -236,6 +236,7 @@ class MockLocationService : Service() {
         releaseWakeLock()
         stateRepo.setPointMock(false)
         stateRepo.onStopped()
+        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
         com.mockrun.app.hook.HookStateBridge.update(this, false)
         CoordinateConverter.flushRealLocation(this)
     }
@@ -255,6 +256,7 @@ class MockLocationService : Service() {
 
         saveSimulationState(active = true, route = route, speed = speedKmh, progress = startProgress)
         stateRepo.onSimulationStarted(route, speedKmh)
+        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(true)
 
         simulationJob?.cancel()
         simulationJob = serviceScope.launch {
@@ -299,6 +301,7 @@ class MockLocationService : Service() {
             MockLocationEngine.forceCleanAllTestProviders(this)
         }
         stateRepo.onStopped()
+        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
         com.mockrun.app.hook.HookStateBridge.update(this, false)
         CoordinateConverter.flushRealLocation(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
