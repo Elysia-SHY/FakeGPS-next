@@ -128,7 +128,12 @@ object VersionSyncManager {
 
     private fun fetchReleaseFromGitHub(): VersionSyncStatus {
         val now = System.currentTimeMillis()
-        val endpoints = listOf(GITHUB_RELEASE_API, GITHUB_RELEASE_API_MIRROR)
+        val endpoints = listOf(
+            GITHUB_RELEASE_API,
+            "https://gh-proxy.com/https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest",
+            "https://ghproxy.net/https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest",
+            "https://gh.llkk.cc/https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+        )
         var lastErrorMessage = "未知网络错误"
 
         for (endpoint in endpoints) {
