@@ -4,6 +4,31 @@
 
 ---
 
+## [1.3.2] - 2026-09-12
+
+### 新增 (Added)
+- **云端版本自动同步服务 (VersionSyncManager)**：引入三级容灾架构（jsdelivr CDN、raw.githubusercontent 及 GitHub Releases API），实现全天候无阻碍版本检测与一键热同步。
+- **介绍页全景重构与美化 (AboutScreen Revamp)**：
+  - 引入版本对比矩阵与状态胶囊，实时显示本地版本、云端最新版本及最后同步时间；
+  - 核心功能技术微标签矩阵（0 注入特征、AOSP 8~15 全兼容、向心减速、动态信噪比等）；
+  - 新增设备环境与运行诊断卡片，实时呈现设备型号、Android 版本（API 级别）、CPU 架构与构建模式。
+- **新版本更新说明速览弹窗**：支持在应用内直接查看云端发布的更新日志，并提供一键前往 GitHub Release / 下载 APK 快捷通道。
+
+### 优化 (Changed)
+- **清理清单文件冗余**：去重 `AndroidManifest.xml` 中重复声明的 `HookConfigProvider`。
+- **根目录版本元数据维护**：在项目根目录新增 `version.json`，提升版本同步吞吐率与抗限流能力。
+
+---
+
+## [1.3.1] - 2026-09-12
+
+### 修复 (Fixed)
+- **系统框架级独立分流闭环**：在清单中注册并导出 `HookConfigProvider`，动态拦截 `LocationProviderManager$Registration` 全量派生类，提取真实 `CallerIdentity` 消除派发 UID 假冒问题。
+- **防位移丢包机制**：在定点驻留模式下抑制 AOSP `minUpdateDistanceMeters` 阈值，注入递增单调时钟避免无位移被底层过滤。
+- **文案与排版修复**：消除首页排查指南中的历史遗留乱码符号，规范使用指引。
+
+---
+
 ## [1.3.0] - 2026-09-11
 
 ### 新增 (Added)

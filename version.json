@@ -1,0 +1,8 @@
+{
+  "versionName": "v1.3.2",
+  "versionCode": 8,
+  "releaseDate": "2026-09-12",
+  "releaseNotes": "1. 介绍页全景重构：新增技术特性微标签与深色液态毛玻璃视觉升级。\n2. 云端版本自动同步：引入三级容灾 CDN/Raw 智能检测，支持一键热同步与更新速览。\n3. 设备环境运行诊断：实时展示 Android 系统版本、硬件型号、ABI 架构及模块注入状态。\n4. 清理冗余配置：规范化清单 IPC 节点与底层稳定性加固。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.2/FakeGPS-v1.3.2.apk"
+}

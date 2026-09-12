@@ -5,8 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,16 +26,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.BuildConfig
+import com.mockrun.app.data.repository.RemoteVersionInfo
+import com.mockrun.app.data.repository.VersionSyncManager
+import com.mockrun.app.data.repository.VersionSyncStatus
 import com.mockrun.app.ui.theme.*
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun AboutScreen(
@@ -44,7 +54,81 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
+    val scope = rememberCoroutineScope()
     val gitRepoUrl = "https://github.com/Elysia-SHY/FakeGPS-next"
+
+    val syncState by VersionSyncManager.status
+    var showChangelogDialog by remember { mutableStateOf<RemoteVersionInfo?>(null) }
+
+    // Auto-sync version on screen launch
+    LaunchedEffect(Unit) {
+        VersionSyncManager.checkForUpdates(force = false)
+    }
+
+    // Changelog Dialog
+    if (showChangelogDialog != null) {
+        val info = showChangelogDialog!!
+        AlertDialog(
+            onDismissRequest = { showChangelogDialog = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.NewReleases, contentDescription = null, tint = IosColors.SystemBlue)
+                    Text(
+                        text = "${info.versionName} 更新说明",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (info.releaseDate.isNotBlank()) {
+                        Text(
+                            text = "发布日期: ${info.releaseDate}",
+                            fontSize = 12.sp,
+                            color = IosColors.SecondaryLabel
+                        )
+                    }
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f))
+                    Text(
+                        text = if (info.releaseNotes.isNotBlank()) info.releaseNotes else "暂无详细更新说明",
+                        fontSize = 13.5.sp,
+                        lineHeight = 20.sp,
+                        color = if (isDark) Color(0xFFE0E0E0) else Color(0xFF2C2C2E)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "无法打开下载链接", Toast.LENGTH_SHORT).show()
+                        }
+                        showChangelogDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
+                ) {
+                    Text("前往下载 / 查看 Release", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showChangelogDialog = null }) {
+                    Text("关闭", color = IosColors.SecondaryLabel)
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -62,498 +146,887 @@ fun AboutScreen(
                 .padding(top = 16.dp, bottom = if (isTablet) 32.dp else 120.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-        // =====================================================================
-        // 1. App Header & Logo Card
-        // =====================================================================
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = 10.dp
-                ),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.Transparent
-        ) {
-            Column(
+            // =====================================================================
+            // 1. App Header & Emblem Card
+            // =====================================================================
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 26.dp, horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(24.dp),
+                        elevation = 10.dp
+                    ),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.Transparent
             ) {
-                // Luminous App Logo Badge
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(76.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFF007AFF),
-                                    Color(0xFF5856D6),
-                                    Color(0xFF00C7BE)
+                        .fillMaxWidth()
+                        .padding(vertical = 26.dp, horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Luminous App Logo Badge
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFF007AFF),
+                                        Color(0xFF5856D6),
+                                        Color(0xFF00C7BE)
+                                    )
                                 )
                             )
-                        )
-                        .border(
-                            1.5.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.White.copy(alpha = 0.6f),
-                                    Color.White.copy(alpha = 0.1f)
-                                )
+                            .border(
+                                1.5.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.65f),
+                                        Color.White.copy(alpha = 0.15f)
+                                    )
+                                ),
+                                RoundedCornerShape(22.dp)
                             ),
-                            RoundedCornerShape(22.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Place,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(42.dp)
-                    )
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                Text(
-                    text = "FakeGPS-next",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.Black
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.15f)
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = BuildConfig.VERSION_NAME,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = IosColors.SystemBlue,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(42.dp)
                         )
                     }
 
+                    Spacer(Modifier.height(14.dp))
+
                     Text(
-                        text = "Build: ${BuildConfig.BUILD_TIME}",
-                        fontSize = 11.5.sp,
-                        color = IosColors.SecondaryLabel
+                        text = "FakeGPS-next",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color.Black
                     )
-                }
 
-                Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
 
-                Text(
-                    text = "系统底层多应用独立分流 · 物理动力学仿真 · 动态 GNSS 星历合成",
-                    fontSize = 13.sp,
-                    color = IosColors.SecondaryLabel,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        // =====================================================================
-        // 2. Core Features & Architectural Capabilities
-        // =====================================================================
-        Text(
-            text = "核心功能与架构特性",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = IosColors.SecondaryLabel,
-            modifier = Modifier.padding(start = 6.dp)
-        )
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = 8.dp
-                ),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                FeatureItem(
-                    icon = Icons.Default.AltRoute,
-                    iconTint = IosColors.SystemBlue,
-                    title = "多应用独立分流引擎 (Multi-Target)",
-                    desc = "突破全系统单点模拟限制。可为微信、钉钉、高德等单独指派独立虚拟位置与航线，支持多开分身独立识别，未添加应用自动物理真实透传。"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                FeatureItem(
-                    icon = Icons.Default.Lock,
-                    iconTint = IosColors.SystemGreen,
-                    title = "系统内核集中拦截 (system_server Hook)",
-                    desc = "在 LSPosed 中仅需勾选「系统框架」，由系统底层集中路由。目标应用进程内 0 注入特征，彻底免除第三方反作弊扫描。"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                FeatureItem(
-                    icon = Icons.Default.PlayArrow,
-                    iconTint = IosColors.SystemOrange,
-                    title = "离线运动学物理仿真 (Kinematics Pro)",
-                    desc = "结合三点外接圆向心过弯减速、步频双峰微动模型与高斯地形海拔起伏仿真，彻底消灭机械直角瞬移痕迹，呈现真人级巡航轨迹。"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                FeatureItem(
-                    icon = Icons.Default.Place,
-                    iconTint = IosColors.SystemPurple,
-                    title = "动态多星座 GNSS 星历合成 (Synthetic GNSS)",
-                    desc = "合成北斗 (BDS)、GPS、GLONASS 16~24 颗卫星动态仰角与载噪比 (C/N0)，解决模拟定位开启后搜星数为 0 的平台封禁隐患。"
-                )
-            }
-        }
-
-        // =====================================================================
-        // 2. Liquid Glass Appearance Settings Card (二级菜单开关)
-        // =====================================================================
-        Text(
-            text = "视觉渲染风格",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = IosColors.SecondaryLabel,
-            modifier = Modifier.padding(start = 6.dp)
-        )
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = 8.dp
-                ),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.weight(1f)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isLiquidGlass) IosColors.SystemBlue.copy(0.18f) else (if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
-                                ),
-                            contentAlignment = Alignment.Center
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = IosColors.SystemBlue.copy(alpha = 0.15f)
                         ) {
-                            Icon(
-                                imageVector = if (isLiquidGlass) Icons.Default.WaterDrop else Icons.Default.BlurOff,
-                                contentDescription = null,
-                                tint = if (isLiquidGlass) IosColors.SystemBlue else IosColors.SecondaryLabel,
-                                modifier = Modifier.size(24.dp)
+                            Text(
+                                text = BuildConfig.VERSION_NAME,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = IosColors.SystemBlue,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
 
+                        Text(
+                            text = "构建时间: ${BuildConfig.BUILD_TIME}",
+                            fontSize = 11.5.sp,
+                            color = IosColors.SecondaryLabel
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Text(
+                        text = "系统框架底层分流 · 物理运动学拟真 · 动态多星座 GNSS 星历合成",
+                        fontSize = 12.5.sp,
+                        color = IosColors.SecondaryLabel,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            // =====================================================================
+            // 2. Cloud Version Sync & Update Center (自动同步与更新中心)
+            // =====================================================================
+            Text(
+                text = "版本与云端同步",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    // Header row with Sync button
+                    val isChecking = syncState is VersionSyncStatus.Checking
+
+                    val infiniteTransition = rememberInfiniteTransition(label = "spin")
+                    val angle by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "spinAngle"
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        when (syncState) {
+                                            is VersionSyncStatus.HasUpdate -> Color(0xFFFF9500).copy(0.18f)
+                                            is VersionSyncStatus.UpToDate -> Color(0xFF34C759).copy(0.18f)
+                                            is VersionSyncStatus.Error -> Color(0xFFFF3B30).copy(0.18f)
+                                            else -> IosColors.SystemBlue.copy(0.18f)
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when (syncState) {
+                                        is VersionSyncStatus.HasUpdate -> Icons.Default.SystemUpdate
+                                        is VersionSyncStatus.UpToDate -> Icons.Default.CheckCircle
+                                        is VersionSyncStatus.Error -> Icons.Default.CloudOff
+                                        else -> Icons.Default.CloudSync
+                                    },
+                                    contentDescription = null,
+                                    tint = when (syncState) {
+                                        is VersionSyncStatus.HasUpdate -> Color(0xFFFF9500)
+                                        is VersionSyncStatus.UpToDate -> Color(0xFF34C759)
+                                        is VersionSyncStatus.Error -> Color(0xFFFF3B30)
+                                        else -> IosColors.SystemBlue
+                                    },
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "云端版本自动同步",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = when (syncState) {
+                                        is VersionSyncStatus.Checking -> "正在同步云端最新版本..."
+                                        is VersionSyncStatus.UpToDate -> "已同步 · 当前安装即为最新版"
+                                        is VersionSyncStatus.HasUpdate -> "检测到新版本可用"
+                                        is VersionSyncStatus.Error -> (syncState as VersionSyncStatus.Error).message
+                                        is VersionSyncStatus.Idle -> "自动同步已就绪"
+                                    },
+                                    fontSize = 11.5.sp,
+                                    color = when (syncState) {
+                                        is VersionSyncStatus.HasUpdate -> Color(0xFFFF9500)
+                                        is VersionSyncStatus.UpToDate -> Color(0xFF34C759)
+                                        is VersionSyncStatus.Error -> Color(0xFFFF3B30)
+                                        else -> IosColors.SecondaryLabel
+                                    }
+                                )
+                            }
+                        }
+
+                        // Sync / Refresh Button
+                        IconButton(
+                            onClick = {
+                                if (!isChecking) {
+                                    scope.launch {
+                                        val res = VersionSyncManager.checkForUpdates(force = true)
+                                        when (res) {
+                                            is VersionSyncStatus.UpToDate -> Toast.makeText(context, "已是最新版本 (${res.info.versionName})", Toast.LENGTH_SHORT).show()
+                                            is VersionSyncStatus.HasUpdate -> Toast.makeText(context, "发现新版本: ${res.info.versionName}", Toast.LENGTH_SHORT).show()
+                                            is VersionSyncStatus.Error -> Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+                                            else -> {}
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "刷新同步",
+                                tint = if (isDark) Color.White else Color.Black,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .then(if (isChecking) Modifier.rotate(angle) else Modifier)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.07f) else Color.Black.copy(0.05f))
+                    Spacer(Modifier.height(12.dp))
+
+                    // Version comparison matrix
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Column {
                             Text(
-                                text = "液态毛玻璃渲染效果",
+                                text = "当前安装版本",
+                                fontSize = 11.5.sp,
+                                color = IosColors.SecondaryLabel
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = BuildConfig.VERSION_NAME,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isDark) Color.White else Color.Black
+                            )
+                        }
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = IosColors.SecondaryLabel.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "云端最新版本",
+                                fontSize = 11.5.sp,
+                                color = IosColors.SecondaryLabel
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            val remoteName = when (syncState) {
+                                is VersionSyncStatus.UpToDate -> (syncState as VersionSyncStatus.UpToDate).info.versionName
+                                is VersionSyncStatus.HasUpdate -> (syncState as VersionSyncStatus.HasUpdate).info.versionName
+                                is VersionSyncStatus.Checking -> "检测中..."
+                                else -> "—"
+                            }
+                            Text(
+                                text = remoteName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = when (syncState) {
+                                    is VersionSyncStatus.HasUpdate -> Color(0xFFFF9500)
+                                    is VersionSyncStatus.UpToDate -> Color(0xFF34C759)
+                                    else -> IosColors.SecondaryLabel
+                                }
+                            )
+                        }
+                    }
+
+                    // Has update banner
+                    if (syncState is VersionSyncStatus.HasUpdate) {
+                        val info = (syncState as VersionSyncStatus.HasUpdate).info
+                        Spacer(Modifier.height(14.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color(0xFFFF9500).copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF9500).copy(alpha = 0.35f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Celebration, contentDescription = null, tint = Color(0xFFFF9500), modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "发现新版本 ${info.versionName}",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else Color.Black
+                                    )
+                                }
+
+                                if (info.releaseDate.isNotBlank()) {
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        text = "发布日期: ${info.releaseDate}",
+                                        fontSize = 11.sp,
+                                        color = IosColors.SecondaryLabel
+                                    )
+                                }
+
+                                Spacer(Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { showChangelogDialog = info },
+                                        modifier = Modifier.weight(1f).height(38.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) Color.White else Color.Black)
+                                    ) {
+                                        Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "无法打开下载页面", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1.2f).height(38.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("立即升级", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Up to date banner
+                    if (syncState is VersionSyncStatus.UpToDate) {
+                        val info = (syncState as VersionSyncStatus.UpToDate).info
+                        val checkedAt = (syncState as VersionSyncStatus.UpToDate).checkedAt
+                        val timeStr = remember(checkedAt) {
+                            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(checkedAt))
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF34C759).copy(alpha = 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(15.dp))
+                                Text(
+                                    text = "已是最新版本，无需更新",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF34C759)
+                                )
+                            }
+                            Text(
+                                text = "$timeStr 已同步",
+                                fontSize = 10.5.sp,
+                                color = IosColors.SecondaryLabel
+                            )
+                        }
+                    }
+                }
+            }
+
+            // =====================================================================
+            // 3. Core Features & Architectural Capabilities (核心功能与架构特性)
+            // =====================================================================
+            Text(
+                text = "核心功能与架构特性",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    FeatureItem(
+                        icon = Icons.Default.AltRoute,
+                        iconTint = IosColors.SystemBlue,
+                        title = "多应用独立分流路由 (Multi-Target)",
+                        tags = listOf("AOSP 8~15 全兼容", "多开分身支持", "零锁高频 IPC", "真实物理透传"),
+                        desc = "突破全系统单点模拟限制。可为微信、钉钉、高德等单独指派独立虚拟位置与专属路线，支持多开分身 (User 999) 独立识别绑定，未添加应用自动走真实物理定位。"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    FeatureItem(
+                        icon = Icons.Default.Lock,
+                        iconTint = IosColors.SystemGreen,
+                        title = "系统内核集中拦截 (system_server Hook)",
+                        tags = listOf("0 注入特征", "仅勾选系统框架", "派发监听全拦截", "AOSP 丢包抑制"),
+                        desc = "在 LSPosed 中仅需勾选「系统框架」，由系统底层集中路由。宿主应用进程内 0 注入代码，彻底免除第三方反作弊扫描与封号风险。"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    FeatureItem(
+                        icon = Icons.Default.PlayArrow,
+                        iconTint = IosColors.SystemOrange,
+                        title = "离线运动学物理仿真 (Kinematics Pro)",
+                        tags = listOf("三点外接圆向心减速", "双峰步频微动", "高斯地形海拔起伏"),
+                        desc = "结合外接圆过弯向心减速约束 (v <= sqrt(a*R)) 杜绝急转弯超速异常；步频双峰微动模型拟真人体步态；高斯地形模型生成逼真海拔曲线。"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    FeatureItem(
+                        icon = Icons.Default.SatelliteAlt,
+                        iconTint = IosColors.SystemPurple,
+                        title = "动态多星座 GNSS 星历合成 (Synthetic GNSS)",
+                        tags = listOf("北斗/GPS/GLONASS", "16~24 动态卫星", "天顶角仰角 C/N0"),
+                        desc = "合成北斗、GPS 与 GLONASS 多星座卫星分布与 24~42 dB-Hz 动态信噪比，在遮挡时叠加多径衰减，解决模拟定位开启后搜星数为 0 触发平台秒封的问题。"
+                    )
+                }
+            }
+
+            // =====================================================================
+            // 4. Device Environment & Diagnostic Card (设备环境与运行诊断)
+            // =====================================================================
+            Text(
+                text = "设备环境与运行诊断",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val deviceModel = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
+                    val osInfo = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+                    val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
+
+                    DiagnosticRow(label = "设备型号", value = deviceModel)
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    DiagnosticRow(label = "系统版本", value = osInfo)
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    DiagnosticRow(label = "指令集架构", value = abi)
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    DiagnosticRow(label = "构建变体", value = "${BuildConfig.BUILD_TYPE.replaceFirstChar { it.uppercase() }} (R8 优化压缩)")
+
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = IosColors.SystemBlue.copy(alpha = 0.08f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "LSPosed 模块建议仅勾选「系统框架 (system)」，各分流目标应用无需勾选即可获得底层路由支持。",
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                color = IosColors.SecondaryLabel
+                            )
+                        }
+                    }
+                }
+            }
+
+            // =====================================================================
+            // 5. Visual Appearance & Glass Rendering (视觉渲染风格)
+            // =====================================================================
+            Text(
+                text = "视觉渲染风格",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isLiquidGlass) IosColors.SystemBlue.copy(0.18f) else (if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isLiquidGlass) Icons.Default.WaterDrop else Icons.Default.BlurOff,
+                                    contentDescription = null,
+                                    tint = if (isLiquidGlass) IosColors.SystemBlue else IosColors.SecondaryLabel,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "液态毛玻璃渲染效果",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (isLiquidGlass) "半透明磨砂 · 镜面光泽 · 柔和环境光" else "纯色材质 · 超低 GPU 负荷 · 极致省电",
+                                    fontSize = 11.5.sp,
+                                    color = IosColors.SecondaryLabel
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = isLiquidGlass,
+                            onCheckedChange = { next ->
+                                LiquidGlassDefaults.setEnabled(context, next)
+                                onToggleLiquidGlass(next)
+                                Toast.makeText(
+                                    context,
+                                    if (next) "💧 已开启液态毛玻璃视觉效果" else "⬛ 已切换为经典纯色节能模式",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = IosColors.SystemBlue
+                            )
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(
+                        color = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.06f),
+                        thickness = 0.8.dp
+                    )
+                    Spacer(Modifier.height(10.dp))
+
+                    Text(
+                        text = "💡 视觉设计参考了 LocationSpoofer 与 Orb 的折射高光光泽。在开启状态下，浮动底栏与抽屉将呈现通透细腻的质感。",
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp,
+                        color = IosColors.SecondaryLabel
+                    )
+                }
+            }
+
+            // =====================================================================
+            // 6. GitHub Open Source Address & Actions (开源代码仓库)
+            // =====================================================================
+            Text(
+                text = "项目开源与代码仓库",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.06f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Code,
+                                contentDescription = null,
+                                tint = if (isDark) Color.White else Color.Black,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "GitHub 源码仓库",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isDark) Color.White else Color.Black
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = if (isLiquidGlass) "半透明磨砂 · 镜面光泽 · 柔和环境光" else "纯色材质 · 超低 GPU 负荷 · 极致省电",
+                                text = gitRepoUrl,
+                                fontSize = 12.sp,
+                                color = IosColors.SystemBlue,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Copy URL Button
+                        Button(
+                            onClick = {
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("GitHub Repository", gitRepoUrl)
+                                cm.setPrimaryClip(clip)
+                                Toast.makeText(context, "已复制 GitHub 仓库地址至剪贴板！", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f),
+                                contentColor = if (isDark) Color.White else Color.Black
+                            )
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("复制链接", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        // Open Browser Button
+                        Button(
+                            onClick = {
+                                try {
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(gitRepoUrl))
+                                    context.startActivity(browserIntent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = IosColors.SystemBlue,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("前往仓库", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // =====================================================================
+            // 7. Quick Access: Route Library (数据管理与路线库)
+            // =====================================================================
+            Text(
+                text = "数据管理与路线库",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    )
+                    .clickable { onNavigateToLibrary() },
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(IosColors.SystemPurple.copy(0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = IosColors.SystemPurple,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "已收藏路线与航点库",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color.White else Color.Black
+                            )
+                            Text(
+                                text = "管理历史规划、导入/导出 GPX 文件",
                                 fontSize = 11.5.sp,
                                 color = IosColors.SecondaryLabel
                             )
                         }
                     }
 
-                    Switch(
-                        checked = isLiquidGlass,
-                        onCheckedChange = { next ->
-                            LiquidGlassDefaults.setEnabled(context, next)
-                            onToggleLiquidGlass(next)
-                            Toast.makeText(
-                                context,
-                                if (next) "💧 已开启液态毛玻璃视觉效果" else "⬛ 已切换为经典纯色节能模式",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = IosColors.SystemBlue
-                        )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = IosColors.SecondaryLabel,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
-
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(
-                    color = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.06f),
-                    thickness = 0.8.dp
-                )
-                Spacer(Modifier.height(10.dp))
-
-                Text(
-                    text = "💡 视觉设计参考了 LocationSpoofer 与 Orb 的折射高光光泽。在开启状态下，浮动底栏与控制抽屉将呈现细腻的玻璃通透质感。",
-                    fontSize = 11.5.sp,
-                    lineHeight = 16.sp,
-                    color = IosColors.SecondaryLabel
-                )
             }
-        }
 
-        // =====================================================================
-        // 3. GitHub Open Source Address & Actions
-        // =====================================================================
-        Text(
-            text = "项目开源与代码仓库",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = IosColors.SecondaryLabel,
-            modifier = Modifier.padding(start = 6.dp)
-        )
+            // =====================================================================
+            // 8. Open Source Credits & Acknowledgements (开源致谢)
+            // =====================================================================
+            Text(
+                text = "开源致谢与架构参考",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = 8.dp
-                ),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.06f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Code,
-                            contentDescription = null,
-                            tint = if (isDark) Color.White else Color.Black,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "GitHub 源码仓库",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) Color.White else Color.Black
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = gitRepoUrl,
-                            fontSize = 12.sp,
-                            color = IosColors.SystemBlue,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Copy URL Button
-                    Button(
-                        onClick = {
-                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("GitHub Repository", gitRepoUrl)
-                            cm.setPrimaryClip(clip)
-                            Toast.makeText(context, "已复制 GitHub 仓库地址至剪贴板！", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f),
-                            contentColor = if (isDark) Color.White else Color.Black
-                        )
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("复制链接", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    // Open Browser Button
-                    Button(
-                        onClick = {
-                            try {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(gitRepoUrl))
-                                context.startActivity(browserIntent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = IosColors.SystemBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("前往仓库", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // =====================================================================
-        // 4. Quick Access: Route Library
-        // =====================================================================
-        Text(
-            text = "数据管理与路线库",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = IosColors.SecondaryLabel,
-            modifier = Modifier.padding(start = 6.dp)
-        )
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = 8.dp
-                )
-                .clickable { onNavigateToLibrary() },
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Row(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(IosColors.SystemPurple.copy(0.18f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = IosColors.SystemPurple,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = "已收藏路线与航点库",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) Color.White else Color.Black
-                        )
-                        Text(
-                            text = "管理历史规划、导入/导出 GPX 文件",
-                            fontSize = 11.5.sp,
-                            color = IosColors.SecondaryLabel
-                        )
-                    }
+                    CreditItem(
+                        name = "LocationSpoofer",
+                        author = "HuangZhuoRui",
+                        desc = "全屏交互地图、抽屉式控制面板与拟真交互设计参考"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Orb Liquid Glass",
+                        author = "LerSent001",
+                        desc = "液态玻璃边缘折射与镜面高光视觉参考"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "OSMDroid & AutoNavi CDN",
+                        author = "OpenSource Community",
+                        desc = "免 Key 国内高速瓦片地图渲染引擎"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "LSPosed Framework",
+                        author = "LSPosed Developers",
+                        desc = "系统级 Hook 运行环境与 Android 8~15 穿透支持"
+                    )
                 }
-
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = IosColors.SecondaryLabel,
-                    modifier = Modifier.size(16.dp)
-                )
             }
-        }
 
-        // =====================================================================
-        // 5. Open Source Credits & Acknowledgements
-        // =====================================================================
-        Text(
-            text = "开源致谢",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = IosColors.SecondaryLabel,
-            modifier = Modifier.padding(start = 6.dp)
-        )
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = 8.dp
-                ),
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                CreditItem(
-                    name = "LocationSpoofer",
-                    author = "HuangZhuoRui",
-                    desc = "全屏交互地图、抽屉式控制面板设计灵感来源"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                CreditItem(
-                    name = "Orb Liquid Glass",
-                    author = "LerSent001",
-                    desc = "液态玻璃边缘折射与镜面高光视觉参考"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                CreditItem(
-                    name = "OSMDroid & AutoNavi CDN",
-                    author = "OpenSource Community",
-                    desc = "免 Key 国内高速瓦片地图渲染引擎"
-                )
-                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                CreditItem(
-                    name = "LSPosed Framework",
-                    author = "LSPosed Developers",
-                    desc = "系统级 Hook 运行环境与 Android 12~16 穿透支持"
-                )
-            }
+            Spacer(Modifier.height(10.dp))
         }
     }
+}
+
+@Composable
+private fun DiagnosticRow(label: String, value: String) {
+    val isDark = isSystemInDarkTheme()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, fontSize = 13.sp, color = IosColors.SecondaryLabel)
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = if (isDark) Color.White else Color.Black
+        )
     }
 }
 
@@ -597,6 +1070,7 @@ private fun FeatureItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconTint: Color,
     title: String,
+    tags: List<String> = emptyList(),
     desc: String
 ) {
     val isDark = isSystemInDarkTheme()
@@ -625,7 +1099,31 @@ private fun FeatureItem(
                 fontWeight = FontWeight.SemiBold,
                 color = if (isDark) Color.White else Color.Black
             )
-            Spacer(Modifier.height(3.dp))
+
+            if (tags.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    tags.take(3).forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = iconTint.copy(alpha = 0.1f)
+                        ) {
+                            Text(
+                                text = tag,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = iconTint,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(5.dp))
             Text(
                 text = desc,
                 fontSize = 12.sp,
