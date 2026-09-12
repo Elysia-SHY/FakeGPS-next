@@ -499,7 +499,7 @@ fun AboutScreen(
                                             verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             LinearProgressIndicator(
-                                                progress = dl.progress,
+                                                progress = { dl.progress },
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .height(6.dp)
@@ -1160,15 +1160,21 @@ fun AboutScreen(
             }
 
             // =====================================================================
-            // 8. Open Source Credits & Acknowledgements (开源致谢)
+            // 8. Open Source Credits & Acknowledgements (开源致谢与许可协议)
             // =====================================================================
-            Text(
-                text = "开源致谢与架构参考",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(start = 6.dp)
-            )
+            ) {
+                Icon(Icons.Default.Favorite, contentDescription = null, tint = IosColors.SystemRed, modifier = Modifier.size(15.dp))
+                Text(
+                    text = "开源致谢与依赖项目 (Acknowledgements)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = IosColors.SecondaryLabel
+                )
+            }
 
             Surface(
                 modifier = Modifier
@@ -1186,27 +1192,66 @@ fun AboutScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     CreditItem(
-                        name = "LocationSpoofer",
-                        author = "HuangZhuoRui",
-                        desc = "全屏交互地图、抽屉式控制面板与拟真交互设计参考"
+                        name = "Haze",
+                        author = "chrisbanes",
+                        desc = "现代化 Jetpack Compose 玻璃拟态 (Glassmorphism) 与实时毛玻璃背景模糊渲染库",
+                        url = "https://github.com/chrisbanes/haze"
                     )
                     HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
                     CreditItem(
-                        name = "Orb Liquid Glass",
-                        author = "LerSent001",
-                        desc = "液态玻璃边缘折射与镜面高光视觉参考"
-                    )
-                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
-                    CreditItem(
-                        name = "OSMDroid & AutoNavi CDN",
-                        author = "OpenSource Community",
-                        desc = "免 Key 国内高速瓦片地图渲染引擎"
+                        name = "OSMDroid",
+                        author = "osmdroid",
+                        desc = "免 Key 开源 OpenStreetMap 高速瓦片底图渲染引擎与多手势地图控制器",
+                        url = "https://github.com/osmdroid/osmdroid"
                     )
                     HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
                     CreditItem(
                         name = "LSPosed Framework",
                         author = "LSPosed Developers",
-                        desc = "系统级 Hook 运行环境与 Android 8~15 穿透支持"
+                        desc = "现代化 ART 运行时系统级 Hook 与 Xposed API 挂载注入框架，接管系统服务分发",
+                        url = "https://github.com/LSPosed/LSPosed"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Jetpack Compose",
+                        author = "Google / AOSP",
+                        desc = "Android 官方现代化声明式响应式 UI 工具包与 Material 3 基础套件",
+                        url = "https://github.com/androidx/androidx"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Kotlin Coroutines & Flow",
+                        author = "JetBrains",
+                        desc = "高性能异步并发控制与响应式状态流调度框架，驱动网络与位置模拟引擎",
+                        url = "https://github.com/Kotlin/kotlinx.coroutines"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Dagger Hilt",
+                        author = "Google",
+                        desc = "Android 官方标准编译期静态依赖注入组件，构建松耦合高扩展架构",
+                        url = "https://github.com/google/dagger"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Room Database",
+                        author = "Google / Android Jetpack",
+                        desc = "类型安全 SQLite 对象关系映射数据库，支持自定义轨迹与路线持久化存储",
+                        url = "https://developer.android.com/training/data-storage/room"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "Gson",
+                        author = "Google",
+                        desc = "轻量级高性能 JSON 数据序列化与反序列化解析库，处理云端版本同步与配置交换",
+                        url = "https://github.com/google/gson"
+                    )
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                    CreditItem(
+                        name = "LocationSpoofer",
+                        author = "HuangZhuoRui",
+                        desc = "全屏交互地图、抽屉式控制面板与拟真定位模拟交互设计参考",
+                        url = "https://github.com/HuangZhuoRui"
                     )
                 }
             }
@@ -1239,21 +1284,49 @@ private fun DiagnosticRow(label: String, value: String) {
 private fun CreditItem(
     name: String,
     author: String,
-    desc: String
+    desc: String,
+    url: String
 ) {
+    val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "无法打开链接: $url", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .padding(vertical = 4.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = name,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color.White else Color.Black
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = name,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color.Black
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = IosColors.SystemBlue,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
             Text(
                 text = author,
                 fontSize = 12.sp,
@@ -1261,11 +1334,21 @@ private fun CreditItem(
                 color = IosColors.SystemBlue
             )
         }
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(3.dp))
         Text(
             text = desc,
             fontSize = 11.5.sp,
+            lineHeight = 16.sp,
             color = IosColors.SecondaryLabel
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = url,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            color = IosColors.SecondaryLabel.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

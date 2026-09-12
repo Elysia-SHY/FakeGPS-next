@@ -24,6 +24,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
+import com.mockrun.app.ui.components.AppUpdateDialog
 import com.mockrun.app.ui.components.FloatingTabItem
 import com.mockrun.app.ui.screen.AboutScreen
 import com.mockrun.app.ui.screen.LocationMockScreen
@@ -31,9 +32,14 @@ import com.mockrun.app.ui.screen.MapScreen
 import com.mockrun.app.ui.screen.MapTab
 import com.mockrun.app.ui.screen.RouteLibraryScreen
 import com.mockrun.app.ui.theme.LiquidGlassDefaults
+import com.mockrun.app.ui.theme.LocalHazeState
 import com.mockrun.app.ui.theme.LocalLiquidGlassEnabled
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
+import com.mockrun.app.data.repository.VersionSyncManager
+import com.mockrun.app.data.repository.VersionSyncStatus
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Location : Screen("location", "定位", Icons.Default.Place)
@@ -86,9 +92,24 @@ fun AppNavigation(
         }
     }
 
-    CompositionLocalProvider(LocalLiquidGlassEnabled provides isLiquidGlassEnabled) {
+    val hazeState = remember { HazeState() }
+    val updateStatus by VersionSyncManager.status
+    val showUpdatePrompt by VersionSyncManager.showUpdatePrompt
+
+    LaunchedEffect(Unit) {
+        VersionSyncManager.checkForUpdates(force = false)
+    }
+
+    CompositionLocalProvider(
+        LocalLiquidGlassEnabled provides isLiquidGlassEnabled,
+        LocalHazeState provides hazeState
+    ) {
         // 沉浸式全景架构：地图铺满整屏（手机 & Pad 通用），无左侧冲突
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .haze(hazeState)
+        ) {
             NavHost(
                 navController = navController,
                 startDestination = Screen.Location.route,
@@ -146,6 +167,16 @@ fun AppNavigation(
                 isLiquidGlass = isLiquidGlassEnabled,
                 onTabSelected = onTabNavigate
             )
+
+            // 全局启动与后台更新弹窗
+            if (showUpdatePrompt && updateStatus is VersionSyncStatus.HasUpdate) {
+                val info = (updateStatus as VersionSyncStatus.HasUpdate).info
+                AppUpdateDialog(
+                    info = info,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    onDismiss = { VersionSyncManager.dismissUpdatePrompt() }
+                )
+            }
         }
     }
 }

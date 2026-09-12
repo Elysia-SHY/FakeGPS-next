@@ -19,8 +19,8 @@ android {
         applicationId = "com.mockrun.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 11
-        versionName = "v1.3.5"
+        versionCode = 12
+        versionName = "v1.3.6"
         buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -88,6 +88,9 @@ dependencies {
 
     // Gson
     implementation(libs.gson)
+
+    // Chris Banes Haze (Glassmorphism / Frosted Glass)
+    implementation("dev.chrisbanes.haze:haze:0.7.3")
 
     // LSPosed / Xposed API (compileOnly, never pack into dex)
     compileOnly("de.robv.android.xposed:api:82")

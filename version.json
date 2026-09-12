@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.3.5",
-  "versionCode": 11,
+  "versionName": "v1.3.6",
+  "versionCode": 12,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 解决加速器/VPN下无法拉取最新版：版本检测引擎升级为多通道高可用竞速并发架构（涵盖 Fastly、ghproxy、raw.github、llkk 等多重海内外镜像源），配合 10s 弹性超时与全链路防缓存重定向，彻底无视代理出口限流。\n2. 应用内极速直接下载与自动安装：告别繁琐的跳出外部浏览器，APP 内直接在线下载新版 APK，提供实时毛玻璃进度条、速率展示、断点续传及自动拉起原生安装器（深度适配 Android 8~15 安装未知来源权限）。\n3. 修复路线与定位搜索框文字截断：重构为原生 BasicTextField 垂直居中架构，彻底消除 Material3 默认边距导致的上下汉字显示不全与裁切问题。",
+  "releaseNotes": "1. ⚡ 全新 GitHub Release + jsDelivr CDN 在线更新：采用官方 GitHub Release API 检查最新发布版本，并深度整合 jsDelivr CDN 高速下载通道，辅以多节点容灾自动降级，保障全球及加速器网络极速直达。\n2. 🚀 应用内全局启动更新弹窗与原生静默安装：APP 启动与关于页自动比对 versionCode，发现新版本即刻弹出液态玻璃更新卡片；内嵌流式进度条与实时下载网速，下载完毕自动唤起 Android 原生安装器（深度适配 Android 8.0~15 未知来源安装权限与 FileProvider 规范）。\n3. 🌊 Chris Banes Haze 液态毛玻璃拟态升级：全面集成业内顶级 Haze 渲染引擎，实现悬浮底栏、控制面板及更新弹窗对底层地图与图层的实时高斯折射模糊，带来前所未有的 iOS 风格沉浸感。\n4. 💖 关于页开源致谢与许可协议：新增致谢专栏，完整列出 Haze、OSMDroid、LSPosed、Compose 等全部底层支撑开源项目与官方 GitHub 仓库直达通道。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.5/FakeGPS-v1.3.5.apk"
+  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.3.6/FakeGPS-next-v1.3.6-release.apk"
 }
