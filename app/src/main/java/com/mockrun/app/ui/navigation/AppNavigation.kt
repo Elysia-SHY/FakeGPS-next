@@ -1,30 +1,24 @@
 package com.mockrun.app.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.*
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
 import com.mockrun.app.ui.components.AppUpdateDialog
 import com.mockrun.app.ui.components.FloatingTabItem
@@ -33,7 +27,9 @@ import com.mockrun.app.ui.screen.LocationMockScreen
 import com.mockrun.app.ui.screen.MapScreen
 import com.mockrun.app.ui.screen.MapTab
 import com.mockrun.app.ui.screen.RouteLibraryScreen
+import com.mockrun.app.ui.theme.BackgroundThemeManager
 import com.mockrun.app.ui.theme.LiquidGlassDefaults
+import com.mockrun.app.ui.theme.LocalBottomBarHazeState
 import com.mockrun.app.ui.theme.LocalHazeState
 import com.mockrun.app.ui.theme.LocalLiquidGlassEnabled
 import com.mockrun.app.ui.viewmodel.MapViewModel
@@ -41,6 +37,10 @@ import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.data.repository.VersionSyncStatus
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Location : Screen("location", "定位", Icons.Default.Place)
@@ -55,14 +55,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object RouteSimulation : Screen("route", "路线", Icons.Default.Navigation)
 }
 
-private fun getRouteIndex(route: String?): Int = when (route) {
-    Screen.Location.route -> 0
-    Screen.Route.route -> 1
-    Screen.Features.route -> 2
-    Screen.About.route -> 3
-    else -> 0
-}
-
 @Composable
 fun AppNavigation(
     mapViewModel: MapViewModel = hiltViewModel(),
@@ -71,16 +63,12 @@ fun AppNavigation(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
+    val coroutineScope = rememberCoroutineScope()
 
     var isLiquidGlassEnabled by remember {
         mutableStateOf(LiquidGlassDefaults.isEnabled(context))
     }
 
-    val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    // Dynamic padding: nav bar inset + pill (62dp) + vertical padding (8+8dp) + safety margin (8dp)
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomBarPadding = navBarBottom + 86.dp
 
@@ -93,113 +81,147 @@ fun AppNavigation(
         )
     }
 
-    val onTabNavigate: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
+    // Dual-Haze Architecture:
+    // 1. cardHazeState: For all cards to blur the background wallpaper/ambient or map
+    // 2. bottomBarHazeState: For bottom floating bar to blur the entire screen (cards + text + background)
+    val cardHazeState = remember { HazeState() }
+    val bottomBarHazeState = remember { HazeState() }
 
-    val hazeState = remember { HazeState() }
+    // Unified interactive tab position: 0.0f .. 3.0f
+    val tabPosition = remember { Animatable(0f) }
+    var showLibrarySubScreen by remember { mutableStateOf(false) }
+
     val updateStatus by VersionSyncManager.status
     val showUpdatePrompt by VersionSyncManager.showUpdatePrompt
 
     LaunchedEffect(Unit) {
+        BackgroundThemeManager.initialize(context)
         VersionSyncManager.checkForUpdates(force = false)
+    }
+
+    // Android back handler
+    BackHandler(enabled = showLibrarySubScreen || tabPosition.value.roundToInt() != 0) {
+        if (showLibrarySubScreen) {
+            showLibrarySubScreen = false
+        } else {
+            coroutineScope.launch {
+                tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
+            }
+        }
     }
 
     CompositionLocalProvider(
         LocalLiquidGlassEnabled provides isLiquidGlassEnabled,
-        LocalHazeState provides hazeState
+        LocalHazeState provides cardHazeState,
+        LocalBottomBarHazeState provides bottomBarHazeState
     ) {
-        // 沉浸式全景架构：地图铺满整屏（手机 & Pad 通用），无左侧冲突
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Location.route,
-                modifier = Modifier.fillMaxSize(),
-                enterTransition = {
-                    val fromIdx = getRouteIndex(initialState.destination.route)
-                    val toIdx = getRouteIndex(targetState.destination.route)
-                    if (toIdx > fromIdx) {
-                        slideInHorizontally(initialOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
-                    } else {
-                        slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
-                    }
-                },
-                exitTransition = {
-                    val fromIdx = getRouteIndex(initialState.destination.route)
-                    val toIdx = getRouteIndex(targetState.destination.route)
-                    if (toIdx > fromIdx) {
-                        slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
-                    } else {
-                        slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
-                    }
-                },
-                popEnterTransition = {
-                    slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
-                },
-                popExitTransition = {
-                    slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
-                }
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Main Sliding Multi-Screen View (Driven by tabPosition in real-time)
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .haze(bottomBarHazeState)
             ) {
-                composable(Screen.Location.route) {
-                    MapScreen(
-                        mapViewModel = mapViewModel,
-                        simulationViewModel = simulationViewModel,
-                        initialTab = MapTab.LOCATION,
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        isTablet = isTablet,
-                        bottomBarPadding = bottomBarPadding,
-                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                    )
-                }
-                composable(Screen.Route.route) {
-                    MapScreen(
-                        mapViewModel = mapViewModel,
-                        simulationViewModel = simulationViewModel,
-                        initialTab = MapTab.ROUTE,
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        isTablet = isTablet,
-                        bottomBarPadding = bottomBarPadding,
-                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                    )
-                }
-                composable(Screen.Features.route) {
-                    LocationMockScreen(
-                        simulationViewModel = simulationViewModel,
-                        onNavigateToMap = { navController.navigate(Screen.Location.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                    )
-                }
-                composable(Screen.About.route) {
-                    AboutScreen(
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        isTablet = isTablet,
-                        onToggleLiquidGlass = { isLiquidGlassEnabled = it },
-                        onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
-                    )
-                }
-                composable(Screen.Library.route) {
-                    RouteLibraryScreen(
-                        mapViewModel = mapViewModel,
-                        onRouteSelected = { navController.navigate(Screen.Route.route) { popUpTo(navController.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true } }
-                    )
+                for (i in 0..3) {
+                    val offsetFraction = i - tabPosition.value
+                    if (abs(offsetFraction) < 1.15f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = offsetFraction * size.width
+                                }
+                        ) {
+                            when (i) {
+                                0 -> MapScreen(
+                                    mapViewModel = mapViewModel,
+                                    simulationViewModel = simulationViewModel,
+                                    initialTab = MapTab.LOCATION,
+                                    isLiquidGlass = isLiquidGlassEnabled,
+                                    isTablet = isTablet,
+                                    bottomBarPadding = bottomBarPadding,
+                                    onNavigateToLibrary = { showLibrarySubScreen = true }
+                                )
+                                1 -> MapScreen(
+                                    mapViewModel = mapViewModel,
+                                    simulationViewModel = simulationViewModel,
+                                    initialTab = MapTab.ROUTE,
+                                    isLiquidGlass = isLiquidGlassEnabled,
+                                    isTablet = isTablet,
+                                    bottomBarPadding = bottomBarPadding,
+                                    onNavigateToLibrary = { showLibrarySubScreen = true }
+                                )
+                                2 -> LocationMockScreen(
+                                    simulationViewModel = simulationViewModel,
+                                    onNavigateToMap = {
+                                        coroutineScope.launch {
+                                            tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
+                                        }
+                                    }
+                                )
+                                3 -> AboutScreen(
+                                    isLiquidGlass = isLiquidGlassEnabled,
+                                    isTablet = isTablet,
+                                    onToggleLiquidGlass = { isLiquidGlassEnabled = it },
+                                    onNavigateToLibrary = { showLibrarySubScreen = true }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // 悬浮式毛玻璃底栏（手机自适应拉伸，Pad 上自动居中最大 480dp 悬浮胶囊，绝不阻挡左侧地图手势）
-            AndroidFloatingBottomBar(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                tabs = navigationTabs,
-                currentRoute = currentRoute,
-                isLiquidGlass = isLiquidGlassEnabled,
-                onTabSelected = onTabNavigate
-            )
+            // Sub-screen overlay: Route Library
+            AnimatedVisibility(
+                visible = showLibrarySubScreen,
+                enter = slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280)),
+                exit = slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
+            ) {
+                RouteLibraryScreen(
+                    mapViewModel = mapViewModel,
+                    onRouteSelected = {
+                        showLibrarySubScreen = false
+                        coroutineScope.launch {
+                            tabPosition.animateTo(1f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
+                        }
+                    }
+                )
+            }
 
-            // 全局启动与后台更新弹窗
+            // Floating Bottom Bar (Synchronized with tabPosition in real-time)
+            if (!showLibrarySubScreen) {
+                AndroidFloatingBottomBar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    tabs = navigationTabs,
+                    currentPosition = tabPosition.value,
+                    isLiquidGlass = isLiquidGlassEnabled,
+                    onDragDelta = { delta ->
+                        coroutineScope.launch {
+                            val next = (tabPosition.value + delta).coerceIn(0f, (navigationTabs.size - 1).toFloat())
+                            tabPosition.snapTo(next)
+                        }
+                    },
+                    onDragEnd = {
+                        val target = tabPosition.value.roundToInt().coerceIn(0, navigationTabs.size - 1)
+                        coroutineScope.launch {
+                            tabPosition.animateTo(
+                                targetValue = target.toFloat(),
+                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
+                    },
+                    onTabSelected = { targetIndex ->
+                        coroutineScope.launch {
+                            tabPosition.animateTo(
+                                targetValue = targetIndex.toFloat(),
+                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
+                    }
+                )
+            }
+
+            // In-app Update Prompt Dialog
             if (showUpdatePrompt && updateStatus is VersionSyncStatus.HasUpdate) {
                 val info = (updateStatus as VersionSyncStatus.HasUpdate).info
                 AppUpdateDialog(

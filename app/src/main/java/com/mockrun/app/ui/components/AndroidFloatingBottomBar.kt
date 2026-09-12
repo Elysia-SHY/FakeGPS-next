@@ -4,13 +4,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.ui.theme.IosColors
+import com.mockrun.app.ui.theme.LocalBottomBarHazeState
 import com.mockrun.app.ui.theme.LocalHazeState
 import com.mockrun.app.ui.theme.bouncyClickable
 import com.mockrun.app.ui.theme.liquidGlass
@@ -38,47 +39,25 @@ data class FloatingTabItem(
 )
 
 /**
- * Floating Capsule Bottom Navigation Bar.
- * Inspired by LocationSpoofer & Orb Liquid Glass:
- * - Ultra-smooth sliding indicator capsule with spring physics
- * - Translucent obsidian/crystal frosted glass surface with specular reflection rim border
- * - Top-down refractive sheen and deep ambient double-layer shadow
+ * Floating Capsule Bottom Navigation Bar with real-time gesture & screen translation synchronization.
+ * Driven by [currentPosition] (Float from 0.0 to tabCount - 1).
  */
 @Composable
 fun AndroidFloatingBottomBar(
     modifier: Modifier = Modifier,
     tabs: List<FloatingTabItem>,
-    currentRoute: String?,
+    currentPosition: Float,
     isLiquidGlass: Boolean,
-    onTabSelected: (String) -> Unit
+    onDragStart: () -> Unit = {},
+    onDragDelta: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onTabSelected: (Int) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    val scope = rememberCoroutineScope()
-    val hazeState = LocalHazeState.current
-
-    val selectedIndex = remember(currentRoute, tabs) {
-        val idx = tabs.indexOfFirst { it.route == currentRoute }
-        if (idx >= 0) idx else 0
-    }
-
+    val hazeState = LocalBottomBarHazeState.current ?: LocalHazeState.current
     val tabCount = tabs.size.coerceAtLeast(1)
-    val animatedIndex = remember { Animatable(selectedIndex.toFloat()) }
-    var isDragging by remember { mutableStateOf(false) }
 
-    // 当外部路由变化（或点击切换）时，平滑驱动滑块滑动至对应标签
-    LaunchedEffect(selectedIndex) {
-        if (!isDragging && animatedIndex.targetValue.roundToInt() != selectedIndex) {
-            animatedIndex.animateTo(
-                targetValue = selectedIndex.toFloat(),
-                animationSpec = spring(
-                    dampingRatio = 0.76f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-        }
-    }
-
-    // 外层单一晶莹液态毛玻璃容器（58dp 高度，29dp 大圆角胶囊，接入真 Haze 模糊）
+    // Single crystal liquid frosted glass capsule (58dp height, 29dp pill corners)
     Surface(
         modifier = modifier
             .navigationBarsPadding()
@@ -99,59 +78,26 @@ fun AndroidFloatingBottomBar(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 4.dp, vertical = 3.dp)
-                // 横向拖动手势监听：手势拖动时实时跟手，松手平滑弹簧回弹并切换页面
+                // Real-time horizontal drag gesture tracking
                 .pointerInput(tabCount) {
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            isDragging = true
-                            scope.launch { animatedIndex.stop() }
-                        },
-                        onDragEnd = {
-                            isDragging = false
-                            val targetIndex = animatedIndex.value.roundToInt().coerceIn(0, tabCount - 1)
-                            scope.launch {
-                                animatedIndex.animateTo(
-                                    targetValue = targetIndex.toFloat(),
-                                    animationSpec = spring(
-                                        dampingRatio = 0.76f,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    )
-                                )
-                                if (targetIndex != selectedIndex) {
-                                    onTabSelected(tabs[targetIndex].route)
-                                }
-                            }
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                            scope.launch {
-                                animatedIndex.animateTo(
-                                    targetValue = selectedIndex.toFloat(),
-                                    animationSpec = spring(
-                                        dampingRatio = 0.76f,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    )
-                                )
-                            }
-                        },
+                        onDragStart = { onDragStart() },
+                        onDragEnd = { onDragEnd() },
+                        onDragCancel = { onDragEnd() },
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             val tabWidthPx = size.width.toFloat() / tabCount
                             val deltaFraction = dragAmount / tabWidthPx
-                            val newFraction = (animatedIndex.value + deltaFraction).coerceIn(0f, (tabCount - 1).toFloat())
-                            scope.launch {
-                                animatedIndex.snapTo(newFraction)
-                            }
+                            onDragDelta(deltaFraction)
                         }
                     )
                 }
         ) {
             val tabWidth = maxWidth / tabCount
-            val indicatorOffset = tabWidth * animatedIndex.value
+            val clampedPosition = currentPosition.coerceIn(0f, (tabCount - 1).toFloat())
+            val indicatorOffset = tabWidth * clampedPosition
 
-            // =================================================================
-            // 1. 一体化柔和微光滑块（无生硬重叠边框，彻底消除“两层盒中盒”感）
-            // =================================================================
+            // 1. Soft seamless micro-glow indicator pill
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
@@ -168,17 +114,14 @@ fun AndroidFloatingBottomBar(
                     )
             )
 
-            // =================================================================
-            // 2. 标签项（支持实时线性插值缩放与颜色渐变）
-            // =================================================================
+            // 2. Tab Items with real-time linear interpolation
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 tabs.forEachIndexed { index, tab ->
-                    // 根据滑块与标签中心距离，计算当前标签的选中权重（0.0 ~ 1.0）
-                    val distance = abs(animatedIndex.value - index)
+                    val distance = abs(clampedPosition - index)
                     val selectProgress = (1.0f - distance).coerceIn(0f, 1f)
 
                     val unselectedColor = if (isDark) Color.White.copy(alpha = 0.52f) else Color.Black.copy(alpha = 0.48f)
@@ -192,18 +135,7 @@ fun AndroidFloatingBottomBar(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(22.dp))
                             .bouncyClickable {
-                                scope.launch {
-                                    animatedIndex.animateTo(
-                                        targetValue = index.toFloat(),
-                                        animationSpec = spring(
-                                            dampingRatio = 0.76f,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        )
-                                    )
-                                }
-                                if (index != selectedIndex) {
-                                    onTabSelected(tab.route)
-                                }
+                                onTabSelected(index)
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -236,4 +168,68 @@ fun AndroidFloatingBottomBar(
             }
         }
     }
+}
+
+/**
+ * Backward compatibility overload for route string-based calls.
+ */
+@Composable
+fun AndroidFloatingBottomBar(
+    modifier: Modifier = Modifier,
+    tabs: List<FloatingTabItem>,
+    currentRoute: String?,
+    isLiquidGlass: Boolean,
+    onTabSelected: (String) -> Unit
+) {
+    val selectedIndex = remember(currentRoute, tabs) {
+        val idx = tabs.indexOfFirst { it.route == currentRoute }
+        if (idx >= 0) idx else 0
+    }
+    val scope = rememberCoroutineScope()
+    val animatedPosition = remember { Animatable(selectedIndex.toFloat()) }
+
+    LaunchedEffect(selectedIndex) {
+        if (animatedPosition.targetValue.roundToInt() != selectedIndex) {
+            animatedPosition.animateTo(
+                targetValue = selectedIndex.toFloat(),
+                animationSpec = spring(dampingRatio = 0.76f, stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+    }
+
+    AndroidFloatingBottomBar(
+        modifier = modifier,
+        tabs = tabs,
+        currentPosition = animatedPosition.value,
+        isLiquidGlass = isLiquidGlass,
+        onDragDelta = { delta ->
+            scope.launch {
+                val next = (animatedPosition.value + delta).coerceIn(0f, (tabs.size - 1).toFloat())
+                animatedPosition.snapTo(next)
+            }
+        },
+        onDragEnd = {
+            val target = animatedPosition.value.roundToInt().coerceIn(0, tabs.size - 1)
+            scope.launch {
+                animatedPosition.animateTo(
+                    targetValue = target.toFloat(),
+                    animationSpec = spring(dampingRatio = 0.76f, stiffness = Spring.StiffnessMediumLow)
+                )
+                if (target != selectedIndex) {
+                    onTabSelected(tabs[target].route)
+                }
+            }
+        },
+        onTabSelected = { targetIndex ->
+            scope.launch {
+                animatedPosition.animateTo(
+                    targetValue = targetIndex.toFloat(),
+                    animationSpec = spring(dampingRatio = 0.76f, stiffness = Spring.StiffnessMediumLow)
+                )
+                if (targetIndex != selectedIndex) {
+                    onTabSelected(tabs[targetIndex].route)
+                }
+            }
+        }
+    )
 }

@@ -32,9 +32,14 @@ import dev.chrisbanes.haze.hazeChild
 val LocalLiquidGlassEnabled = compositionLocalOf { true }
 
 /**
- * CompositionLocal providing Chris Banes HazeState for authentic background frosted blur.
+ * CompositionLocal providing Chris Banes HazeState for authentic background frosted blur for cards.
  */
 val LocalHazeState = compositionLocalOf<HazeState?> { null }
+
+/**
+ * CompositionLocal providing independent HazeState for bottom floating bar to blur entire screen without clipping cards.
+ */
+val LocalBottomBarHazeState = compositionLocalOf<HazeState?> { null }
 
 object LiquidGlassDefaults {
     const val PREFS_NAME = "fake_gps_ui_prefs"
@@ -72,7 +77,7 @@ fun Modifier.liquidGlass(
     hazeState: HazeState? = null
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
-    val resolvedHaze = hazeState
+    val resolvedHaze = hazeState ?: LocalHazeState.current
 
     if (isLiquidGlass) {
         // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)

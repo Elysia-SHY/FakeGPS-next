@@ -27,6 +27,7 @@ import com.mockrun.app.BuildConfig
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
+import dev.chrisbanes.haze.HazeState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -52,12 +53,16 @@ fun RouteLibraryScreen(
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(IosColors.SystemGroupedBackground)
-            .statusBarsPadding()
-    ) {
+    val hazeState = LocalHazeState.current ?: remember { HazeState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppBackground(hazeState = hazeState)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
         // =====================================================================
         // 1. Apple Large Title Navigation Header
         // =====================================================================
@@ -229,17 +234,17 @@ fun RouteLibraryScreen(
             ) {
                 items(filteredRoutes, key = { it.id }) { route ->
                     val isCurrent = selectedRoute?.id == route.id
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = IosColors.SecondaryGroupedBackground
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        border = BorderStroke(
-                            if (isCurrent) 1.5.dp else 0.5.dp,
-                            if (isCurrent) IosColors.SystemBlue else IosColors.Separator
-                        )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .liquidGlass(
+                                isLiquidGlass = true,
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = 6.dp
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Transparent,
+                        border = if (isCurrent) BorderStroke(1.5.dp, IosColors.SystemBlue) else null
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             // Top Row: Title + Date + Selection Capsule
@@ -539,4 +544,5 @@ fun RouteLibraryScreen(
             shape = RoundedCornerShape(18.dp)
         )
     }
+}
 }

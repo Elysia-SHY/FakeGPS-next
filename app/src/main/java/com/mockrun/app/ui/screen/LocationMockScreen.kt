@@ -161,12 +161,10 @@ fun LocationMockScreen(
     val isLiquidGlass = LocalLiquidGlassEnabled.current
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .haze(hazeState),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        FrostedAmbientBackground()
+        AppBackground(hazeState = hazeState)
 
         Column(
             modifier = Modifier

@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -79,8 +81,24 @@ fun AboutScreen(
     val downloadState by VersionSyncManager.downloadStatus
     var showChangelogDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    // Auto-sync version on screen launch
+    val currentBgPreset by BackgroundThemeManager.currentPreset
+    val wallpaperTimestamp by BackgroundThemeManager.customWallpaperTimestamp
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val success = BackgroundThemeManager.setCustomWallpaper(context, uri)
+            Toast.makeText(
+                context,
+                if (success) "🖼️ 自定义壁纸已设置并在全应用生效" else "⚠️ 壁纸读取失败，请重试",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // Auto-sync version & background preferences on screen launch
     LaunchedEffect(Unit) {
+        BackgroundThemeManager.initialize(context)
         VersionSyncManager.checkForUpdates(force = false)
     }
 
@@ -144,12 +162,10 @@ fun AboutScreen(
     val hazeState = LocalHazeState.current ?: remember { HazeState() }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .haze(hazeState),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        FrostedAmbientBackground()
+        AppBackground(hazeState = hazeState)
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)
@@ -977,6 +993,179 @@ fun AboutScreen(
                         lineHeight = 16.sp,
                         color = IosColors.SecondaryLabel
                     )
+                }
+            }
+
+            // =====================================================================
+            // 5.2. Personalization & Background Themes (个性化主题与背景定制)
+            // =====================================================================
+            Text(
+                text = "个性化主题与背景定制",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = IosColors.SecondaryLabel,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .liquidGlass(
+                        isLiquidGlass = isLiquidGlass,
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(currentBgPreset.accentColor.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = currentBgPreset.iconEmoji,
+                                    fontSize = 20.sp
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "全局背景氛围风格",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = "${currentBgPreset.title} · ${currentBgPreset.subtitle}",
+                                    fontSize = 11.5.sp,
+                                    color = IosColors.SecondaryLabel
+                                )
+                            }
+                        }
+                    }
+
+                    // Preset Chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            BackgroundPreset.AURORA,
+                            BackgroundPreset.CYBERPUNK,
+                            BackgroundPreset.SUNSET,
+                            BackgroundPreset.GLACIER,
+                            BackgroundPreset.DEEP_SPACE
+                        ).forEach { preset ->
+                            val isSelected = currentBgPreset == preset
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        BackgroundThemeManager.setPreset(context, preset)
+                                        Toast.makeText(context, "已切换为「${preset.title}」风格", Toast.LENGTH_SHORT).show()
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) preset.accentColor.copy(alpha = 0.22f) else (if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.04f)),
+                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.2.dp, preset.accentColor) else null
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(preset.iconEmoji, fontSize = 16.sp)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = preset.title,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) preset.accentColor else (if (isDark) Color.White else Color.Black)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+
+                    // Custom Wallpaper Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = if (currentBgPreset == BackgroundPreset.CUSTOM) Color(0xFF10B981) else IosColors.SecondaryLabel,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = if (currentBgPreset == BackgroundPreset.CUSTOM) "已应用自选相册壁纸" else "从相册自定义壁纸",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color.White else Color.Black
+                                )
+                                Text(
+                                    text = "选择照片作为全应用底衬，卡片将通透毛玻璃折射",
+                                    fontSize = 11.sp,
+                                    color = IosColors.SecondaryLabel
+                                )
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (currentBgPreset == BackgroundPreset.CUSTOM) {
+                                TextButton(
+                                    onClick = {
+                                        BackgroundThemeManager.clearCustomWallpaper(context)
+                                        Toast.makeText(context, "已恢复为默认极光壁纸", Toast.LENGTH_SHORT).show()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("恢复预设", fontSize = 12.sp, color = IosColors.SystemRed)
+                                }
+                            }
+                            Button(
+                                onClick = { photoPickerLauncher.launch("image/*") },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (currentBgPreset == BackgroundPreset.CUSTOM) Color(0xFF10B981) else IosColors.SystemBlue
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (currentBgPreset == BackgroundPreset.CUSTOM) "更换图片" else "选取图片",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
