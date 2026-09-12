@@ -154,10 +154,66 @@ fun AboutScreen(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = "系统底层级虚拟定位 · 全屏地图交互 · 轨迹巡航",
+                    text = "系统底层多应用独立分流 · 物理动力学仿真 · 动态 GNSS 星历合成",
                     fontSize = 13.sp,
                     color = IosColors.SecondaryLabel,
                     textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        // =====================================================================
+        // 2. Core Features & Architectural Capabilities
+        // =====================================================================
+        Text(
+            text = "核心功能与架构特性",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = IosColors.SecondaryLabel,
+            modifier = Modifier.padding(start = 6.dp)
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(
+                    isLiquidGlass = isLiquidGlass,
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = 8.dp
+                ),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.Transparent
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                FeatureItem(
+                    icon = Icons.Default.AltRoute,
+                    iconTint = IosColors.SystemBlue,
+                    title = "多应用独立分流引擎 (Multi-Target)",
+                    desc = "突破全系统单点模拟限制。可为微信、钉钉、高德等单独指派独立虚拟位置与航线，支持多开分身独立识别，未添加应用自动物理真实透传。"
+                )
+                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                FeatureItem(
+                    icon = Icons.Default.Lock,
+                    iconTint = IosColors.SystemGreen,
+                    title = "系统内核集中拦截 (system_server Hook)",
+                    desc = "在 LSPosed 中仅需勾选「系统框架」，由系统底层集中路由。目标应用进程内 0 注入特征，彻底免除第三方反作弊扫描。"
+                )
+                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                FeatureItem(
+                    icon = Icons.Default.PlayArrow,
+                    iconTint = IosColors.SystemOrange,
+                    title = "离线运动学物理仿真 (Kinematics Pro)",
+                    desc = "结合三点外接圆向心过弯减速、步频双峰微动模型与高斯地形海拔起伏仿真，彻底消灭机械直角瞬移痕迹，呈现真人级巡航轨迹。"
+                )
+                HorizontalDivider(color = if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.05f))
+                FeatureItem(
+                    icon = Icons.Default.Place,
+                    iconTint = IosColors.SystemPurple,
+                    title = "动态多星座 GNSS 星历合成 (Synthetic GNSS)",
+                    desc = "合成北斗 (BDS)、GPS、GLONASS 16~24 颗卫星动态仰角与载噪比 (C/N0)，解决模拟定位开启后搜星数为 0 的平台封禁隐患。"
                 )
             }
         }
@@ -533,5 +589,49 @@ private fun CreditItem(
             fontSize = 11.5.sp,
             color = IosColors.SecondaryLabel
         )
+    }
+}
+
+@Composable
+private fun FeatureItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    title: String,
+    desc: String
+) {
+    val isDark = isSystemInDarkTheme()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(iconTint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isDark) Color.White else Color.Black
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = desc,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = IosColors.SecondaryLabel
+            )
+        }
     }
 }

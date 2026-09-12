@@ -775,13 +775,13 @@ fun LocationMockScreen(
                 ) {
                     Column {
                         Text(
-                            "【作用域中勾选【系统框架】并软重启】",
+                            "【LSPosed 仅勾选「系统框架」】",
                             style = IosTypography.Headline,
                             color = IosColors.SystemBlue
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            "全机所有应用将由系统底层分发虚拟坐标，免除逐个勾选且无法被应用检测。",
+                            "微信、高德等目标应用无需在 LSPosed 中勾选。由系统内核 (system_server) 统筹分流路由，应用进程内零注入特征，彻底免除反作弊检测。",
                             style = IosTypography.Callout,
                             color = IosColors.SecondaryLabel
                         )
@@ -789,13 +789,13 @@ fun LocationMockScreen(
 
                     Column {
                         Text(
-                            "【关闭辅助硬件扫描】",
+                            "【关闭 Wi-Fi 与蓝牙辅助扫描】",
                             style = IosTypography.Headline,
                             color = IosColors.SystemOrange
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            "在系统设置中搜索“扫描”，关闭“Wi-Fi扫描”与“蓝牙扫描”，减少应用通过周边 Wi-Fi 路由器 BSSID 获取真实物理位置。",
+                            "在系统设置中搜索并关闭「WLAN 扫描」和「蓝牙扫描」，防止地图/社交类 App 通过周边路由器 MAC 地址 (BSSID) 穿透反查真实位置。",
                             style = IosTypography.Callout,
                             color = IosColors.SecondaryLabel
                         )
@@ -803,13 +803,13 @@ fun LocationMockScreen(
 
                     Column {
                         Text(
-                            "【前台通知与电池无限制】",
+                            "【开启常驻保活与电池无限制】",
                             style = IosTypography.Headline,
                             color = IosColors.SystemGreen
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            "保持前台常驻通知开启并将电池策略设为无限制，防止被各大手机厂商后台清理机制误杀。",
+                            "开启前台保活通知并在手机设置中将电池优化设为「无限制」，防止锁屏息屏后被各大厂商省电策略清理杀后台。",
                             style = IosTypography.Callout,
                             color = IosColors.SecondaryLabel
                         )
