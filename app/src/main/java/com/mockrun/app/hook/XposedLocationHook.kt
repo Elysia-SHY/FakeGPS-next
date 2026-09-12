@@ -407,7 +407,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManagerService.getLastLocation on ${lmsClass.simpleName}")
 
             // 2. getCurrentLocation(...) (Android 11+)
             runCatching {
@@ -423,7 +423,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManagerService.getCurrentLocation on ${lmsClass.simpleName}")
 
             // 3. reportLocation(...) (Android <= 10)
             runCatching {
@@ -443,7 +443,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManagerService.reportLocation on ${lmsClass.simpleName}")
 
             // 4. handleLocationChanged(...) (All Android versions)
             runCatching {
@@ -461,7 +461,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 })
-            }
+            }.logFailure(TAG, "hook LocationManagerService.handleLocationChanged on ${lmsClass.simpleName}")
         }
     }
 
@@ -472,6 +472,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 "com.android.server.LocationManagerService\$Receiver",
                 lpparam.classLoader
             )
+            if (receiverClass == null) {
+                Diag.d(TAG, "LocationManagerService\$Receiver absent (expected on Android 11+)")
+            }
             if (receiverClass != null) {
                 XposedBridge.hookAllMethods(receiverClass, "callLocationChangedLocked", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
@@ -483,7 +486,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook LocationManagerService\$Receiver.callLocationChangedLocked")
 
         // Android 11~16+ LocationRegistration dispatchers
         val locRegClasses = listOfNotNull(
@@ -638,6 +641,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 "com.android.server.TelephonyRegistry",
                 lpparam.classLoader
             )
+            if (telRegistryClass == null) {
+                Diag.w(TAG, "com.android.server.TelephonyRegistry not found — cell tower masking inactive")
+            }
             if (telRegistryClass != null) {
                 val emptyCellHook = object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
@@ -667,7 +673,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook TelephonyRegistry cell info/location masking")
     }
 
     // =========================================================================
@@ -941,12 +947,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         }
                     }
                 )
-            }
+            }.logFailure(TAG, "hook ${className}.onSatelliteStatusChanged")
         }
     }
 
     private fun hookWifiManager(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val wmClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiManager", lpparam.classLoader) ?: return
+        val wmClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiManager", lpparam.classLoader)
+        if (wmClass == null) {
+            Diag.w(TAG, "android.net.wifi.WifiManager not found — client Wi-Fi masking inactive")
+            return
+        }
 
         // getScanResults() -> Return empty list
         runCatching {
@@ -1283,7 +1293,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             val at = catMethod.invoke(null)
             val scMethod = atClass.getMethod("getSystemContext")
             scMethod.invoke(at) as? Context
-        }.getOrNull()
+        }.logFailure(TAG, "resolve system context via ActivityThread", Diag.Level.DEBUG)
+            .getOrNull()
     }
 
     private fun getAnyContext(): Context? {
@@ -1300,7 +1311,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 if (sc != null) appContext = sc
                 sc
             }
-        }.getOrNull()
+        }.logFailure(
+            TAG,
+            "resolve any Context — ContentProvider IPC fallback channel unavailable",
+            Diag.Level.DEBUG
+        ).getOrNull()
     }
 
     private fun parseJsonLocation(text: String): SpoofLocation? {
