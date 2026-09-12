@@ -74,8 +74,6 @@ import com.mockrun.app.BuildConfig
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent

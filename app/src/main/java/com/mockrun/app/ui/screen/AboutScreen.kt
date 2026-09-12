@@ -44,8 +44,6 @@ import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.data.repository.DownloadStatus
 import com.mockrun.app.data.repository.VersionSyncStatus
 import com.mockrun.app.ui.theme.*
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -69,7 +67,6 @@ private const val BUILTIN_CHANGELOG = """【FakeGPS-next v1.3.2 更新日志】
 fun AboutScreen(
     isLiquidGlass: Boolean,
     isTablet: Boolean = false,
-    isSliding: Boolean = false,
     onToggleLiquidGlass: (Boolean) -> Unit,
     onNavigateToLibrary: () -> Unit = {}
 ) {
@@ -159,14 +156,11 @@ fun AboutScreen(
         )
     }
 
-    val screenHazeState = remember { HazeState() }
-
-    CompositionLocalProvider(LocalHazeState provides (if (isSliding) null else screenHazeState)) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            AppBackground(hazeState = screenHazeState)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        AppBackground()
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)
@@ -1387,7 +1381,6 @@ fun AboutScreen(
             Spacer(Modifier.height(20.dp))
         }
     }
-}
 }
 
 @Composable

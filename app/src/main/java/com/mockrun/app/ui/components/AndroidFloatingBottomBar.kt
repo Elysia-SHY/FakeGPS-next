@@ -24,8 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.ui.theme.IosColors
-import com.mockrun.app.ui.theme.LocalBottomBarHazeState
-import com.mockrun.app.ui.theme.LocalHazeState
 import com.mockrun.app.ui.theme.bouncyClickable
 import com.mockrun.app.ui.theme.liquidGlass
 import kotlinx.coroutines.launch
@@ -54,7 +52,6 @@ fun AndroidFloatingBottomBar(
     onTabSelected: (Int) -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    val hazeState = LocalBottomBarHazeState.current ?: LocalHazeState.current
     val tabCount = tabs.size.coerceAtLeast(1)
 
     // Single crystal liquid frosted glass capsule (58dp height, 29dp pill corners)
@@ -68,8 +65,7 @@ fun AndroidFloatingBottomBar(
             .liquidGlass(
                 isLiquidGlass = isLiquidGlass,
                 shape = RoundedCornerShape(29.dp),
-                elevation = 12.dp,
-                hazeState = hazeState
+                elevation = 10.dp
             ),
         shape = RoundedCornerShape(29.dp),
         color = Color.Transparent

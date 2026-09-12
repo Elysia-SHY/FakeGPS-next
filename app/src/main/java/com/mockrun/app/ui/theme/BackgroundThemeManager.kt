@@ -17,8 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import java.io.File
 import java.io.FileOutputStream
 
@@ -99,7 +97,7 @@ object BackgroundThemeManager {
 @Composable
 fun AppBackground(
     modifier: Modifier = Modifier,
-    hazeState: HazeState? = null
+    hazeState: Any? = null
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -199,9 +197,7 @@ fun AppBackground(
             }
         }
 
-    val finalModifier = if (hazeState != null) baseModifier.haze(hazeState) else baseModifier
-
-    Box(modifier = finalModifier) {
+    Box(modifier = baseModifier) {
         if (customBitmap != null) {
             Image(
                 bitmap = customBitmap!!,

@@ -54,14 +54,11 @@ import com.mockrun.app.domain.model.TargetMockMode
 import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 
 @Composable
 fun LocationMockScreen(
     simulationViewModel: SimulationViewModel,
-    isSliding: Boolean = false,
     onNavigateToMap: () -> Unit
 ) {
     val context = LocalContext.current
@@ -158,15 +155,13 @@ fun LocationMockScreen(
     var showHelpSheet by remember { mutableStateOf(false) }
     var showWeChatGuideSheet by remember { mutableStateOf(false) }
 
-    val screenHazeState = remember { HazeState() }
     val isLiquidGlass = LocalLiquidGlassEnabled.current
 
-    CompositionLocalProvider(LocalHazeState provides (if (isSliding) null else screenHazeState)) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            AppBackground(hazeState = screenHazeState)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        AppBackground()
 
         Column(
             modifier = Modifier
@@ -772,7 +767,6 @@ fun LocationMockScreen(
         )
         Spacer(Modifier.height(20.dp))
     }
-}
 }
 
     // iOS Style Guide Dialog: 防闪回与使用指南

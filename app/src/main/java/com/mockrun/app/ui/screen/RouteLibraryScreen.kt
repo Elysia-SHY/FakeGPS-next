@@ -27,7 +27,6 @@ import com.mockrun.app.BuildConfig
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
-import dev.chrisbanes.haze.HazeState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,11 +52,8 @@ fun RouteLibraryScreen(
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
-    val screenHazeState = remember { HazeState() }
-
-    CompositionLocalProvider(LocalHazeState provides screenHazeState) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AppBackground(hazeState = screenHazeState)
+    Box(modifier = Modifier.fillMaxSize()) {
+        AppBackground()
 
         Column(
             modifier = Modifier
@@ -545,6 +541,5 @@ fun RouteLibraryScreen(
             shape = RoundedCornerShape(18.dp)
         )
     }
-}
 }
 }

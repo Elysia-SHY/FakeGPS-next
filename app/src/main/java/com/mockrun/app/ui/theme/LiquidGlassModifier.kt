@@ -21,25 +21,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-import dev.chrisbanes.haze.HazeDefaults
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
-
 /**
  * CompositionLocal providing global Liquid Glass effect toggle state.
  */
 val LocalLiquidGlassEnabled = compositionLocalOf { true }
 
-/**
- * CompositionLocal providing Chris Banes HazeState for authentic background frosted blur for cards.
- */
-val LocalHazeState = compositionLocalOf<HazeState?> { null }
-
-/**
- * CompositionLocal providing independent HazeState for bottom floating bar to blur entire screen without clipping cards.
- */
-val LocalBottomBarHazeState = compositionLocalOf<HazeState?> { null }
+val LocalHazeState = compositionLocalOf<Any?> { null }
+val LocalBottomBarHazeState = compositionLocalOf<Any?> { null }
 
 object LiquidGlassDefaults {
     const val PREFS_NAME = "fake_gps_ui_prefs"
@@ -74,10 +62,9 @@ fun Modifier.liquidGlass(
     elevation: Dp = 12.dp,
     containerColor: Color? = null,
     borderWidth: Dp = 1.0.dp,
-    hazeState: HazeState? = null
+    hazeState: Any? = null
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
-    val resolvedHaze = hazeState ?: LocalHazeState.current
 
     if (isLiquidGlass) {
         // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
@@ -147,29 +134,10 @@ fun Modifier.liquidGlass(
             this.clip(shape)
         }
 
-        // 3. Single-layer Frosted Blur or Crystal Base
-        val blurredModifier = if (resolvedHaze != null) {
-            baseModifier.hazeChild(
-                state = resolvedHaze,
-                shape = shape,
-                style = HazeDefaults.style(
-                    tint = if (containerColor != null) {
-                        containerColor.copy(alpha = 0.25f)
-                    } else if (isDark) {
-                        Color(0x221E2430) // Translucent obsidian tint, letting wallpaper shine through
-                    } else {
-                        Color(0x40FFFFFF)
-                    },
-                    blurRadius = 20.dp,
-                    noiseFactor = 0.05f
-                )
-            )
-        } else {
-            baseModifier.background(crystalBaseBrush, shape)
-        }
-
-        // 4. Single crisp hairline border
-        blurredModifier.border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
+        // 3. Clean Translucent Crystal Base with Single Crisp Hairline Border
+        baseModifier
+            .background(crystalBaseBrush, shape)
+            .border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
     } else {
         val solidFill = containerColor ?: if (isDark) {
             Color(0xFF1E1E20)
@@ -199,7 +167,7 @@ fun Modifier.liquidGlass(
  */
 @Composable
 fun FrostedAmbientBackground(
-    hazeState: HazeState? = null,
+    hazeState: Any? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
@@ -317,6 +285,5 @@ fun FrostedAmbientBackground(
                 }
             }
 
-    val finalModifier = if (hazeState != null) baseModifier.haze(hazeState) else baseModifier
-    Box(modifier = finalModifier)
+    Box(modifier = baseModifier)
 }

@@ -36,8 +36,6 @@ import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.data.repository.VersionSyncStatus
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -81,12 +79,8 @@ fun AppNavigation(
         )
     }
 
-    // Bottom bar haze state: For bottom floating bar to blur whatever is beneath it
-    val bottomBarHazeState = remember { HazeState() }
-
     // Unified interactive tab position: 0.0f .. 3.0f
     val tabPosition = remember { Animatable(0f) }
-    val isSliding = abs(tabPosition.value - tabPosition.value.roundToInt()) > 0.008f
     var showLibrarySubScreen by remember { mutableStateOf(false) }
 
     val updateStatus by VersionSyncManager.status
@@ -109,15 +103,12 @@ fun AppNavigation(
     }
 
     CompositionLocalProvider(
-        LocalLiquidGlassEnabled provides isLiquidGlassEnabled,
-        LocalBottomBarHazeState provides bottomBarHazeState
+        LocalLiquidGlassEnabled provides isLiquidGlassEnabled
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Main Sliding Multi-Screen View (Driven by tabPosition in real-time)
             BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .haze(bottomBarHazeState)
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Page 0: MapScreen (Handles Tab 0: 定位 and Tab 1: 路线 on ONE single Tencent MapView instance)
                 val mapTab = if (tabPosition.value < 0.5f) MapTab.LOCATION else MapTab.ROUTE
@@ -156,7 +147,6 @@ fun AppNavigation(
                     ) {
                         LocationMockScreen(
                             simulationViewModel = simulationViewModel,
-                            isSliding = isSliding,
                             onNavigateToMap = {
                                 coroutineScope.launch {
                                     tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
@@ -179,7 +169,6 @@ fun AppNavigation(
                         AboutScreen(
                             isLiquidGlass = isLiquidGlassEnabled,
                             isTablet = isTablet,
-                            isSliding = isSliding,
                             onToggleLiquidGlass = { isLiquidGlassEnabled = it },
                             onNavigateToLibrary = { showLibrarySubScreen = true }
                         )
