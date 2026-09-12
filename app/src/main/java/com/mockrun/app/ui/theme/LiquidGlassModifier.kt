@@ -26,14 +26,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
+import dev.chrisbanes.haze.HazeDefaults
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 
 /**
  * CompositionLocal providing global Liquid Glass effect toggle state.
  */
 val LocalLiquidGlassEnabled = compositionLocalOf { true }
 
-val LocalHazeState = compositionLocalOf<Any?> { null }
-val LocalBottomBarHazeState = compositionLocalOf<Any?> { null }
+val LocalHazeState = compositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
+val LocalBottomBarHazeState = compositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
 
 object LiquidGlassDefaults {
     const val PREFS_NAME = "fake_gps_ui_prefs"
@@ -79,22 +83,13 @@ fun Modifier.liquidGlass(
 
     if (isLiquidGlass) {
         val canUseAgsl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        val glassPaint = if (canUseAgsl) sharedLiquidGlassPaint else null
 
-        // RuntimeShader compiles the AGSL source in its constructor, and that compile can fail
-        // on a device whose GPU driver does not implement every feature the shader uses.
-        // There is no way to probe support up front, so the construction itself is guarded:
-        // a failure degrades to the gradient path instead of taking the whole screen down.
-        val glassPaint = if (canUseAgsl) {
-            remember {
-                runCatching { LiquidGlassPaint() }
-                    .logFailure(
-                        "LiquidGlass",
-                        "AGSL RuntimeShader unavailable - degrading to gradient glass",
-                        Diag.Level.WARN
-                    )
-                    .getOrNull()
-            }
-        } else null
+        // Backdrop blur is available only where a HazeState is provided — i.e. on screens whose
+        // background is drawn by Compose. MapScreen deliberately provides null: OSMDroid renders
+        // into its own View hierarchy, which Compose's GraphicsLayer capture cannot see, which
+        // is exactly what produced the "ghost blur" removed in v1.3.9.
+        val hazeState = LocalHazeState.current
 
         val params = when {
             containerColor != null -> LiquidGlassPresets.tinted(containerColor, isDark)
@@ -102,7 +97,7 @@ fun Modifier.liquidGlass(
             else -> LiquidGlassPresets.light
         }
 
-        // Shadow + clip shared by both glass paths
+        // Shadow + clip shared by every glass path
         val baseModifier = if (elevation > 0.dp) {
             this.shadow(
                 elevation = elevation.coerceAtMost(3.dp),
@@ -114,10 +109,36 @@ fun Modifier.liquidGlass(
             this.clip(shape)
         }
 
+        // Layer 1 — backdrop blur. Haze blurs whatever Compose drew beneath this card.
+        val hazedModifier = if (hazeState != null) {
+            baseModifier.hazeChild(
+                state = hazeState,
+                shape = shape,
+                style = HazeDefaults.style(
+                    tint = if (containerColor != null) {
+                        containerColor.copy(alpha = 0.20f)
+                    } else if (isDark) {
+                        Color(0x38161B26)
+                    } else {
+                        Color(0x40FFFFFF)
+                    },
+                    blurRadius = 22.dp,
+                    noiseFactor = 0.10f
+                )
+            )
+        } else {
+            baseModifier
+        }
+
         if (glassPaint != null) {
-            // ---- AGSL path (Android 13+): the real glass material ----
+            // ---- Layer 2 — AGSL edge optics (Android 13+) ----
+            // When Haze already supplies the frosted body, the shader's own base gradient is
+            // switched off (alpha 0) and only the light layers remain: rim + dispersion +
+            // specular + grain + hairline. Blur and optics then coexist instead of
+            // double-darkening the card.
+            val keepBase = hazeState == null
             val rimWidthPx = with(LocalDensity.current) { 2.5.dp.toPx() }
-            baseModifier.drawBehind {
+            hazedModifier.drawBehind {
                 val outline = shape.createOutline(size, layoutDirection, this)
                 val cornerPx = (outline as? Outline.Rounded)
                     ?.roundRect?.topLeftCornerRadius?.x ?: 0f
@@ -125,8 +146,8 @@ fun Modifier.liquidGlass(
                     width = size.width,
                     height = size.height,
                     cornerPx = cornerPx,
-                    baseTop = params.baseTop,
-                    baseBottom = params.baseBottom,
+                    baseTop = if (keepBase) params.baseTop else params.baseTop.copy(alpha = 0f),
+                    baseBottom = if (keepBase) params.baseBottom else params.baseBottom.copy(alpha = 0f),
                     edgeTint = params.edgeTint,
                     rimWidthPx = rimWidthPx,
                     dispersion = params.dispersion,
@@ -138,6 +159,9 @@ fun Modifier.liquidGlass(
                     0f, 0f, size.width, size.height, glassPaint.paint
                 )
             }
+        } else if (hazeState != null) {
+            // No shader available, but Haze works: keep the old hairline border instead.
+            hazedModifier.border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), Color(0x40FFFFFF), shape)
         } else {
             // ---- Gradient fallback (Android 10–12) — previous implementation, kept verbatim ----
             // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
@@ -216,6 +240,41 @@ fun Modifier.liquidGlass(
             .clip(shape)
             .background(solidFill, shape)
             .border(borderWidth, solidBorder, shape)
+    }
+}
+
+/**
+ * Makes everything inside [content] available as a **backdrop** for Liquid Glass cards.
+ *
+ * Wrap the root of a screen once; every `Modifier.liquidGlass(...)` inside will then blur
+ * whatever sits behind it. This is opt-in per screen on purpose:
+ *
+ * - **Works on** screens whose background is drawn by Compose (About, LocationMock,
+ *   RouteLibrary, dialogs) — Haze records the Compose layer and blurs it.
+ * - **Must not wrap MapScreen.** OSMDroid draws into its own View hierarchy, invisible to
+ *   Compose's GraphicsLayer capture; wrapping it produced the misaligned "ghost blur" that
+ *   v1.3.9 had to remove. MapScreen therefore provides `LocalHazeState = null` and keeps
+ *   edge-optics-only glass.
+ *
+ * [modifier] normally passes `Modifier.fillMaxSize()` so the recorded backdrop covers the
+ * whole screen; [content] is the screen itself.
+ */
+@Composable
+fun LiquidGlassBackdrop(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    // haze 0.7.3 ships HazeState but no rememberHazeState() factory, so it is created directly.
+    val hazeState = remember { HazeState() }
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Box(
+            modifier = modifier.haze(
+                state = hazeState,
+                style = HazeDefaults.style(backgroundColor = Color.Transparent)
+            )
+        ) {
+            content()
+        }
     }
 }
 
