@@ -55,6 +55,7 @@ import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 
 @Composable
@@ -160,10 +161,12 @@ fun LocationMockScreen(
     val isLiquidGlass = LocalLiquidGlassEnabled.current
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .haze(hazeState),
         contentAlignment = Alignment.TopCenter
     ) {
-        FrostedAmbientBackground(hazeState = hazeState)
+        FrostedAmbientBackground()
 
         Column(
             modifier = Modifier
@@ -239,8 +242,7 @@ fun LocationMockScreen(
                     isLiquidGlass = isLiquidGlass,
                     shape = RoundedCornerShape(16.dp),
                     elevation = 6.dp,
-                    containerColor = IosColors.SystemOrange.copy(alpha = 0.16f),
-                    hazeState = hazeState
+                    containerColor = IosColors.SystemOrange.copy(alpha = 0.16f)
                 ),
             shape = RoundedCornerShape(16.dp),
             color = Color.Transparent

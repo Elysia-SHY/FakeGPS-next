@@ -1,5 +1,7 @@
 package com.mockrun.app.ui.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -51,6 +53,14 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object Map : Screen("location", "定位", Icons.Default.Place)
     object LocationMock : Screen("features", "功能", Icons.Default.Build)
     object RouteSimulation : Screen("route", "路线", Icons.Default.Navigation)
+}
+
+private fun getRouteIndex(route: String?): Int = when (route) {
+    Screen.Location.route -> 0
+    Screen.Route.route -> 1
+    Screen.Features.route -> 2
+    Screen.About.route -> 3
+    else -> 0
 }
 
 @Composable
@@ -110,7 +120,31 @@ fun AppNavigation(
             NavHost(
                 navController = navController,
                 startDestination = Screen.Location.route,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                enterTransition = {
+                    val fromIdx = getRouteIndex(initialState.destination.route)
+                    val toIdx = getRouteIndex(targetState.destination.route)
+                    if (toIdx > fromIdx) {
+                        slideInHorizontally(initialOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
+                    } else {
+                        slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
+                    }
+                },
+                exitTransition = {
+                    val fromIdx = getRouteIndex(initialState.destination.route)
+                    val toIdx = getRouteIndex(targetState.destination.route)
+                    if (toIdx > fromIdx) {
+                        slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
+                    } else {
+                        slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
+                    }
+                },
+                popEnterTransition = {
+                    slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(280))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(targetOffsetX = { it / 3 }, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(280))
+                }
             ) {
                 composable(Screen.Location.route) {
                     MapScreen(

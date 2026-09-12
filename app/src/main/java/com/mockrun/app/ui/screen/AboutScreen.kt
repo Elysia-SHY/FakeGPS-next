@@ -144,10 +144,12 @@ fun AboutScreen(
     val hazeState = LocalHazeState.current ?: remember { HazeState() }
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .haze(hazeState),
         contentAlignment = Alignment.TopCenter
     ) {
-        FrostedAmbientBackground(hazeState = hazeState)
+        FrostedAmbientBackground()
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)

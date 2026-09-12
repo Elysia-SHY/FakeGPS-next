@@ -72,7 +72,7 @@ fun Modifier.liquidGlass(
     hazeState: HazeState? = null
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
-    val resolvedHaze = hazeState ?: LocalHazeState.current
+    val resolvedHaze = hazeState
 
     if (isLiquidGlass) {
         // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
@@ -235,14 +235,13 @@ fun Modifier.liquidGlass(
  */
 @Composable
 fun FrostedAmbientBackground(
-    hazeState: HazeState,
+    hazeState: HazeState? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
+    val baseModifier = modifier
+        .fillMaxSize()
             .background(if (isDark) Color(0xFF090C12) else Color(0xFFF2F4F7))
             .drawBehind {
                 val canvasWidth = size.width
@@ -353,6 +352,7 @@ fun FrostedAmbientBackground(
                     )
                 }
             }
-            .haze(hazeState)
-    )
+
+    val finalModifier = if (hazeState != null) baseModifier.haze(hazeState) else baseModifier
+    Box(modifier = finalModifier)
 }
