@@ -17,9 +17,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeChild
 
 /**
  * CompositionLocal providing global Liquid Glass effect toggle state.
@@ -65,7 +63,6 @@ fun Modifier.liquidGlass(
     hazeState: HazeState? = null
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
-    val resolvedHaze = hazeState ?: LocalHazeState.current
 
     if (isLiquidGlass) {
         val baseFill = containerColor ?: if (isDark) {
@@ -92,34 +89,15 @@ fun Modifier.liquidGlass(
             }
         )
 
-        val baseModifier = this
+        this
             .shadow(
                 elevation = elevation,
                 shape = shape,
                 spotColor = if (isDark) Color.Black.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.14f),
                 ambientColor = if (isDark) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.08f)
             )
-
-        val blurredModifier = if (resolvedHaze != null) {
-            baseModifier
-                .clip(shape)
-                .hazeChild(
-                    state = resolvedHaze,
-                    shape = shape,
-                    style = HazeDefaults.style(
-                        backgroundColor = if (isDark) Color(0x66121212) else Color(0x66F5F5F7),
-                        tint = baseFill,
-                        blurRadius = 24.dp,
-                        noiseFactor = 0.05f
-                    )
-                )
-        } else {
-            baseModifier
-                .clip(shape)
-                .background(baseFill, shape)
-        }
-
-        blurredModifier
+            .clip(shape)
+            .background(baseFill, shape)
             .border(borderWidth, borderBrush, shape)
             .drawWithContent {
                 drawContent()

@@ -39,7 +39,6 @@ import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.data.repository.VersionSyncStatus
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Location : Screen("location", "定位", Icons.Default.Place)
@@ -106,9 +105,7 @@ fun AppNavigation(
     ) {
         // 沉浸式全景架构：地图铺满整屏（手机 & Pad 通用），无左侧冲突
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .haze(hazeState)
+            modifier = Modifier.fillMaxSize()
         ) {
             NavHost(
                 navController = navController,

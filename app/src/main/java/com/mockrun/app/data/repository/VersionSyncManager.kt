@@ -111,19 +111,23 @@ object VersionSyncManager {
             return _status.value
         }
 
-        _status.value = VersionSyncStatus.Checking
+        withContext(Dispatchers.Main) {
+            _status.value = VersionSyncStatus.Checking
+        }
 
-        return withContext(Dispatchers.IO) {
-            val result = fetchReleaseFromGitHub()
-            lastCheckTime = now
+        val result = withContext(Dispatchers.IO) {
+            fetchReleaseFromGitHub()
+        }
+
+        lastCheckTime = now
+        withContext(Dispatchers.Main) {
             _status.value = result
-
             if (result is VersionSyncStatus.HasUpdate) {
                 _showUpdatePrompt.value = true
             }
-
-            result
         }
+
+        return result
     }
 
     private fun fetchReleaseFromGitHub(): VersionSyncStatus {

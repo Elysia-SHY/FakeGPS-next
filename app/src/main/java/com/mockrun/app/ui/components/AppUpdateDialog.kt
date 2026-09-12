@@ -59,7 +59,7 @@ fun AppUpdateDialog(
             usePlatformDefaultWidth = false
         )
     ) {
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 440.dp)
@@ -67,12 +67,14 @@ fun AppUpdateDialog(
                     isLiquidGlass = isLiquidGlass,
                     shape = RoundedCornerShape(28.dp),
                     elevation = 16.dp
-                )
-                .clip(RoundedCornerShape(28.dp))
-                .padding(24.dp)
+                ),
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDark) Color(0xF21C1C1E) else Color(0xFAFFFFFF)
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Icon Badge
