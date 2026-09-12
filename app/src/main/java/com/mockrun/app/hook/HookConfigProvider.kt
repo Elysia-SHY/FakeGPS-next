@@ -5,7 +5,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Binder
 import android.os.Bundle
+import com.mockrun.app.util.Diag
 import kotlinx.coroutines.*
 
 object HookStateBridge {
@@ -165,13 +167,19 @@ object HookStateBridge {
                                 append("setprop debug.fakegps.bearing $bear; ")
                                 append("setprop debug.fakegps.speed $spd; ")
                                 append("echo '$jsonStr' > /data/system/fake_gps_hook.json 2>/dev/null; ")
-                                append("chmod 666 /data/system/fake_gps_hook.json 2>/dev/null; ")
+                                // 0644 rather than 0666. The hook has to be able to READ these from
+                                // any process, so world-readable is load-bearing — but world-WRITABLE
+                                // is not. With 0666 any app on the device could rewrite the
+                                // coordinates this hook serves.
+                                append("chmod 644 /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("echo '$jsonStr' > /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
-                                append("chmod 666 /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
+                                append("chmod 644 /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings put global fake_gps_config '$jsonStr' 2>/dev/null; ")
                                 append("chmod 755 $pkgDir 2>/dev/null; ")
                                 append("chmod 755 $pkgDir/shared_prefs 2>/dev/null; ")
-                                append("chmod 666 $pkgDir/shared_prefs/hook_config.xml 2>/dev/null")
+                                // Owner is this app (it is the one writing the prefs), so 0644 still
+                                // lets it write while keeping other apps read-only.
+                                append("chmod 644 $pkgDir/shared_prefs/hook_config.xml 2>/dev/null")
                             }
                         } else {
                             buildString {
@@ -206,9 +214,46 @@ object HookStateBridge {
 
 class HookConfigProvider : ContentProvider() {
 
+    private companion object {
+        const val TAG = "HookProvider"
+    }
+
     override fun onCreate(): Boolean = true
 
+    /**
+     * Gate every inbound call on the caller's uid.
+     *
+     * ## Why not a permission
+     *
+     * This provider is deliberately `exported` because the hook runs inside `system_server`,
+     * which cannot hold an app-signature permission — a `protectionLevel="signature"` guard
+     * would lock the framework out of its own config channel.
+     *
+     * ## Why uid gating
+     *
+     * Before this check **any installed app** could call `getLocation` on
+     * `content://com.mockrun.app.hook.provider` and read the current spoofed coordinates plus
+     * the hook-active flag. That leaks the user's spoofed position and reveals that this app is
+     * installed and active.
+     *
+     * Allowed callers: this app itself, the system uid, root and shell. Everything else is
+     * refused and recorded.
+     *
+     * ## Accepted trade-off
+     *
+     * The hook's ContentProvider channels (used as a fallback in `loadMultiTargetRules()` and
+     * `getGlobalActiveLocation()`) stop working when the hook runs inside a third-party app
+     * process, because that process's uid is not on the list. Those channels are already
+     * last-resort — SystemProperties, the `/data/system` and `/data/local/tmp` files,
+     * `Settings.Global` and XSharedPreferences are all tried first — and a refusal is now
+     * logged instead of passing silently. If this turns out to matter on a real device, the
+     * fix is to have the app push state into XSharedPreferences rather than relaxing this check.
+     */
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
+        if (!isTrustedCaller()) {
+            Diag.w(TAG, "refused call '$method' from untrusted uid ${Binder.getCallingUid()}")
+            return null
+        }
         return when (method) {
             "getLocation" -> {
                 HookStateBridge.recordSystemHookHeartbeat()
@@ -246,6 +291,17 @@ class HookConfigProvider : ContentProvider() {
             }
             else -> null
         }
+    }
+
+    /** See [call] for why gating happens here rather than via a manifest permission. */
+    private fun isTrustedCaller(): Boolean {
+        val uid = Binder.getCallingUid()
+        // Fully qualified on purpose: this file also uses java.lang.Process for `su` execution,
+        // so importing android.os.Process here would shadow it and break those call sites.
+        return uid == android.os.Process.myUid() ||
+            uid == android.os.Process.SYSTEM_UID ||
+            uid == android.os.Process.ROOT_UID ||
+            uid == android.os.Process.SHELL_UID
     }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null

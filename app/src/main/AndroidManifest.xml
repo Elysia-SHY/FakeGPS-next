@@ -96,11 +96,20 @@
             android:stopWithTask="false"
             android:foregroundServiceType="location" />
 
-        <!-- ADB Broadcast Receiver -->
+        <!-- ADB Broadcast Receiver.
+
+             Guarded by WRITE_SECURE_SETTINGS: adb shell is granted it by default, ordinary
+             third-party apps are not. Before this, any installed app could send these
+             broadcasts and drive the simulation at will.
+
+             The app itself never broadcasts to this receiver — SimulationViewModel talks to
+             MockLocationService via startService() directly — so nothing in-process depends on
+             being able to send here. -->
         <receiver
             android:name=".location.AdbCommandReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS">
             <intent-filter>
                 <action android:name="com.mockrun.app.ACTION_START" />
                 <action android:name="com.mockrun.app.ACTION_PAUSE" />

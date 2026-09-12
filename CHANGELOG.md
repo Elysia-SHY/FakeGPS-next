@@ -2,6 +2,30 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，版本命名采用 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [1.4.1] - 2026-09-12
+
+> 本版为 **v1.4.0 之上的安全加固**，不新增任何功能，不改变任何业务逻辑分支。
+
+### 安全 (Security)
+
+- **跨进程配置接口收闸**（`HookConfigProvider`）：该 Provider 因需服务 `system_server` 而必须保持 `exported`（signature 级权限会把系统框架挡在外面），**但这意味着任何第三方应用都能调用 `getLocation` 读取当前伪造坐标，并借 `isHookActive` 探测本应用是否安装与激活**。现改为在 `call()` 内按调用方 uid 校验，仅放行本应用自身、system、root 与 shell，其余拒绝并记录。
+  - **已知取舍**：hook 运行在第三方应用进程时，其 ContentProvider 兜底通道将失效。这两个通道本就是末位兜底（SystemProperties、`/data/system` 与 `/data/local/tmp` 文件、`Settings.Global`、XSharedPreferences 均优先尝试），且现在失败会留痕。若真机验证发现确有必要，正确做法是由应用侧单向推送 XSharedPreferences，而非放宽此校验。
+- **配置文件去除全局可写**：`hook_config.xml` 与两个钩子配置 JSON 的权限由 `0666` 收紧为 `0644`。
+  - 说明：**世界可读是设计必需**（hook 要在任意进程读到配置），所以不能简单去掉权限位；但**世界可写完全没必要** —— 在 `0666` 下设备上任何应用都能改写本 hook 所服务的伪造坐标，这才是真正的风险面。`0644` 保留了跨进程只读，去掉了篡改通道。
+- **ADB 控制广播加权限**（`AdbCommandReceiver`）：增加 `android:permission="android.permission.WRITE_SECURE_SETTINGS"`。
+  - adb shell 默认持有该权限，普通第三方应用没有 —— 既保留了原有 adb 调试用法，又阻止了任意应用发送广播驱动模拟。已确认应用自身**不发送**这些广播（`SimulationViewModel` 直接 `startService`），故不会误伤。
+
+### 修复 (Fixed)
+
+- 修复 `HookConfigProvider` 中 `android.os.Process` 与 `java.lang.Process`（`su` 执行用）的导入冲突。
+
+### 说明 (Notes)
+
+- **本版未经真机验证**。三项改动均为结构性收敛，编译与产物权限已通过 `aapt2` 反查确认，但实际行为需在设备上确认。
+- **仍未处理**：`AdbCommandReceiver` 的 `exported=true` 本身保留（`am broadcast` 需要它，权限由 `WRITE_SECURE_SETTINGS` 兜住）；hook 外部文件约 58 处静默失败点未收口。
+
+---
+
 ## [1.4.0] - 2026-09-12
 
 > 本版为**可观测性专项**：不改变任何业务逻辑分支，不新增特权能力，只让原本静默失败的路径留下记录。

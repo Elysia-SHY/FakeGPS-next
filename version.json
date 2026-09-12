@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.0",
-  "versionCode": 17,
+  "versionName": "v1.4.1",
+  "versionCode": 18,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 全局诊断体系上线：新增统一诊断出口 Diag，同时输出到 logcat 与 LSPosed 日志，内置按标签限流（10 秒 5 条），避免在 system_server 高频路径上刷屏。\n2. 系统性收口静默失败：XposedLocationHook 中 94 个异常吞没点已为 63 个补上失败记录，重点覆盖坐标包装、Hook 安装、分流规则加载与坐标构造等关键链路；新增「静默零」守卫，当候选类名全部未命中时不再无声无息。\n3. 修复线上更新误报：extractVersionCode 不再把版本标签按十进制拼接（v1.3.9 曾被算成 139 并与 versionCode 直接比较），改为未知时回退语义化版本比较。\n4. 更新包签名校验：下载的 APK 必须与已安装应用的签名证书一致才会交给系统安装器，阻断被篡改的更新包。\n5. 仓库整理：取消跟踪根目录 APK 产物，忽略本机工作区目录。",
+  "releaseNotes": "本版为 v1.4.0 之上的安全加固，不新增功能。\n1. 跨进程配置接口收闸：HookConfigProvider 此前对任意第三方应用开放，任何应用都能读取当前伪造坐标并探测本应用是否安装与激活；现改为按调用方 uid 校验，仅允许本应用自身、system、root 与 shell。\n2. 配置文件去除全局可写：hook_config.xml 与两个钩子配置 JSON 的权限由 0666 收紧为 0644，保留跨进程只读（hook 设计要求如此），但不再允许任意应用改写伪造坐标。\n3. ADB 控制广播加权限：AdbCommandReceiver 增加 WRITE_SECURE_SETTINGS 保护。adb shell 默认持有该权限，普通第三方应用没有，因此既保留了原有 adb 调试用法，又阻止了任意应用驱动模拟。\n4. 另修复 v1.4.0 中的一处编译问题。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.4.0/FakeGPS-next-v1.4.0-release.apk"
+  "downloadUrl": "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v1.4.1/FakeGPS-next-v1.4.1-release.apk"
 }
