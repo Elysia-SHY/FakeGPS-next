@@ -8,9 +8,12 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
 import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.*
 
 object HookStateBridge {
+    private const val TAG = "HookState"
+
     @Volatile
     var isHookActive: Boolean = false
         private set
@@ -112,7 +115,7 @@ object HookStateBridge {
                 if (prefsFile.exists()) {
                     prefsFile.setReadable(true, false)
                 }
-            }
+            }.logFailure(TAG, "channel 1: write hook_config SharedPreferences", Diag.Level.DEBUG)
 
             val jsonStr = """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
 
@@ -127,7 +130,7 @@ object HookStateBridge {
                         """{"isActive":false,"latitude":$lat,"longitude":$lon,"time":$updateTimestamp}"""
                     )
                 }
-            }
+            }.logFailure(TAG, "channel 2: write Settings.Global fake_gps_config", Diag.Level.DEBUG)
 
             // 3. Local file writes (cacheDir)
             runCatching {
@@ -144,7 +147,7 @@ object HookStateBridge {
                     }
                 }
                 Unit
-            }
+            }.logFailure(TAG, "channel 3: write cacheDir/current_hook.json", Diag.Level.DEBUG)
 
             // 4. Multi-Channel System Sync via Root (Asynchronous, NEVER blocks UI thread)
             val now = System.currentTimeMillis()
@@ -201,11 +204,17 @@ object HookStateBridge {
                             process.outputStream.close()
                             process.waitFor()
                         } finally {
+                            // Best-effort resource cleanup — deliberately not logged, same
+                            // reasoning as RootSuBridge: failures here are harmless.
                             runCatching { process?.inputStream?.close() }
                             runCatching { process?.errorStream?.close() }
                             runCatching { process?.destroy() }
                         }
-                    }
+                    }.logFailure(
+                        TAG,
+                        "root sync of hook state (SystemProperties + /data files + Settings.Global) — " +
+                            "hook will fall back to the non-root channels"
+                    )
                 }
             }
         }
