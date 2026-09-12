@@ -885,15 +885,17 @@ fun MapScreen(
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Road Route Planner Button
-                            IconButton(
-                                onClick = { showRoadRouteDialog = true },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Text(
-                                    text = "🛣️",
-                                    fontSize = 16.sp
-                                )
+                            // Road Route Planner Button (Only in ROUTE mode)
+                            if (activeMapTab == MapTab.ROUTE) {
+                                IconButton(
+                                    onClick = { showRoadRouteDialog = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text(
+                                        text = "🛣️",
+                                        fontSize = 16.sp
+                                    )
+                                }
                             }
 
                             // Map Layer Selector (唯一的地图API底图切换入口)
@@ -936,12 +938,14 @@ fun MapScreen(
                                 }
                             }
 
-                            // GPX Import Button
-                            IconButton(
-                                onClick = { gpxPickerLauncher.launch(arrayOf("*/*")) },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "导入GPX", tint = IosBlue, modifier = Modifier.size(20.dp))
+                            // GPX Import Button (Only in ROUTE mode)
+                            if (activeMapTab == MapTab.ROUTE) {
+                                IconButton(
+                                    onClick = { gpxPickerLauncher.launch(arrayOf("*/*")) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "导入GPX", tint = IosBlue, modifier = Modifier.size(20.dp))
+                                }
                             }
 
                             if (!isContinuousDrawMode && drawnWaypoints.isNotEmpty()) {
@@ -1076,14 +1080,17 @@ fun MapScreen(
                                     Surface(
                                         modifier = Modifier.size(8.dp),
                                         shape = CircleShape,
-                                        color = if (isSelected) Color.White else ruleColor
+                                        color = if (isSelected) Color.White else (if (rule.isEnabled) ruleColor else IosColors.SystemGray)
                                     ) {}
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = if (rule.userId != 0) "${rule.appName} (${rule.userId})" else rule.appName,
+                                        text = buildString {
+                                            if (rule.userId != 0) append("${rule.appName} (${rule.userId})") else append(rule.appName)
+                                            if (!rule.isEnabled) append(" (暂停)")
+                                        },
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else IosColors.Label
+                                        color = if (isSelected) Color.White else (if (rule.isEnabled) IosColors.Label else IosColors.SecondaryLabel)
                                     )
                                 }
                             }
@@ -1116,49 +1123,6 @@ fun MapScreen(
                                         color = IosBlue
                                     )
                                 }
-                            }
-                        }
-                    }
-
-                    // Clear prompt banner when an app is selected
-                    val currentActiveRule = multiTargetRules.find { it.key == activeTargetKey }
-                    if (currentActiveRule != null) {
-                        val currentRuleColor = remember(currentActiveRule.colorHex) {
-                            runCatching { Color(android.graphics.Color.parseColor(currentActiveRule.colorHex)) }
-                                .getOrDefault(IosColors.SystemBlue)
-                        }
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = currentRuleColor.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, currentRuleColor.copy(alpha = 0.45f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Surface(shape = CircleShape, color = currentRuleColor, modifier = Modifier.size(8.dp)) {}
-                                    Text(
-                                        text = "正在为【${currentActiveRule.appName}】选择分流定位点",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSystemDark) Color.White else Color.Black
-                                    )
-                                }
-                                Text(
-                                    text = "切回全局",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.SystemBlue,
-                                    modifier = Modifier.bouncyClickable { simulationViewModel.setActiveTargetKey(null) }
-                                )
                             }
                         }
                     }
@@ -1389,8 +1353,16 @@ fun MapScreen(
                     bottomBarPadding = bottomBarPadding,
                     activeRule = multiTargetRules.find { it.key == activeTargetKey },
                     onSetTargetLocation = { rule ->
+                        if (!rule.isEnabled) {
+                            simulationViewModel.toggleMultiTargetRule(rule.key, true)
+                        }
                         simulationViewModel.updateMultiTargetLocation(rule.key, activeCoord.first, activeCoord.second)
-                        Toast.makeText(context, "✅ 已将【${rule.appName}】分流定位点设为：$currentAddressText", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "✅ 已设为【${rule.appName}】分流定位点：$currentAddressText", Toast.LENGTH_SHORT).show()
+                    },
+                    onToggleTargetRule = { rule, isChecked ->
+                        simulationViewModel.toggleMultiTargetRule(rule.key, isChecked)
+                        val status = if (isChecked) "已开启" else "已暂停"
+                        Toast.makeText(context, "【${rule.appName}】独立分流${status}", Toast.LENGTH_SHORT).show()
                     },
                     onClearActiveTarget = {
                         simulationViewModel.setActiveTargetKey(null)

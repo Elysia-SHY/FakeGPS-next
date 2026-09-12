@@ -110,6 +110,11 @@ class SimulationViewModel @Inject constructor(
             }
             return false
         }
+        // Mutual Exclusion: Stop Route Simulation if running
+        if (stateRepo.state.value.status is com.mockrun.app.domain.model.SimulationStatus.Running) {
+            stopSimulation(context)
+        }
+
         stateRepo.setPointMock(true, com.mockrun.app.domain.model.WayPoint(latitude, longitude))
         stateRepo.updateJoystickLocation(latitude, longitude)
         com.mockrun.app.hook.HookStateBridge.update(context, true, latitude, longitude)
@@ -168,6 +173,15 @@ class SimulationViewModel @Inject constructor(
             }
             return false
         }
+
+        // Mutual Exclusion: Stop Point Mock & Joystick if active
+        if (stateRepo.isPointMockActive.value) {
+            stopPointMock(context)
+        }
+        if (stateRepo.isJoystickActive.value) {
+            context.stopService(Intent(context, com.mockrun.app.location.FloatingJoystickService::class.java))
+        }
+
         stateRepo.prepareRoute(route)
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_START

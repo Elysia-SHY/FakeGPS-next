@@ -63,6 +63,7 @@ fun LocationControlPanel(
     bottomBarPadding: Dp,
     activeRule: MultiTargetRule? = null,
     onSetTargetLocation: ((MultiTargetRule) -> Unit)? = null,
+    onToggleTargetRule: ((MultiTargetRule, Boolean) -> Unit)? = null,
     onClearActiveTarget: (() -> Unit)? = null,
     onSearchQueryChange: (String) -> Unit,
     onSearchResultSelect: (SearchResultItem) -> Unit,
@@ -226,72 +227,160 @@ fun LocationControlPanel(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // 1. Sleek App Diversion Status Card with Inline Switch
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = activeRuleColor.copy(alpha = 0.14f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, activeRuleColor.copy(alpha = 0.45f)),
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.45f) else (if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA))
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Surface(shape = CircleShape, color = activeRuleColor, modifier = Modifier.size(8.dp)) {}
-                                Text(
-                                    text = "分流目标：【${activeRule.appName}】",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color.White else Color.Black
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemGray,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = activeRule.appName.take(1),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = activeRule.appName,
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color.Black
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else IosColors.SystemGray.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = if (activeRule.isEnabled) "分流运行中" else "分流已暂停",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (activeRule.isEnabled) activeRuleColor else IosColors.SecondaryLabel,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = if (activeRule.isEnabled) "独立虚拟定位生效中" else "暂停后使用全局或物理定位",
+                                        fontSize = 10.5.sp,
+                                        color = IosColors.SecondaryLabel
+                                    )
+                                }
                             }
-                            Text(
-                                text = "切回全局",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = IosColors.SystemBlue,
-                                modifier = Modifier.clickable { onClearActiveTarget?.invoke() }
+
+                            // Switch to turn diversion on / off for this app!
+                            Switch(
+                                checked = activeRule.isEnabled,
+                                onCheckedChange = { isChecked ->
+                                    onToggleTargetRule?.invoke(activeRule, isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = activeRuleColor,
+                                    uncheckedThumbColor = Color.White,
+                                    uncheckedTrackColor = if (isDark) Color(0xFF3A3A3C) else Color(0xFFD1D1D6)
+                                )
                             )
                         }
                     }
 
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .liquidGlass(
-                                isLiquidGlass = isLiquidGlass,
-                                shape = RoundedCornerShape(26.dp),
-                                elevation = 8.dp,
-                                containerColor = activeRuleColor
-                            )
-                            .clickable {
-                                onSetTargetLocation?.invoke(activeRule)
-                            },
-                        shape = RoundedCornerShape(26.dp),
-                        color = Color.Transparent
+                    // 2. Main Action Row: [ 确定设为该应用分流定位点 ] & [ 切回全局 ]
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
+                        Surface(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                                .weight(1f)
+                                .height(50.dp)
+                                .liquidGlass(
+                                    isLiquidGlass = isLiquidGlass,
+                                    shape = RoundedCornerShape(25.dp),
+                                    elevation = 8.dp,
+                                    containerColor = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemBlue
+                                )
+                                .clickable {
+                                    onSetTargetLocation?.invoke(activeRule)
+                                },
+                            shape = RoundedCornerShape(25.dp),
+                            color = Color.Transparent
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "确定设为【${activeRule.appName}】分流定位点",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (activeRule.isEnabled) "更新【${activeRule.appName}】定位点" else "开启并设为【${activeRule.appName}】定位点",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .height(50.dp)
+                                .liquidGlass(
+                                    isLiquidGlass = isLiquidGlass,
+                                    shape = RoundedCornerShape(25.dp),
+                                    elevation = 4.dp
+                                )
+                                .clickable { onClearActiveTarget?.invoke() },
+                            shape = RoundedCornerShape(25.dp),
+                            color = Color.Transparent
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "切回全局",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = IosColors.SystemBlue
+                                )
+                            }
                         }
                     }
                 }

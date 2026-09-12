@@ -244,6 +244,11 @@ class MockLocationService : Service() {
     // ---- Simulation Control ----
 
     private fun startSimulation(route: Route, speedKmh: Float, startProgress: Float) {
+        // Mutual exclusion: cancel point mock
+        pointMockJob?.cancel()
+        savePointMockState(active = false)
+        stateRepo.setPointMock(false)
+
         currentRoute = route
         currentSpeedKmh = speedKmh
         currentProgress = startProgress
@@ -325,7 +330,11 @@ class MockLocationService : Service() {
     }
 
     private fun startPointMock(lat: Double, lon: Double) {
+        // Mutual exclusion: cancel route simulation
         simulationJob?.cancel()
+        saveSimulationState(active = false)
+        stateRepo.onStopped()
+        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
         pointMockJob?.cancel()
 
         if (!mockEngine.register()) {
