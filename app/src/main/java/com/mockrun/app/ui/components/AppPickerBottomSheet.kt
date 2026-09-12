@@ -34,6 +34,8 @@ import com.mockrun.app.data.repository.InstalledAppItem
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
 import com.mockrun.app.ui.theme.*
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -552,13 +554,14 @@ private fun AppItemRow(
     isAlreadyAdded: Boolean,
     onSelect: () -> Unit
 ) {
-    val bitmap = remember(item.icon) {
-        item.icon?.let { d ->
-            runCatching {
-                d.toBitmap(width = 80, height = 80)
-            }.getOrNull()
-        }
-    }
+val bitmap = remember(item.icon) {
+           item.icon?.let { d ->
+               runCatching {
+                   d.toBitmap(width = 80, height = 80)
+               }.logFailure("AppPicker", "icon toBitmap (${item.appName})", Diag.Level.DEBUG)
+                   .getOrNull()
+           }
+       }
 
     Surface(
         modifier = Modifier

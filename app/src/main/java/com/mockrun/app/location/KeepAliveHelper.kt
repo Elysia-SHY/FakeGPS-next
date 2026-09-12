@@ -13,6 +13,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import com.mockrun.app.util.Diag
 
 /**
  * System-level keep-alive and anti-kill helper.
@@ -119,8 +120,10 @@ object KeepAliveHelper {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 return true
-            } catch (_: Exception) {
-                // Try next intent
+            } catch (e: Exception) {
+                // Expected on most devices: only one OEM's component set exists.
+                // Recorded at DEBUG so a fully-failed chain is still diagnosable.
+                Diag.d(TAG, "OEM startup-manager intent unavailable: ${e.javaClass.simpleName}")
             }
         }
 

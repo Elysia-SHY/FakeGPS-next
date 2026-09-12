@@ -12,6 +12,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.FileProvider
 import com.mockrun.app.BuildConfig
+import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.io.File
@@ -419,7 +420,8 @@ object VersionSyncManager {
         }
 
         installedSigners == archiveSigners
-    }.getOrDefault(false)
+    }.logFailure("VersionSync", "isApkSignedBySameCertificate (fails closed)")
+        .getOrDefault(false)
 
     /**
      * Launch Android PackageInstaller with FileProvider and Unknown Sources permission handling.

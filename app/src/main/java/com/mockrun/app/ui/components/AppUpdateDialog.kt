@@ -36,6 +36,7 @@ import com.mockrun.app.data.repository.RemoteReleaseInfo
 import com.mockrun.app.data.repository.VersionSyncManager
 import com.mockrun.app.ui.theme.IosColors
 import com.mockrun.app.ui.theme.liquidGlass
+import com.mockrun.app.util.Diag
 
 @Composable
 fun AppUpdateDialog(
@@ -214,7 +215,10 @@ fun AppUpdateDialog(
                                     try {
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseHtmlUrl))
                                         context.startActivity(intent)
-                                    } catch (_: Exception) {}
+                                    } catch (e: Exception) {
+                                        // Silent to the user (button just no-ops), but recorded for diagnosis
+                                        Diag.d("AppUpdateDialog", "open browser for release page failed: ${e.message}")
+                                    }
                                 }
                             ) {
                                 Text("浏览器下载", fontSize = 12.5.sp, color = IosColors.SecondaryLabel)

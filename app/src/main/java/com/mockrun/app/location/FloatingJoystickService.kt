@@ -20,10 +20,14 @@ import com.mockrun.app.domain.model.SimulatedPoint
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.domain.model.WayPoint
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import javax.inject.Inject
 import kotlin.math.*
+
+private const val TAG = "FloatingJoystick"
 
 @AndroidEntryPoint
 class FloatingJoystickService : Service() {
@@ -108,7 +112,7 @@ class FloatingJoystickService : Service() {
                 action = MockLocationService.ACTION_STOP_POINT_MOCK
             }
             startService(stopIntent)
-        }
+        }.logFailure(TAG, "start stopPointMockIntent", Diag.Level.DEBUG)
 
         // 4. Register multi-provider mock engine (GPS, NETWORK, FUSED)
         mockEngine.register()
@@ -137,7 +141,9 @@ class FloatingJoystickService : Service() {
         )
         var real: Location? = null
         for (provider in providers) {
-            val loc = runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
+            val loc = runCatching { locationManager.getLastKnownLocation(provider) }
+                .logFailure(TAG, "getLastKnownLocation($provider)", Diag.Level.DEBUG)
+                .getOrNull()
             if (loc != null) {
                 if (real == null || loc.time > real.time) {
                     real = loc

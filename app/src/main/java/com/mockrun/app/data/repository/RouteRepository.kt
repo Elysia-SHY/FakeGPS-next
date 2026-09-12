@@ -6,6 +6,8 @@ import com.mockrun.app.data.db.RouteDao
 import com.mockrun.app.data.db.RouteEntity
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.WayPoint
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -33,7 +35,8 @@ class RouteRepository @Inject constructor(
         val wps: List<WayPoint> = runCatching {
             val parsed: List<WayPoint>? = gson.fromJson(waypointsJson, type)
             parsed ?: emptyList()
-        }.getOrDefault(emptyList())
+        }.logFailure("RouteRepository", "parse waypoints for route '$name'", Diag.Level.DEBUG)
+            .getOrDefault(emptyList())
         return Route(id = id, name = name, waypoints = wps, createdAt = createdAt)
     }
 

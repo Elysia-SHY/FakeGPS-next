@@ -1,6 +1,8 @@
 package com.mockrun.app.location
 
 import kotlin.math.*
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 
 /**
  * Converts between WGS-84 (standard GPS / mock location) and GCJ-02 (China national standard).
@@ -14,6 +16,7 @@ import kotlin.math.*
  */
 object CoordinateConverter {
 
+    private const val TAG = "CoordConverter"
     private const val A = 6378245.0
     private const val EE = 0.00669342162296594323
 
@@ -122,7 +125,9 @@ object CoordinateConverter {
         )
         var best: android.location.Location? = null
         for (p in providers) {
-            val loc = runCatching { lm.getLastKnownLocation(p) }.getOrNull() ?: continue
+            val loc = runCatching { lm.getLastKnownLocation(p) }
+                .logFailure(TAG, "getLastKnownLocation($p)", Diag.Level.DEBUG)
+                .getOrNull() ?: continue
             // Strictly filter out mock/spoofed locations!
             if (isMockLocation(loc)) continue
             // Guard: If HookStateBridge is active, reject coordinates matching the spoofed location
@@ -141,6 +146,14 @@ object CoordinateConverter {
             }
             return best.latitude to best.longitude
         }
+        // No hardware provider yielded a usable location: every one either threw, returned
+        // null, or was filtered as mock/spoofed. Callers fall back to the cached value, and
+        // if that is missing too the "reset position" UI simply shows nothing - which used
+        // to have no explanation attached to it anywhere.
+        Diag.d(
+            TAG,
+            "no usable hardware location across ${providers.size} providers — falling back to saved value"
+        )
         return getSavedRealLocation(context)
     }
 
@@ -187,8 +200,11 @@ object CoordinateConverter {
                     }, 15_000L)
                     lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
                 }
-            } catch (_: SecurityException) {
-            } catch (_: Throwable) {
+            } catch (e: SecurityException) {
+                // Missing location permission — the saved real location goes stale silently
+                Diag.w(TAG, "flushRealLocation($provider): no location permission")
+            } catch (e: Throwable) {
+                Diag.w(TAG, "flushRealLocation($provider) failed", e)
             }
         }
     }
@@ -248,10 +264,11 @@ object CoordinateConverter {
                     }, 15_000L)
                     lm.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
                 }
-            } catch (_: SecurityException) {
-                // Missing location permission
-            } catch (_: Throwable) {
-                // Sensor unavailable
+            } catch (e: SecurityException) {
+                // Missing location permission — user-visible symptom: location never refreshes
+                Diag.w(TAG, "requestFreshLocation($provider): no location permission")
+            } catch (e: Throwable) {
+                Diag.w(TAG, "requestFreshLocation($provider) failed", e)
             }
         }
     }

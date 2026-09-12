@@ -46,8 +46,10 @@ import com.mockrun.app.location.FloatingJoystickService
 import com.mockrun.app.location.KeepAliveHelper
 import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.ui.components.PermissionGuideDialog
+import com.mockrun.app.util.Diag
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
+import com.mockrun.app.util.logFailure
 import androidx.compose.ui.text.style.TextAlign
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
@@ -893,7 +895,7 @@ fun LocationMockScreen(
                             onClick = {
                                 runCatching {
                                     context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                }.onFailure {
+                                }.logFailure("LocationMockScreen", "open location settings").onFailure {
                                     Toast.makeText(context, "请在系统设置中搜索「扫描」", Toast.LENGTH_SHORT).show()
                                 }
                             },
@@ -911,7 +913,7 @@ fun LocationMockScreen(
                                         data = Uri.parse("package:com.tencent.mm")
                                     }
                                     context.startActivity(intent)
-                                }.onFailure {
+                                }.logFailure("LocationMockScreen", "open wechat app details").onFailure {
                                     Toast.makeText(context, "未能直接打开微信应用信息", Toast.LENGTH_SHORT).show()
                                 }
                             },
@@ -1085,6 +1087,7 @@ private fun MultiTargetRuleItemRow(
 ) {
     val ruleColor = remember(rule.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
+            .logFailure("LocationMockScreen", "parse rule color", Diag.Level.DEBUG)
             .getOrDefault(IosColors.SystemBlue)
     }
 

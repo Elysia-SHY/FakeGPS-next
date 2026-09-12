@@ -3,6 +3,8 @@ package com.mockrun.app.location
 import android.content.Context
 import android.location.Address
 import android.location.Geocoder
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,6 +13,8 @@ import java.net.URL
 import java.util.Collections
 import java.util.LinkedHashMap
 import java.util.Locale
+
+private const val TAG = "AddressResolver"
 
 /**
  * Reverse geocoding utility to resolve human-readable street/area address
@@ -66,7 +70,7 @@ object AddressResolver {
         if (!list.isNullOrEmpty()) {
             formatAddress(list[0], origLat, origLon)
         } else null
-    }.getOrNull()
+    }.logFailure(TAG, "querySystemGeocoder", Diag.Level.DEBUG).getOrNull()
 
     private fun queryOsmFallback(lat: Double, lon: Double): String? {
         var connection: HttpURLConnection? = null
@@ -82,7 +86,7 @@ object AddressResolver {
                 val json = JSONObject(text)
                 json.optString("display_name").takeIf { it.isNotBlank() }
             } else null
-        }.getOrNull().also {
+        }.logFailure(TAG, "queryOsmFallback", Diag.Level.DEBUG).getOrNull().also {
             connection?.disconnect()
         }
     }

@@ -13,6 +13,8 @@ import com.mockrun.app.MainActivity
 import com.mockrun.app.R
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.SimulatedPoint
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -53,6 +55,8 @@ class MockLocationService : Service() {
         const val PROVIDER_NAME = LocationManager.GPS_PROVIDER
 
         private const val PREFS_MOCK_SERVICE = "mock_location_service_prefs"
+
+        private const val TAG = "MockLocationService"
         private const val KEY_IS_POINT_MOCK_ACTIVE = "key_is_point_mock_active"
         private const val KEY_SAVED_LAT = "key_saved_lat"
         private const val KEY_SAVED_LON = "key_saved_lon"
@@ -106,10 +110,10 @@ class MockLocationService : Service() {
             ACTION_START -> {
                 val route = stateRepo.pendingRoute ?: run {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE, Route::class.java) }.getOrNull()
+                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE, Route::class.java) }.logFailure(TAG, "read EXTRA_ROUTE (T+)").getOrNull()
                     } else {
                         @Suppress("DEPRECATION")
-                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE) as? Route }.getOrNull()
+                        runCatching { intent.getSerializableExtra(EXTRA_ROUTE) as? Route }.logFailure(TAG, "read EXTRA_ROUTE (legacy)").getOrNull()
                     }
                 }
                 val speed = intent.getFloatExtra(EXTRA_SPEED, 8f)
@@ -212,13 +216,13 @@ class MockLocationService : Service() {
         val baos = java.io.ByteArrayOutputStream()
         java.io.ObjectOutputStream(baos).use { it.writeObject(route) }
         android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.DEFAULT)
-    }.getOrDefault("")
+    }.logFailure(TAG, "serializeRoute", Diag.Level.DEBUG).getOrDefault("")
 
     private fun deserializeRoute(str: String): Route? = runCatching {
         val bytes = android.util.Base64.decode(str, android.util.Base64.DEFAULT)
         val bais = java.io.ByteArrayInputStream(bytes)
         java.io.ObjectInputStream(bais).use { it.readObject() as Route }
-    }.getOrNull()
+    }.logFailure(TAG, "deserializeRoute", Diag.Level.DEBUG).getOrNull()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -398,7 +402,7 @@ class MockLocationService : Service() {
                     if (tick % 20 == 0) {
                         updateNotification("单点虚拟定位生效中: ${"%.4f".format(lat)}, ${"%.4f".format(lon)}")
                     }
-                }
+                }.logFailure(TAG, "point-mock tick", Diag.Level.DEBUG)
                 delay(500) // 2Hz continuous injection
             }
         }
