@@ -2,7 +2,7 @@
   "versionName": "v1.3.2",
   "versionCode": 8,
   "releaseDate": "2026-09-12",
-  "releaseNotes": "1. 介绍页 UI 全景重构：引入 FlowRow 自适应折行，彻底解决不同屏幕分辨率下技术标签挤压变形；扩大底部防遮挡安全边距。\n2. 云端版本与更新自动同步：三级容灾架构（jsdelivr CDN、GitHub Raw 及 Releases API），支持实时智能版本比对、一键热同步与应用内更新日志预览。\n3. 设备环境与运行诊断：实时展示 Android 系统版本、硬件型号、ABI 架构及模块注入状态。\n4. 系统框架级独立分流：补全 HookConfigProvider 跨进程通信与底层派发拦截，消除 AOSP 最小位移丢包问题。",
+  "releaseNotes": "1. 应用分流选点交互重构：地图选点准心挂载应用浮动徽标，底部面板直观显示「确定设为【应用】分流定位点」，分流应用与全局定位操作彻底明确清晰。\n2. 路线巡航纯全局解耦：路线规划与巡航移动彻底设为全局模式，底层广播 is_route 属性，巡航时所有非透传应用无缝跟随路线漫游，停止后即刻恢复各自独立分流，零冲突运行。\n3. 介绍页 UI 全景重构：FlowRow 标签自适应平滑折行，彻底消除小屏排版压缩；底部边距扩大避让导航栏；新增软硬件运行诊断面板。\n4. 云端版本与更新自动同步：三级容灾架构（jsdelivr CDN、GitHub Raw 及 Releases API），支持实时智能版本比对、一键热同步与应用内更新日志预览。\n5. 系统框架级底层分流闭环：HookConfigProvider 跨进程通信与全量派生监听器拦截，解决静态驻留丢包回退问题。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
   "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.3.2/FakeGPS-v1.3.2.apk"
 }
