@@ -500,6 +500,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
             XposedHelpers.findClassIfExists("com.android.server.location.LocationManagerService\$LocationRegistration", lpparam.classLoader)
         ).distinct()
 
+        // Silent-zero guard: 11 candidate names spanning AOSP versions and vendor forks. If none
+        // resolve, the per-app dispatch path is never hooked and every app quietly keeps
+        // receiving the raw hardware location instead of its routed one.
+        if (locRegClasses.isEmpty()) {
+            Diag.w(TAG, "LocationRegistration dispatch hook: none of the 11 candidate classes resolved")
+        } else {
+            Diag.d(TAG, "LocationRegistration dispatch hook: ${locRegClasses.size} candidate class(es) resolved")
+        }
+
         for (locRegClass in locRegClasses) {
             runCatching {
                 val hookDispatch = object : XC_MethodHook() {
@@ -533,8 +542,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             if (req != null) {
                                 val minDistance = runCatching {
                                     XposedHelpers.callMethod(req, "getMinUpdateDistanceMeters") as? Float
-                                }.getOrNull() ?: 0f
+                                }.logFailure(TAG, "read getMinUpdateDistanceMeters()", Diag.Level.DEBUG)
+                                    .getOrNull() ?: 0f
                                 if (minDistance > 0f) {
+                                    // findClass() (not findClassIfExists) throws when the ROM lacks
+                                    // this class — which used to abort the whole suppression silently.
                                     val builderClass = XposedHelpers.findClass("android.location.LocationRequest\$Builder", lpparam.classLoader)
                                     val builder = XposedHelpers.findConstructorExact(builderClass, req.javaClass).newInstance(req)
                                     XposedHelpers.callMethod(builder, "setMinUpdateDistanceMeters", 0.0f)
@@ -542,12 +554,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
                                     XposedHelpers.setObjectField(param.thisObject, "mProviderLocationRequest", zeroDistReq)
                                 }
                             }
-                        }
+                        }.logFailure(
+                            TAG,
+                            "suppress smallestDisplacement filter — stationary updates may be dropped by AOSP"
+                        )
                     }
                 }
                 XposedBridge.hookAllMethods(locRegClass, "acceptLocationChange", hookDispatch)
                 XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", hookDispatch)
-            }
+            }.logFailure(TAG, "register dispatch hooks on ${locRegClass.name}")
         }
     }
 
@@ -558,6 +573,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 "com.android.server.wifi.WifiServiceImpl",
                 lpparam.classLoader
             )
+            if (wifiServiceClass == null) {
+                // Pure addition — does not change behaviour, only makes the miss visible.
+                Diag.w(TAG, "WifiServiceImpl not found — Wi-Fi scan/BSSID masking inactive")
+            }
             if (wifiServiceClass != null) {
                 // getScanResults(...) -> Return empty list to prevent neighbor Wi-Fi BSSID sniffing
                 XposedBridge.hookAllMethods(wifiServiceClass, "getScanResults", object : XC_MethodHook() {
@@ -580,12 +599,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             runCatching {
                                 XposedHelpers.setObjectField(wifiInfo, "mBSSID", "02:00:00:00:00:00")
                                 XposedHelpers.setObjectField(wifiInfo, "mMacAddress", "02:00:00:00:00:00")
-                            }
+                            }.logFailure(
+                                TAG,
+                                "mask WifiInfo BSSID/MAC — field names absent on this ROM, real BSSID leaked",
+                                Diag.Level.DEBUG
+                            )
                         }
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook WifiServiceImpl getScanResults/getConnectionInfo")
 
         // 2. WifiScanningServiceImpl
         runCatching {
@@ -593,6 +616,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 "com.android.server.wifi.scanner.WifiScanningServiceImpl",
                 lpparam.classLoader
             )
+            if (wifiScanClass == null) {
+                Diag.d(TAG, "WifiScanningServiceImpl not found (normal on some Android versions)")
+            }
             if (wifiScanClass != null) {
                 XposedBridge.hookAllMethods(wifiScanClass, "getScanResults", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
@@ -603,7 +629,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "hook WifiScanningServiceImpl getScanResults")
     }
 
     private fun hookSystemTelephonyRegistry(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -664,7 +690,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     private fun hookMockDetection(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
-            val locClass = XposedHelpers.findClassIfExists("android.location.Location", lpparam.classLoader) ?: return
+            val locClass = XposedHelpers.findClassIfExists("android.location.Location", lpparam.classLoader)
+            if (locClass == null) {
+                // Same control flow as the previous `?: return`, but the miss is now visible.
+                Diag.w(TAG, "android.location.Location not found — isMock masking inactive")
+                return
+            }
             XposedBridge.hookAllMethods(locClass, "isFromMockProvider", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val spoof = getActiveLocation()
@@ -704,11 +735,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }
+        }.logFailure(TAG, "install mock-flag masking hooks")
     }
 
     private fun hookLocationManager(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val lmClass = XposedHelpers.findClassIfExists("android.location.LocationManager", lpparam.classLoader) ?: return
+        val lmClass = XposedHelpers.findClassIfExists("android.location.LocationManager", lpparam.classLoader)
+        if (lmClass == null) {
+            Diag.w(TAG, "android.location.LocationManager not found — client-side location hooks skipped")
+            return
+        }
 
         // 1. getLastKnownLocation(String)
         runCatching {
