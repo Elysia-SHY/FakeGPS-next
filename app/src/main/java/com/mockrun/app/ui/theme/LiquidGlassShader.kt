@@ -6,6 +6,8 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 
 /**
  * AGSL (Android Graphics Shading Language) renderer for the iOS-26-style Liquid Glass material.
@@ -40,6 +42,32 @@ import androidx.compose.ui.graphics.lerp
  *  - Callers gate on `Build.VERSION.SDK_INT >= 33` (RuntimeShader/AGSL requirement); older
  *    devices keep the previous gradient implementation.
  */
+/**
+ * Shared, lazily-created shader instance.
+ *
+ * AGSL sources are compiled by the GPU inside the [RuntimeShader] constructor, and that
+ * compile costs tens of milliseconds. Instantiating one per `liquidGlass` call site meant
+ * ~31 compiles per screen — the dominant cost of the first frames on any screen full of
+ * glass cards, and the cause of the stutter reported on the map screen.
+ *
+ * One instance is safe to share: uniforms are uploaded immediately before each
+ * [android.graphics.Canvas.drawRect] and never read back, so the sequence
+ * configure → draw → configure → draw keeps each draw correctly parameterised.
+ * Compose draws on a single UI thread in order, which is what makes this sound.
+ *
+ * Returns null when the runtime cannot compile the shader (device GPU/driver gaps);
+ * callers fall back to the gradient path in that case.
+ */
+val sharedLiquidGlassPaint: LiquidGlassPaint? by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    runCatching { LiquidGlassPaint() }
+        .logFailure(
+            "LiquidGlass",
+            "AGSL RuntimeShader unavailable - degrading to gradient glass",
+            Diag.Level.WARN
+        )
+        .getOrNull()
+}
+
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 class LiquidGlassPaint {
 
@@ -185,6 +213,12 @@ half4 main(float2 fragCoord) {
 /**
  * Visual presets mirroring the two system appearances (and the containerColor override used by
  * tinted glass cards). Values tuned to keep map content readable underneath.
+ *
+ * Note on opacity: MapScreen has no backdrop blur to dissolve whatever sits behind the card
+ * (Compose cannot capture the OSMDroid View, which is why backdrop blur was removed there in
+ * v1.3.9). That absence is compensated with a slightly more present base body — without it a
+ * card over a crisp map reads as cellophane rather than glass. Screens that DO provide a
+ * HazeState pass these bases with alpha 0 and let the blur carry the body instead.
  */
 object LiquidGlassPresets {
 
@@ -200,24 +234,24 @@ object LiquidGlassPresets {
 
     /** Everyday light-mode glass: cool near-white, airy translucency, gentle dispersion. */
     val light = Params(
-        baseTop = Color(0.96f, 0.98f, 1.00f, 0.52f),
-        baseBottom = Color(0.86f, 0.92f, 0.98f, 0.40f),
-        edgeTint = Color(1.00f, 1.00f, 1.00f, 0.50f),
-        dispersion = 0.32f,
-        specular = 0.16f,
-        grain = 0.018f,
-        hairline = 0.55f
+        baseTop = Color(0.97f, 0.98f, 1.00f, 0.62f),
+        baseBottom = Color(0.87f, 0.93f, 0.99f, 0.50f),
+        edgeTint = Color(1.00f, 1.00f, 1.00f, 0.58f),
+        dispersion = 0.34f,
+        specular = 0.20f,
+        grain = 0.020f,
+        hairline = 0.68f
     )
 
     /** Dark-mode glass: obsidian depth, cooler rim, slightly stronger grain. */
     val dark = Params(
-        baseTop = Color(0.17f, 0.19f, 0.24f, 0.56f),
-        baseBottom = Color(0.09f, 0.10f, 0.13f, 0.46f),
-        edgeTint = Color(0.56f, 0.63f, 0.80f, 0.32f),
-        dispersion = 0.34f,
-        specular = 0.11f,
-        grain = 0.022f,
-        hairline = 0.38f
+        baseTop = Color(0.17f, 0.19f, 0.24f, 0.64f),
+        baseBottom = Color(0.09f, 0.10f, 0.13f, 0.54f),
+        edgeTint = Color(0.56f, 0.63f, 0.80f, 0.38f),
+        dispersion = 0.36f,
+        specular = 0.14f,
+        grain = 0.024f,
+        hairline = 0.48f
     )
 
     /** Derives a preset from a caller-supplied [containerColor] (tinted glass). */
