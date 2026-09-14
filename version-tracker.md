@@ -319,7 +319,7 @@
 
 - **构建状态**：审查指定基准包 (`bed3e4fd6620ecd53c47b4fbccaf6c2e_544552256908235.apk`)，完成复原与升级（产物 `outputs/app-debug.apk`、`d:\Desktop\FakeGPS-v1.3.apk`）。
 - **Android 配置**：`versionCode = 103`，`versionName = "v1.3"`。
-- **流水线执行**：遵循 `AGENTS.md` 规则，构建完成后自动执行 minor +0.1，`package.json` 同步递增至 `1.3.0`。
+- **流水线执行**：构建完成后自动执行 minor +0.1，`package.json` 同步递增至 `1.3.0`。
 - **与基准 APK 的比对与对齐**：
   1. **底部导航标签与顺序还原**：
      - `地图选点` (Map) → `虚拟定位` (LocationMock) → `路线模拟` (RouteSimulation) → `路线库` (Library)；
@@ -338,7 +338,7 @@
 
 - **构建状态**：新项目首个自动化流水线构建完成（产物 `outputs/app-debug.apk`、`d:\Desktop\FakeGPS-v1.2.apk`）。
 - **Android 配置**：`versionCode = 102`，`versionName = "v1.2"`。
-- **流水线执行**：遵循 `AGENTS.md` 规则，构建后自动执行 minor +0.1，`package.json` 同步递增至 `1.2.0`。
+- **流水线执行**：构建后自动执行 minor +0.1，`package.json` 同步递增至 `1.2.0`。
 - **关键交付成果**：
   - 生成 `FakeGPS-v1.2.apk` 并部署至 `d:\Desktop\` 与 `d:\Desktop\fake gps\`；
   - 顶部定位状态胶囊实时显示：`当前定位 · v1.2 [构建 2026-09-09 12:01]`；
