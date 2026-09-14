@@ -21,31 +21,31 @@
 
 ```mermaid
 graph TD
-    subgraph UI [Client Layer (Apple HIG)]
-        A[MapScreen / RouteSimulation] -->|StateFlow| B[SimulationViewModel]
+    subgraph UI["Client Layer (Apple HIG)"]
+        A["MapScreen / RouteSimulation"] -->|StateFlow| B[SimulationViewModel]
         B -->|Async Coroutines| C[MockLocationService]
         B -->|Sync Engine| V[VersionSyncManager]
     end
 
-    subgraph Core [Engine Layer]
+    subgraph Core["Engine Layer"]
         C --> D[MockLocationEngine]
         C --> E[SensorMockEngine]
         C --> K[KinematicsEngine]
         C --> F[HookStateBridge]
     end
 
-    subgraph SystemServer [Android OS system_server (LSPosed)]
-        F -.->|ContentProvider IPC / Property| G[XposedLocationHook]
+    subgraph SystemServer["Android OS system_server (LSPosed)"]
+        F -.->|"ContentProvider IPC / Property"| G[XposedLocationHook]
         G --> M[MultiTargetRouting]
         G --> H[LocationManagerService]
         G --> I[LocationProviderManager]
         G --> S[SyntheticGnssProvider]
     end
 
-    subgraph Recovery [Hardware Auto-Recovery]
-        C -->|Stop Mock| R[CoordinateConverter.flushRealLocation]
-        R ==>|Single Request| L[NETWORK_PROVIDER / GPS_PROVIDER]
-        L ==>|Fresh Fix| I
+    subgraph Recovery["Hardware Auto-Recovery"]
+        C -->|"Stop Mock"| R["CoordinateConverter.flushRealLocation"]
+        R ==>|"Single Request"| L["NETWORK_PROVIDER / GPS_PROVIDER"]
+        L ==>|"200ms Fresh Fix"| I
     end
 ```
 
