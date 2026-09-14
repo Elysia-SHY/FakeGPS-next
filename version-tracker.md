@@ -1,20 +1,54 @@
 # Version Tracker - FakeGPS-next
 
-> **当前真实基准版本**：`1.4.1`
-> **Android 内部版本**：`versionCode = 18`
-> **Android 显示版本**：`versionName = "v1.4.1"`
-> **交付存放目录**：`d:\Desktop\fake gps\`
-> **最新安装包路径**：`d:\Desktop\fake gps\FakeGPS-next-v1.4.1-release.apk`
-> **构建时间**：2026-09-12 18:04
-> **构建命令**：`./gradlew assembleRelease --no-daemon`
-> **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
-> **APK SHA-256**：`8c4ffa2264012f1c4f7a08a13cda37ab044412948b8e387756406db31e8985c0`
+> **版本真源**：`app/build.gradle.kts` 的 `versionCode` / `versionName`。`version.json`、`package.json`、README 与 CHANGELOG 均以其为准同步。
+
+## 当前状态 (Current State) — 更新于 2026-09-14
+
+| 项目 | 值 |
+| :--- | :--- |
+| **最新已发布版本** | `v1.4.1`（tag `v1.4.1` → `17dcab5`） |
+| **Android 内部版本** | `versionCode = 18` |
+| **Android 显示版本** | `versionName = "v1.4.1"` |
+| **main 分支 HEAD** | `3b7463e` — *回滚提交，未发版* |
+| **HEAD 与 v1.4.1 差异** | 仅 UI：液态玻璃相关代码回退至 `0a1eeb0`（v1.3.7）基线；**版本号未变** |
+| **交付存放目录** | `D:\Desktop\fake gps\` |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.1-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.1-release.apk`（已 tracked，jsDelivr CDN 依赖此路径） |
+
+### v1.4.1 构建信息
+
+- **构建时间**：2026-09-12 18:04
+- **构建命令**：`./gradlew assembleRelease --no-daemon`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK SHA-256**：`8c4ffa2264012f1c4f7a08a13cda37ab044412948b8e387756406db31e8985c0`
+
+### ⚠️ 已知版本治理问题（待处理）
+
+1. **v1.3.8 / v1.3.9 从未打 tag、未发 Release**，仅存在于提交历史（`96e4004` / `1ac36a2`）。
+2. **versionCode 时序错乱**：`v1.3.7=16` > `v1.3.9=15` > `v1.3.8=14`。v1.3.7 实为 v1.3.9 之后的回退重发基线。
+3. `main` 的 UI 代码（HEAD `3b7463e`）与 `v1.4.1` 标签不一致——下次发版前需明确是「沿用回滚后的 UI」还是「回到 v1.4.1 的 UI」。
 
 > **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [Unreleased] — main @ `3b7463e`（2026-09-12）
+
+- **回滚至 v1.3.7 UI 基线**：撤销 `c9ca650` ~ `8c7bc10` 的液态玻璃改动，`LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0`；`LiquidGlassShader.kt` 删除。
+- **原因**：多轮 iOS-26 级玻璃效果迭代后真机背景模糊仍不达预期，用户要求停止迭代。
+- **版本号保持 `v1.4.1`（18）不变**。详见 [CHANGELOG.md](CHANGELOG.md)。
+
+### [1.3.9] - 2026-09-12
+
+- **构建状态**：⚠️ **未打 tag、未发 Release**（提交 `1ac36a2`，`versionCode = 15`）。
+- **核心变更**：修复滑动时卡片模糊画面偏移漂移、精简自定义壁纸、上浮 FAB 避让、移除地图幽灵模糊斑。
+
+### [1.3.8] - 2026-09-12
+
+- **构建状态**：⚠️ **未打 tag、未发 Release**（提交 `96e4004`，`versionCode = 14`）。
+- **核心变更**：全卡片通用毛玻璃（双 `HazeState`）、关于页背景自定义、底栏拖拽实时跟随联动。
 
 ### [1.4.1] - 2026-09-12
 - **构建状态**：✅ `assembleRelease` 成功，产物 3,884,308 bytes（3.7 MB）(`app/build/outputs/apk/release/app-release.apk`)。

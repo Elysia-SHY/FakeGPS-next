@@ -9,7 +9,10 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.3.7)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.4.1)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+
+> **当前版本**：`v1.4.1`（`versionCode = 18`）
+> 版本真源为 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode`，与 [`version.json`](version.json)、[`package.json`](package.json) 三处保持一致。
 
 ---
 
@@ -91,12 +94,12 @@ graph TD
 
 ### 方式一：LSPosed 系统级模式（推荐高级用户）
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-v1.3.2.apk**；
+2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.1-release.apk**；
 3. **作用域选择**：在 LSPosed 管理器中启用模块，**务必仅勾选【系统框架 (Android / android)】**（普通目标应用无需勾选）；
 4. 重启设备或软重启 `system_server` 后即可长效生效。
 
 ### 方式二：免 Root 模式（开箱即用）
-1. 安装 FakeGPS-v1.3.2.apk；
+1. 安装 FakeGPS-next-v1.4.1-release.apk；
 2. 打开手机 **【系统设置】➔【开发者选项】➔【选择模拟位置信息应用】**，选中 **Fake GPS**；
 3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」** 即可。
 
@@ -139,6 +142,10 @@ cd FakeGPS-next
 
 完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.4.1]** (2026-09-12) — **安全加固**（不新增功能）：跨进程配置接口 `HookConfigProvider` 改为按调用方 uid 校验（仅放行自身 / system / root / shell），hook 配置文件权限由 `0666` 收紧为 `0644`（保留跨进程只读、去掉任意应用篡改通道），`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护；另修复一处导入冲突导致的编译问题。
+- **[v1.4.0]** (2026-09-12) — **可观测性专项**（不改业务逻辑）：新增统一诊断出口 `Diag`（App 进程走 `Log`、被注入进程镜像到 `XposedBridge`，内置 10 秒 / 5 条限流），新增 `Result.logFailure()`，系统性收口 94 处 `runCatching` 中的 63 处静默失败；修复在线更新把 `v1.3.9` 误算成 `139` 导致的**每次启动都误报更新**；下载 APK 新增签名证书比对，与已安装应用不一致即拒绝安装。
+- **[v1.3.9]** (2026-09-12) — 修复滑动时卡片模糊画面偏移漂移、精简自定义壁纸逻辑、上浮右侧 FAB 避让底栏、移除地图上的幽灵模糊斑。
+- **[v1.3.8]** (2026-09-12) — 全卡片通用毛玻璃（双 `HazeState`）、关于页支持自定义背景、底栏拖拽时页面实时跟随联动。
 - **[v1.3.7]** (2026-09-12) — 极致通透液态毛玻璃升级（彻底重构玻璃拟态管线，引入高透光率多阶微偏光晶体渐变底衬、135° 菲涅尔全反射微棱镜边框、物理厚度微倒角高光内沿及表面镜面掠射弧光，底层地图道路地标清晰穿透，质感晶莹流光溢彩）、纯净前景色渲染保护（折射高光与棱镜光影下沉至 drawBehind，100% 保持文字图标高对比度与纯净锐利度）、更新弹窗背景通透化适配。
 - **[v1.3.6]** (2026-09-12) — 全新 GitHub Release + jsDelivr CDN 在线更新机制（官方 API 检查、jsDelivr CDN 高速分发、全局启动弹窗与实时下载安装、Android 8~15 深度适配）、集成 Chris Banes Haze 现代液态毛玻璃渲染库（实现真高斯背景模糊质感）、关于页新增完整开源致谢与依赖项目清单（支持一键访问各开源项目 GitHub）。
 - **[v1.3.5]** (2026-09-12) — 代理加速网络全节点兼容（多源高可用并发竞速，彻底解决挂加速器/VPN无法拉取最新版问题）、APP 内直接极速下载与自动安装 APK（毛玻璃实时进度/速度、断点容灾轮询、Android 8~15 自动拉起安装器）、彻底修复路线模拟与定位搜索框文字上下截断裁切。
@@ -152,6 +159,23 @@ cd FakeGPS-next
 - **[v1.2.0]** (2026-09-10) — 消除开启卡顿 ANR 隐患、引入 20 秒心跳超时 TTL 机制、注销 Test Provider 强力复位。
 - **[v1.1.0]** (2026-09-09) — 全面适配 Apple HIG 暗黑模式、高德夜间色阶矩阵滤镜、平板 UI 分屏适配。
 - **[v1.0.0]** (2026-09-09) — 正式版首发，防闪退权限引导向导、三模自适应架构打通。
+
+---
+
+## 👤 开发者与 AI 协作 (Authors & AI Collaboration)
+
+> **本项目由 AI 辅助构建。**
+
+| 角色 | 署名 | 说明 |
+| :--- | :--- | :--- |
+| **项目所有者 · 主开发者** | **Elysia-SHY** | 需求定义、架构决策、真机验证与版本发布 |
+| **AI 辅助构建** | **ChatGPT**（OpenAI） | 架构设计评审、业务逻辑实现、疑难问题定位与修复方案 |
+| **AI 辅助构建** | **Claude**（Anthropic） | Kotlin / Jetpack Compose 实现、代码审查与重构、工程规范 |
+| **AI 辅助构建** | **Gemini**（Google DeepMind） | Android 系统层与 Xposed / LSPosed Hook 方案、跨版本兼容适配 |
+| **AI 辅助构建** | **DeepSeek 4.1 Flash**（DeepSeek） | 高频迭代实现、性能优化、文档与变更日志撰写 |
+
+- 完整署名清单与开源项目致谢见 [AUTHORS.md](AUTHORS.md)。
+- AI 模型为辅助开发工具，不持有本项目著作权、不对项目用途承担责任；全部权利与责任归属项目所有者。
 
 ---
 

@@ -10,6 +10,34 @@
 - **本地代码路径**：`C:\Users\Administrator\.gemini\antigravity\scratch\FakeGPS-next`
 - **桌面发布产物**：`D:\Desktop\fake gps\`
 - **GitHub 远端仓库**：`https://github.com/Elysia-SHY/FakeGPS-next`
+- **当前版本**：`v1.4.1`（`versionCode = 18`），真源为 `app/build.gradle.kts`
+- **main HEAD**：`3b7463e`（UI 回滚至 v1.3.7 基线，未发版）
+
+### 👤 开发者与 AI 协作
+
+> **本项目由 AI 辅助构建。**
+
+| 角色 | 署名 |
+| :--- | :--- |
+| 项目所有者 · 主开发者 | **Elysia-SHY** |
+| AI 辅助构建 | **ChatGPT**（OpenAI） |
+| AI 辅助构建 | **Claude**（Anthropic） |
+| AI 辅助构建 | **Gemini**（Google DeepMind） |
+| AI 辅助构建 | **DeepSeek 4.1 Flash**（DeepSeek） |
+
+完整署名与开源致谢见 [AUTHORS.md](AUTHORS.md)。
+
+### 📚 文档索引
+
+| 文件 | 用途 |
+| :--- | :--- |
+| `README.md` | 项目介绍、架构亮点、快速上手、版本日志 |
+| `CHANGELOG.md` | 完整变更日志（Keep a Changelog 规范） |
+| `version-tracker.md` | 构建状态、产物校验、版本治理问题记录 |
+| `version.json` | 应用内在线更新读取的云端版本元数据 |
+| `AUTHORS.md` | 开发者与 AI 署名、开源项目致谢 |
+| `AGENTS.md` | Agent 协作规范、版本与署名强制规则 |
+| `CODE_REVIEW.md` | 代码审查记录 |
 - **技术栈**：
   - Kotlin + Jetpack Compose + Material 3
   - Hilt 依赖注入

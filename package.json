@@ -1,8 +1,16 @@
 {
   "name": "fakegps-next",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "FakeGPS-next: Android System-Level Deep Hook Virtual Location & Route Simulation",
   "private": true,
+  "author": "Elysia-SHY (https://github.com/Elysia-SHY)",
+  "contributors": [
+    "Elysia-SHY — 项目发起者 / 主开发者",
+    "ChatGPT (OpenAI) — AI 辅助构建：架构设计、业务实现、问题定位",
+    "Claude (Anthropic) — AI 辅助构建：Kotlin/Compose 实现、代码审查与重构",
+    "Gemini (Google DeepMind) — AI 辅助构建：系统层 Hook 方案与兼容性适配",
+    "DeepSeek 4.1 Flash (DeepSeek) — AI 辅助构建：迭代实现、性能优化与文档撰写"
+  ],
   "scripts": {
     "build": "gradlew.bat assembleDebug",
     "clean": "gradlew.bat clean"

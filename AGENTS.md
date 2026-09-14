@@ -13,6 +13,20 @@
    - 记录字段包括：版本号、构建时间戳、Android versionCode/versionName、主要改动摘要及校验状态。
 4. **变更日志输出**：
    - 在任务完成反馈时，必须显式输出版本变更日志与当前最新版本号。
+5. **版本号五处同步（强制）**：`versionCode` / `versionName` 的**唯一真源**是 `app/build.gradle.kts`。每次版本号变动后，必须同步以下四处，不得遗漏：
+   - `version.json`（`versionName` / `versionCode` / `releaseNotes` / `downloadUrl`）
+   - `package.json` 的 `"version"` 字段（**不带 `v` 前缀**，如 `1.4.1`）
+   - `README.md` 顶部的「当前版本」与「更新日志」章节
+   - `CHANGELOG.md` 与 `version-tracker.md`
+6. **每次发版必须打 tag**：禁止出现「改了版本号但没打 tag、没发 Release」的情况（历史上 v1.3.8 / v1.3.9 即遗漏）。tag 名与 `versionName` 一致，如 `v1.4.1`。
+7. **versionCode 必须单调递增**：不得出现回退或乱序（历史上 `v1.3.7=16` 反而大于 `v1.3.9=15`，属异常）。若需回退 UI，**回退代码但不回退 versionCode**。
+
+## 署名与 AI 协作规范 (Attribution)
+
+1. **本项目由 AI 辅助构建**，参与模型固定为：**ChatGPT（OpenAI）**、**Claude（Anthropic）**、**Gemini（Google DeepMind）**、**DeepSeek 4.1 Flash（DeepSeek）**。
+2. 该署名必须出现在：`README.md` 的「开发者与 AI 协作」章节、`AUTHORS.md`、`package.json` 的 `contributors`，以及应用内关于页。
+3. 新增或调整参与模型时，必须**同时**更新上述四处，避免署名漂移。
+4. AI 产出须经项目所有者审阅并在真机验证后方可合并；未经真机验证的改动必须在 CHANGELOG 中显式标注「未经真机验证」。
 
 ## 开发与环境约束
 
