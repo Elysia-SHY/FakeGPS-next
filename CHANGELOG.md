@@ -2,47 +2,47 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 规范，版本命名采用 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-> **AI 辅助构建声明**：本项目由 **ChatGPT（OpenAI）**、**Claude（Anthropic）**、**Gemini（Google DeepMind）** 与 **DeepSeek 4.1 Flash（DeepSeek）** 辅助构建，全部产出经项目所有者审阅并在真机验证后合并。完整署名见 [AUTHORS.md](AUTHORS.md)。
+> **AI 辅助构建声明**：本项目由 ChatGPT（OpenAI）、Claude（Anthropic）、Gemini（Google DeepMind）与 DeepSeek 4.1 Flash（DeepSeek）辅助构建，产出均经项目所有者审阅并在真机验证后合并。完整署名见 [AUTHORS.md](AUTHORS.md)。
 >
-> **版本真源**：`app/build.gradle.kts` 中的 `versionCode` / `versionName` 为唯一权威来源，`version.json` 与 `package.json` 必须与其同步。
+> **版本真源**：`app/build.gradle.kts` 中的 `versionCode` / `versionName` 是唯一权威来源，`version.json` 与 `package.json` 须与其同步。
 
 ---
 
-## [Unreleased] — main @ `3b7463e`（2026-09-12）
+## [Unreleased] main @ `3b7463e`（2026-09-12）
 
-> 尚未打 tag、尚未发 Release。此段描述 `main` 分支相对 `v1.4.1` 的**差异**。
+> 尚未打 tag，尚未发 Release。本节描述 `main` 分支相对 `v1.4.1` 的差异。
 
 ### 回滚 (Reverted)
 
-- **恢复 v1.3.7「稳定晶体玻璃」UI 基线**（`3b7463e`）：回滚 `c9ca650` ~ `8c7bc10` 这一组液态玻璃改动。
-  - `LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0` 的状态：`LocalHazeState` 退回 `compositionLocalOf<Any?> { null }`；移除 `hazeChild` 调用、`LiquidGlassBackdrop` 包装器与 `sharedLiquidGlassPaint` 单例。
-  - `LiquidGlassShader.kt`（AGSL 着色器）在 `8c7bc10` 中已删除。
-  - **原因**：几轮 iOS-26 级玻璃效果迭代后，真机上的背景模糊表现仍不达预期，用户要求停止迭代。
-  - **结果**：`main` 的 UI 代码现等同于 v1.3.7 发布基线；**版本号仍为 `v1.4.1`（versionCode 18），未随回滚变动**。
+- **恢复 v1.3.7 的「稳定晶体玻璃」UI 基线**（`3b7463e`）：回滚 `c9ca650` 至 `8c7bc10` 这一组液态玻璃改动。
+  - `LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0` 的状态：`LocalHazeState` 退回 `compositionLocalOf<Any?> { null }`，移除 `hazeChild` 调用、`LiquidGlassBackdrop` 包装器与 `sharedLiquidGlassPaint` 单例。
+  - `LiquidGlassShader.kt`（AGSL 着色器）已于 `8c7bc10` 删除。
+  - **原因**：几轮 iOS 26 风格的玻璃效果迭代后，真机上的背景模糊表现仍未达预期，项目所有者要求停止迭代。
+  - **结果**：`main` 的 UI 代码等同于 v1.3.7 发布基线。**版本号仍为 `v1.4.1`（versionCode 18）**，未随回滚变动。
 
-### 注意 (Notes)
+### 说明 (Notes)
 
-- Haze 依赖仍保留在 `app/build.gradle.kts`，但当前无任何代码引用它。
-- 本段未经过重新打包验证，`v1.4.1` 的 APK 产物仍是当前可下载版本。
+- Haze 依赖仍保留在 `app/build.gradle.kts`，但当前没有代码引用它。
+- 本次回滚未重新打包，`v1.4.1` 的 APK 产物仍是当前可下载版本。
 
 ---
 
 ## [1.4.1] - 2026-09-12
 
-> 本版为 **v1.4.0 之上的安全加固**，不新增任何功能，不改变任何业务逻辑分支。
+> 本版是在 v1.4.0 之上做安全加固，不新增功能，不改动业务逻辑分支。
 
 ### 安全 (Security)
 
-- **跨进程配置接口收闸**（`HookConfigProvider`）：该 Provider 因需服务 `system_server` 而必须保持 `exported`（signature 级权限会把系统框架挡在外面），**但这意味着任何第三方应用都能调用 `getLocation` 读取当前伪造坐标，并借 `isHookActive` 探测本应用是否安装与激活**。现改为在 `call()` 内按调用方 uid 校验，仅放行本应用自身、system、root 与 shell，其余拒绝并记录。
-  - **已知取舍**：hook 运行在第三方应用进程时，其 ContentProvider 兜底通道将失效。这两个通道本就是末位兜底（SystemProperties、`/data/system` 与 `/data/local/tmp` 文件、`Settings.Global`、XSharedPreferences 均优先尝试），且现在失败会留痕。若真机验证发现确有必要，正确做法是由应用侧单向推送 XSharedPreferences，而非放宽此校验。
+- **跨进程配置接口收闸**（`HookConfigProvider`）：该 Provider 需要服务 `system_server`，因此必须保持 `exported`（改用 signature 级权限会把系统框架挡在外面）。但这也意味着任何第三方应用都能调用 `getLocation` 读到当前伪造坐标，并通过 `isHookActive` 探测本应用是否安装与激活。现改为在 `call()` 内按调用方 uid 校验，只放行本应用自身、system、root 与 shell，其余拒绝并记录。
+  - **已知取舍**：hook 运行在第三方应用进程时，其 ContentProvider 兜底通道会失效。该通道本就是末位兜底（SystemProperties、`/data/system` 与 `/data/local/tmp` 文件、`Settings.Global`、XSharedPreferences 都优先尝试），且现在失败会留痕。若真机验证确认有必要恢复，正确做法是由应用侧单向推送 XSharedPreferences，而不是放宽这层校验。
 - **配置文件去除全局可写**：`hook_config.xml` 与两个钩子配置 JSON 的权限由 `0666` 收紧为 `0644`。
-  - 说明：**世界可读是设计必需**（hook 要在任意进程读到配置），所以不能简单去掉权限位；但**世界可写完全没必要** —— 在 `0666` 下设备上任何应用都能改写本 hook 所服务的伪造坐标，这才是真正的风险面。`0644` 保留了跨进程只读，去掉了篡改通道。
+  - 说明：**世界可读是设计必需**（hook 要在任意进程读到配置），不能简单去掉权限位；但**世界可写没有必要**。在 `0666` 下，设备上任何应用都能改写本 hook 所服务的伪造坐标，这才是真正的风险面。`0644` 保留了跨进程只读，去掉了篡改通道。
 - **ADB 控制广播加权限**（`AdbCommandReceiver`）：增加 `android:permission="android.permission.WRITE_SECURE_SETTINGS"`。
-  - adb shell 默认持有该权限，普通第三方应用没有 —— 既保留了原有 adb 调试用法，又阻止了任意应用发送广播驱动模拟。已确认应用自身**不发送**这些广播（`SimulationViewModel` 直接 `startService`），故不会误伤。
+  - adb shell 默认持有该权限，普通第三方应用没有，因此既保留了原有 adb 调试用法，也阻止了任意应用发送广播驱动模拟。已确认应用自身不发送这些广播（`SimulationViewModel` 直接 `startService`），不会误伤。
 
 ### 修复 (Fixed)
 
-- 修复 `HookConfigProvider` 中 `android.os.Process` 与 `java.lang.Process`（`su` 执行用）的导入冲突。
+- 修复 `HookConfigProvider` 中 `android.os.Process` 与 `java.lang.Process`（用于执行 `su`）的导入冲突。
 
 ### 说明 (Notes)
 
@@ -53,46 +53,46 @@
 
 ## [1.4.0] - 2026-09-12
 
-> 本版为**可观测性专项**：不改变任何业务逻辑分支，不新增特权能力，只让原本静默失败的路径留下记录。
+> 本版为可观测性专项：不改动业务逻辑分支，不新增特权能力，只让原本静默失败的路径留下记录。
 
 ### 新增 (Added)
 
 - **统一诊断出口 `Diag`**（`com.mockrun.app.util`）：
-  - 同时适配两种运行形态 —— App 进程用 `android.util.Log`，被注入进程（`system_server` 与各被 Hook 应用）额外镜像到 `XposedBridge` 日志；
+  - 同时适配两种运行形态。App 进程用 `android.util.Log`，被注入进程（`system_server` 与各被 Hook 应用）额外镜像到 `XposedBridge` 日志；
   - 因 Xposed API 声明为 `compileOnly`，`XposedBridge` 在 App 进程不在 classpath，故通过**反射惰性解析**，缺失时静默降级；
-  - **内置按标签限流**（10 秒窗口 / 5 条）：这些站点大多位于「每次位置分发」的高频路径且运行在 `system_server`，不限流会刷爆日志并实际消耗 CPU；
-  - 全程异常包裹，诊断失败绝不向宿主进程传播。
-- **`Result<T>.logFailure(tag, what, level)` 扩展**：以**纯增量**方式接入既有 `runCatching` 调用链，不改变控制流。
+  - **内置按标签限流**（10 秒窗口 5 条）。这些站点大多位于「每次位置分发」的高频路径且运行在 `system_server`，不限流会刷爆日志并实际消耗 CPU；
+  - 全程异常包裹，诊断失败不会向宿主进程传播。
+- **`Result<T>.logFailure(tag, what, level)` 扩展**：以纯增量方式接入既有 `runCatching` 调用链，不改变控制流。
 
 ### 修复 (Fixed)
 
-- **在线更新误报「有新版本」**：`VersionSyncManager.extractVersionCode` 原先在 Release 说明中找不到 `versionCode:` 时，会退化成「把版本标签按十进制拼接」——`v1.3.9` 被算成 `139`，再与 `versionCode`(15) 直接比较，`139 > 15` 恒为真，导致**每次启动都弹出更新提示**。现改为返回未知哨兵并由语义化版本比较兜底。
+- **在线更新误报「有新版本」**：`VersionSyncManager.extractVersionCode` 原先在 Release 说明中找不到 `versionCode:` 时，会退化成「把版本标签按十进制拼接」，`v1.3.9` 被算成 `139`，再与 `versionCode`(15) 比较，`139 > 15` 始终成立，导致**每次启动都弹出更新提示**。现改为返回未知哨兵，交由语义化版本比较兜底。
 - **更新包完整性缺失**：下载的 APK 此前仅校验「文件大于 1MB」就交给系统安装器，而下载源包含第三方镜像。现新增签名证书比对，与已安装应用签名不一致即拒绝安装（fail-closed）。
 
 ### 优化 (Changed)
 
-- **静默失败路径系统性收口**：`XposedLocationHook` 中 94 个 `runCatching` 站点已有 63 个携带失败记录，其余 31 处为**刻意保留的静默**（有合理默认值、或属可选能力的探测），逐条理由见提交说明。重点覆盖：
-  - `createLocationResult` —— 坐标包装失败会让伪造坐标静默不生效，现在会打出具体类名；
-  - `getGlobalActiveLocation` —— 6 个配置通道全部失败时此前无任何输出，设备只是安静地继续上报真实位置，现已在终点告警；
-  - Hook 安装路径 —— 新增「静默零」守卫，当全部候选类名都未命中时显式告警，不再让「ROM 改了类名」与「无事可做」无法区分。
+- **静默失败路径收口**：`XposedLocationHook` 中 94 个 `runCatching` 站点已有 63 个携带失败记录，其余 31 处为刻意保留的静默（有合理默认值，或属可选能力的探测），逐条理由见提交说明。重点覆盖：
+  - `createLocationResult`：坐标包装失败会让伪造坐标静默不生效，现在会打出具体类名；
+  - `getGlobalActiveLocation`：6 个配置通道全部失败时此前没有任何输出，设备只是安静地继续上报真实位置，现已在终点告警；
+  - Hook 安装路径：新增「静默零」守卫，当全部候选类名都未命中时显式告警，不再让「ROM 改了类名」与「无事可做」无法区分。
 - **仓库整理**：取消跟踪根目录 `FakeGPS-next-v1.3.7-release.apk`（本地文件保留），并将 `.workbuddy/` 加入忽略列表。
 
 ### 说明 (Notes)
 
-- **本版未经真机验证**：改动均为纯增量的日志与异常记录，编译验证通过，但效果需在真机上确认。
+- **本版未经真机验证**。改动均为纯增量的日志与异常记录，编译验证通过，但效果需在真机上确认。
 - 已知未处理项：`HookConfigProvider` 与 `AdbCommandReceiver` 仍为 `exported=true` 且无权限保护；`HookStateBridge` 中的 `chmod 666` 未收敛。这两项需先做 IPC 设计确认，未纳入本版。
 
 ---
 
 ## [1.3.9] - 2026-09-12
 
-> ⚠️ **该版本未打 git tag、未发 Release**，仅存在于提交历史（`1ac36a2`，`versionCode = 15`）。
+> 该版本未打 git tag，未发 Release，仅存在于提交历史（`1ac36a2`，`versionCode = 15`）。
 
 ### 修复 (Fixed)
 
-- **滑动时卡片模糊画面偏移**：修复拖拽/滑动过程中毛玻璃卡片内背景与底层内容脱节错位的问题。
-- **地图幽灵模糊斑**：移除在 osmdroid 原生 `MapView` 上产生的圆形模糊残影。
-- **右侧 FAB 与底栏碰撞**：上浮 FAB 位置以避让底部操作栏。
+- **滑动时卡片模糊画面偏移**：修复拖拽、滑动过程中毛玻璃卡片内的背景与底层内容错位脱节的问题。
+- **地图模糊残影**：移除在 osmdroid 原生 `MapView` 上出现的圆形模糊斑。
+- **右侧浮动按钮与底栏碰撞**：上移按钮位置以避让底部操作栏。
 
 ### 优化 (Changed)
 
@@ -102,43 +102,43 @@
 
 ## [1.3.8] - 2026-09-12
 
-> ⚠️ **该版本未打 git tag、未发 Release**，仅存在于提交历史（`96e4004`，`versionCode = 14`）。
+> 该版本未打 git tag，未发 Release，仅存在于提交历史（`96e4004`，`versionCode = 14`）。
 
 ### 新增 (Added)
 
-- **全卡片通用毛玻璃**：引入双 `HazeState`，使各页面卡片具备一致的背景模糊质感。
+- **卡片毛玻璃改为全局通用**：引入双 `HazeState`，使各页面卡片具备一致的背景模糊质感。
 - **关于页背景自定义**：支持在关于页更换全应用底衬背景。
 
 ### 优化 (Changed)
 
-- **底栏拖拽实时跟随**：拖动底部导航栏时页面内容实时联动过渡。
+- **底栏拖动跟随**：拖动底部导航栏时页面内容实时联动过渡。
 
 ---
 
 ## [1.3.7] - 2026-09-12
 
-> ⚠️ **版本时序说明**：本版本的 `versionCode = 16`，**高于** v1.3.8（14）与 v1.3.9（15），且提交（`0a1eeb0`）晚于两者。
-> 即 v1.3.7 是在 v1.3.9 之后**回退 Haze 实时模糊、重新发布的稳定基线**，并非 v1.3.6 之后的线性延续。
+> **版本时序说明**：本版本的 `versionCode = 16`，高于 v1.3.8（14）与 v1.3.9（15），且提交（`0a1eeb0`）晚于两者。也就是说，v1.3.7 是在 v1.3.9 之后回退 Haze 实时模糊、重新发布的稳定基线，并不是 v1.3.6 之后的线性延续。
 
 ### 优化与突破 (Highlights)
-- **极致通透液态毛玻璃（Liquid Glass Refraction）**：
-  - 彻底重构玻璃拟态着色管线，摒弃扁平单调半透明遮罩；
-  - 引入高透光率多阶微偏光晶体渐变底衬（32%~72% 透光率），底层地图道路、地标及图钉清晰穿透；
-  - 135° 菲涅尔全反射微棱镜双光边框（98% 纯净高光耀斑与微色彩折射边缘）；
-  - 沿圆角内壁绘制 1.2dp 微倒角立体高光内沿，模拟 3mm 物理晶体厚度感；
-  - 顶部镜面掠射弧光与底部漫反射环境反光，质感晶莹流光溢彩。
-- **纯净前景色渲染保护**：
-  - 将折射高光与棱镜光影下沉至 `drawBehind` 专用底层管道，100% 保护前景文字、图标与交互控件的原生锐利度与高对比度，彻底根除白屏或文字隐形隐患。
-- **更新弹窗容器通透化**：
-  - 修正更新弹窗背景色覆盖问题，使弹窗在开启毛玻璃时完美呈现全透晶莹质感。
+
+- **毛玻璃材质改为静态晶体微光方案**：
+  - 不再使用扁平的单层半透明遮罩，改为多层渐变半透明底衬（透光率 32% 至 72%），让底层地图道路、地标与图钉可穿透显示；
+  - 边框改为 135° 双光描边，含高光与轻微色彩折射边缘；
+  - 沿圆角内壁绘制 1.2dp 倒角高光内沿，用于表现厚度感；
+  - 顶部与底部分别加入镜面掠射高光与漫反射环境反光。
+- **前景渲染保护**：
+  - 将高光与描边绘制下沉到 `drawBehind` 专用底层管道，保持前景文字、图标与交互控件的对比度，避免出现白屏或文字不可见的情况。
+- **更新弹窗容器适配**：
+  - 修正更新弹窗背景色覆盖问题，使弹窗在开启毛玻璃时呈现通透质感。
 
 ---
 
 ## [1.3.6] - 2026-09-12
 
 ### 新增 (Added)
-- **全新 GitHub Release + jsDelivr CDN 在线更新机制**：官方 Release API 智能判定，jsDelivr 全球加速分发与多节点容灾，内置流式下载面板与 Android 8~15 原生安装器全自动化唤起。
-- **开源生态致谢专栏**：关于页面新增开源致谢专栏，完整列出 Chris Banes Haze、OSMDroid、LSPosed、Jetpack Compose 等开源项目与 GitHub 直达链接。
+
+- **GitHub Release 与 jsDelivr CDN 在线更新机制**：官方 Release API 判定版本，jsDelivr 加速分发与多节点容灾，内置流式下载面板，并在 Android 8 至 15 上自动唤起系统安装器。
+- **开源生态致谢专栏**：关于页新增致谢专栏，列出 Chris Banes Haze、OSMDroid、LSPosed、Jetpack Compose 等开源项目与 GitHub 链接。
 
 ---
 
@@ -146,11 +146,11 @@
 
 ### 新增 (Added)
 
-- **应用内 APK 下载与自动安装**：内置毛玻璃实时进度与速度面板、断点容灾轮询，并在 Android 8~15 上自动拉起系统安装器。
+- **应用内 APK 下载与安装**：内置下载进度与速度面板、断点容灾轮询，并在 Android 8 至 15 上自动唤起系统安装器。
 
 ### 修复 (Fixed)
 
-- **代理 / 加速网络下无法拉取最新版本**：版本同步改为多源高可用并发竞速，解决挂加速器或 VPN 时更新检测失败的问题。
+- **代理或加速网络下拉取不到最新版**：版本同步改为多源并发竞速，解决挂加速器或 VPN 时更新检测失败的问题。
 - **搜索框文字上下截断**：修复路线模拟与定位搜索框中文字被裁切的问题。
 
 ---
@@ -159,11 +159,11 @@
 
 ### 新增 (Added)
 
-- **路线模拟支持 POI / 地名搜索**：选点阶段新增毛玻璃搜索栏与联想下拉卡片，支持一键对齐与定点。
+- **路线模拟支持 POI 与地名搜索**：选点阶段新增搜索栏与联想下拉卡片，可一键对齐与定点。
 
 ### 优化 (Changed)
 
-- **路线模式 UI 解叠降重**：移除顶部巨幅横幅与冗余按钮，右侧浮动按钮上浮解耦避让。
+- **路线模式 UI 精简**：移除顶部横幅与冗余按钮，右侧浮动按钮上移以解耦避让。
 - **分流控制面板纵向结构优化**。
 
 ---
@@ -172,114 +172,129 @@
 
 ### 优化 (Changed)
 
-- **独立应用分流选点交互重构**：新增准心浮动指示气泡、底部面板专属保存确认与按需落盘。
-- **路线巡航全局解耦**：广播 `is_route` 属性，使分流模式与全局路线模式零冲突运作，并精简分流模式交互。
+- **独立应用分流选点交互重构**：新增准心指示、底部面板专属保存确认与按需落盘。
+- **路线巡航与分流模式解耦**：通过广播 `is_route` 属性，使两者可同时运作、互不冲突，并精简分流模式交互。
 
 ---
 
 ## [1.3.2] - 2026-09-12
 
 ### 新增 (Added)
-- **云端版本自动同步服务 (VersionSyncManager)**：引入三级容灾架构（jsdelivr CDN、raw.githubusercontent 及 GitHub Releases API），实现全天候无阻碍版本检测与一键热同步。
-- **介绍页全景重构与美化 (AboutScreen Revamp)**：
-  - 引入版本对比矩阵与状态胶囊，实时显示本地版本、云端最新版本及最后同步时间；
-  - 核心功能技术微标签矩阵（0 注入特征、AOSP 8~15 全兼容、向心减速、动态信噪比等）；
-  - 新增设备环境与运行诊断卡片，实时呈现设备型号、Android 版本（API 级别）、CPU 架构与构建模式。
-- **新版本更新说明速览弹窗**：支持在应用内直接查看云端发布的更新日志，并提供一键前往 GitHub Release / 下载 APK 快捷通道。
+
+- **云端版本自动同步服务 (VersionSyncManager)**：引入三级容灾架构（jsDelivr CDN、`raw.githubusercontent` 与 GitHub Releases API），实现版本检测与一键热同步。
+- **介绍页重构 (AboutScreen Revamp)**：
+  - 引入版本对比矩阵与状态胶囊，显示本地版本、云端最新版本与最后同步时间；
+  - 核心功能技术标签矩阵（无注入特征、AOSP 8 至 15 兼容、向心减速、动态信噪比等）；
+  - 新增设备环境与运行诊断卡片，展示设备型号、Android 版本与 API 级别、CPU 架构与构建模式。
+- **新版本说明速览弹窗**：可在应用内直接查看云端发布的更新日志，并提供前往 GitHub Release 或下载 APK 的入口。
 
 ### 优化 (Changed)
-- **清理清单文件冗余**：去重 `AndroidManifest.xml` 中重复声明的 `HookConfigProvider`。
-- **根目录版本元数据维护**：在项目根目录新增 `version.json`，提升版本同步吞吐率与抗限流能力。
+
+- **清理清单冗余**：去重 `AndroidManifest.xml` 中重复声明的 `HookConfigProvider`。
+- **补充版本元数据**：在项目根目录新增 `version.json`，降低版本同步对被限流的依赖。
 
 ---
 
 ## [1.3.1] - 2026-09-12
 
 ### 修复 (Fixed)
-- **系统框架级独立分流闭环**：在清单中注册并导出 `HookConfigProvider`，动态拦截 `LocationProviderManager$Registration` 全量派生类，提取真实 `CallerIdentity` 消除派发 UID 假冒问题。
-- **防位移丢包机制**：在定点驻留模式下抑制 AOSP `minUpdateDistanceMeters` 阈值，注入递增单调时钟避免无位移被底层过滤。
-- **文案与排版修复**：消除首页排查指南中的历史遗留乱码符号，规范使用指引。
+
+- **系统框架级独立分流闭环**：在清单中注册并导出 `HookConfigProvider`，动态拦截 `LocationProviderManager$Registration` 的全量派生类，并提取真实 `CallerIdentity`，解决派发 UID 被假冒的问题。
+- **防位移丢包**：定点驻留模式下抑制 AOSP 的 `minUpdateDistanceMeters` 阈值，并注入递增单调时钟，避免坐标因无位移被底层过滤。
+- **文案与排版修复**：清除首页排查指南中的历史遗留乱码符号，统一使用指引表述。
 
 ---
 
 ## [1.3.0] - 2026-09-11
 
 ### 新增 (Added)
-- **多应用独立分流虚拟定位 (Multi-Instance Routing)**：突破单一全局坐标，基于调用方应用 UID 与 User ID（支持应用双开/多开空间）实现独立分流。不同应用可驻留不同虚拟坐标，未配置应用与系统地图可直接使用真实物理定位。
-- **地图多目标胶囊选择与多色 Pin 联动**：地图顶部新增横向应用胶囊选择器，直观切换当前操作目标；在底图图层中为各分流应用赋予独立高对比度色彩的定位标点（Pin），并支持点击图钉直接聚焦。
+
+- **多应用独立分流 (Multi-Instance Routing)**：突破单一全局坐标，按调用方应用 UID 与 User ID（支持应用双开、多开空间）分流。不同应用可驻留不同坐标，未配置的应用与系统地图继续使用真实定位。
+- **地图多目标选择与多色图钉**：地图顶部新增横向应用胶囊选择器，便于切换当前操作目标；底图为各分流应用绘制独立颜色的定位标点，支持点击图钉直接聚焦。
 - **离线物理运动动力学引擎 (Kinematics Engine)**：
-  - 基于三点外接圆几何算法实时评估道路曲率，提供向心加速度弯道减速约束（\(v \le \sqrt{a_{\max} \cdot R}\)），避免直角弯道或掉头时的突兀瞬移。
-  - 基于 Ornstein-Uhlenbeck 均值回归随机过程生成平滑道路微起伏高程，避免恒定 20.0m 海拔特征。
-- **动态 GNSS 卫星星座仿真 (Synthetic GNSS)**：底层合成包含北斗（BDS）、GPS 及 GLONASS 的多星座卫星数据，动态模拟天顶角、方位角与微动载噪比（\(C/N_0\)），辅助应对无卫星检测异常。
-- **应用分流规则管理**：首页新增分流规则卡片列表与已安装应用快速选择抽屉，支持随时切换定点驻留、路线巡航与物理透传模式。
+  - 基于三点外接圆几何算法实时估算道路曲率，据此提供弯道减速约束（`v ≤ √(a_max · R)`），减少直角弯或掉头时的突兀位移。
+  - 基于 Ornstein-Uhlenbeck 均值回归随机过程生成道路微起伏高程，避免出现恒定 20.0m 海拔这一特征。
+- **动态 GNSS 卫星星座仿真 (Synthetic GNSS)**：合成北斗 (BDS)、GPS 与 GLONASS 多星座卫星数据，动态模拟天顶角、方位角与载噪比 (`C/N0`)。
+- **分流规则管理**：首页新增分流规则卡片列表与已安装应用选择抽屉，可随时在定点驻留、路线巡航与真实透传之间切换。
 
 ### 优化 (Changed)
-- **系统设置解耦**：非 Root 环境下避免修改系统全局持久化定位开关，保持系统设置原始状态。
-- **高频跨进程路由缓存**：在系统进程维护并发规则映射表，降低分流判定开销。
+
+- **系统设置解耦**：非 Root 环境下不再修改系统全局持久化定位开关，保持系统设置原状。
+- **跨进程路由缓存**：在系统进程维护并发规则映射表，降低分流判定开销。
 
 ---
 
 ## [1.2.2] - 2026-09-11
 
 ### 修复 (Fixed)
-- **MapView 内存泄漏**：在 Compose `AndroidView` 中补齐 `onRelease` 回调，并在离开组合与前后台切换时正确绑定 `onResume` / `onPause` / `onDetach`，彻底清理地图图层与渲染监听器。
-- **大路线跨进程传输异常**：由单例状态仓库维护路由对象，避免长航点路线经由 `Intent` 序列化引发 `TransactionTooLargeException` 崩溃。
-- **硬件定位监听器超时清理**：为单次真实物理位置请求引入 15 秒超时自动清理机制，避免在弱信号或无定位环境下系统监听器长期残留。
+
+- **MapView 内存泄漏**：在 Compose `AndroidView` 中补齐 `onRelease` 回调，并在离开组合与前后台切换时正确绑定 `onResume` / `onPause` / `onDetach`，清理地图图层与渲染监听器。
+- **大路线跨进程传输异常**：改由单例状态仓库维护路由对象，避免长航点路线经 `Intent` 序列化触发 `TransactionTooLargeException` 崩溃。
+- **硬件定位监听器超时清理**：为单次真实位置请求引入 15 秒超时清理，避免弱信号或无定位环境下监听器长期残留。
 - **悬浮摇杆与传感器状态同步**：摇杆归中静止时同步发送速度为 0 的传感器心跳，并在服务销毁时重置计步仿真引擎。
 
 ### 优化 (Changed)
-- **构建体积精简**：在 Release 构建中配置生产级 R8 代码混淆与资源缩减（`isMinifyEnabled` 与 `isShrinkResources`），安装包体积由 56.2 MB 降至 **3.53 MB**（缩减约 93.7%）。
-- **反射调用开销优化**：对 `XposedLocationHook` 中的 `LocationResult` 构造方法引入方法缓存，减少系统进程内的高频反射开销。
+
+- **构建体积精简**：在 Release 构建中启用 R8 代码混淆与资源缩减（`isMinifyEnabled` 与 `isShrinkResources`），安装包体积由 56.2 MB 降至 **3.53 MB**（缩减约 93.7%）。
+- **反射调用开销优化**：为 `XposedLocationHook` 中的 `LocationResult` 构造方法引入方法缓存，降低系统进程内的高频反射开销。
 
 ---
 
 ## [1.2.1] - 2026-09-10
 
 ### 修复 (Fixed)
-- **退出后定位残留问题**：停止模拟后主动向系统请求一次网络与 GPS 真实位置更新，加速刷新 `system_server` 的 `mLastLocation` 缓存；调整硬件扫描设置逻辑，不再篡改系统级辅助扫描开关。
+
+- **退出后定位残留**：停止模拟后主动向系统请求一次网络与 GPS 真实位置更新，加速刷新 `system_server` 的 `mLastLocation` 缓存；调整硬件扫描设置逻辑，不再篡改系统级辅助扫描开关。
 - **Android 12+ 缓存清理适配**：在 `LocationProviderManager.getLastLocation` 中兼容 `LocationResult` 包装对象，停止模拟时置空底层分发的假坐标缓存。
 
 ### 优化 (Changed)
-- **界面文本规范化**：规范化应用内各模块提示与排查指南文案，去除夸大表述，提升表述准确度。
+
+- **界面文本规范化**：统一应用内各模块的提示与排查指南文案，去掉夸大表述，提高表述准确度。
 
 ---
 
 ## [1.2.0] - 2026-09-10
 
 ### 重点突破 (Highlights)
-解决开启单点模拟时主界面卡死停滞、未停止或异常退出导致必须重启手机方可恢复 GPS 的顽固问题。
+
+解决开启单点模拟时主界面卡死停滞，以及未停止或异常退出后必须重启手机才能恢复 GPS 的问题。
 
 ### 修复 (Fixed)
-- **UI 主线程阻塞假死**：将 HookStateBridge 中所有 su 提权命令执行与跨进程文件写入移入 Dispatchers.IO 后台异步线程，杜绝主线程与 su 守护进程建立 IPC 握手时的阻塞与 ANR 风险。
-- **启动交互阻断**：移除 startPointMock 中每次开启无条件触发的系统电池优化弹窗打断，点击即时响应。
-- **物理真机位置误保存**：在 saveRealLocation 中增加 isHookActive 守卫，模拟生效时严禁将虚假坐标误存为真机物理偏好；增加 clearSavedRealLocation 彻底清理历史脏数据。
+
+- **UI 主线程阻塞假死**：将 HookStateBridge 中所有 su 提权命令执行与跨进程文件写入移入 `Dispatchers.IO` 后台线程，避免主线程与 su 守护进程建立 IPC 握手时阻塞造成 ANR。
+- **启动交互阻断**：移除 startPointMock 中每次开启都无条件触发的系统电池优化弹窗，点击即可响应。
+- **物理真机位置误保存**：在 saveRealLocation 中增加 isHookActive 守卫，模拟生效时不把虚假坐标存为真机物理位置；增加 clearSavedRealLocation 清理历史脏数据。
 
 ### 新增 (Added)
-- **20 秒动态心跳超时 (TTL) 机制**：在 SystemProperties (debug.fakegps.time)、/data/system/fake_gps_hook.json、Settings.Global 及 XSharedPreferences 中全量引入时间戳检测；超过 20 秒无心跳自动判定模拟失效并交还真实硬件控制权，告别重启手机。
-- **注销测试 Provider**：新增 MockLocationEngine.forceCleanAllTestProviders，调用 removeTestProvider 清理 gps、network、passive、fused，避免残留禁用标志。
+
+- **20 秒动态心跳超时 (TTL)**：在 SystemProperties (`debug.fakegps.time`)、`/data/system/fake_gps_hook.json`、`Settings.Global` 及 XSharedPreferences 中引入时间戳检测；超过 20 秒无心跳即判定模拟失效，交还真实硬件控制权，不再需要重启手机。
+- **注销测试 Provider**：新增 `MockLocationEngine.forceCleanAllTestProviders`，调用 removeTestProvider 清理 gps、network、passive、fused，避免残留禁用标志。
 
 ---
 
 ## [1.1.0] - 2026-09-09
 
 ### 新增 (Added)
-- **Apple HIG 动态色彩体系与全暗黑模式 (OLED Dark Mode)**：构建全局 IosColorPalette、LightIosColorPalette 与 DarkIosColorPalette，支持浅色纯白与深色纯黑自适应切换。
-- **高德地图深色夜间滤镜 (Apple Maps Night Matrix)**：基于高精度 ColorMatrix 色阶矩阵，将纯白路网转换为深邃 #141416 底图，保持高对比度清晰道路与地标。
-- **平板端 (Pad / Tablet) 横屏适配**：新增响应式横屏自适应，宽屏下操作控制板与全景地图左右分屏并列展示，彻底解决侧边栏与地图的遮挡冲突。
-- **全界面弹窗深色磨砂化**：地点检索弹窗、道路规划弹窗、路线保存库、微信防检测向导全面升级为深色毛玻璃材质。
+
+- **Apple HIG 动态色彩体系与暗黑模式 (OLED Dark Mode)**：构建全局 IosColorPalette、LightIosColorPalette 与 DarkIosColorPalette，支持浅色纯白与深色纯黑自适应切换。
+- **高德地图深色夜间滤镜 (Apple Maps Night Matrix)**：基于 ColorMatrix 色阶矩阵，将纯白路网转换为深色底图 `#141416`，保持道路与地标的对比度。
+- **平板横屏适配**：新增响应式横屏布局，宽屏下操作控制板与地图左右分屏并列，解决侧边栏与地图的遮挡冲突。
+- **弹窗深色磨砂化**：地点检索弹窗、道路规划弹窗、路线保存库与微信检测向导统一为深色毛玻璃材质。
 
 ### 优化 (Changed)
-- 地图顶部悬浮地址胶囊适配暗黑高反差文本；
-- 优化分段选择器 IosSegmentedControl 与开关 IosSwitch 的微动动效与暗黑底色。
+
+- 地图顶部悬浮地址胶囊适配暗黑模式下的高反差文本；
+- 优化分段选择器 IosSegmentedControl 与开关 IosSwitch 的动效与暗黑底色。
 
 ---
 
 ## [1.0.0] - 2026-09-09
 
 ### 新增 (Added)
+
 - **正式版首发 (Initial Release)**：
-  - 支持免 Root 模式、Root 模式与 LSPosed 系统内核级 Hook 三大工作模式；
+  - 支持免 Root、Root 与 LSPosed 系统框架级 Hook 三种工作模式；
   - 道路拓扑路线巡航引擎（驾车、骑行、步行三种速度拓扑与 GPX 轨迹导入）；
-  - 全局桌面触控悬浮摇杆（80dp ~ 220dp 实时动态阻尼缩放与方向锁定）；
-  - 步频生物力学与计步传感器拟真引擎（自适应配速换算与加速度抖动）；
-  - 防闪退与防漏点权限引导弹窗，自动检测精确定位权限与开发者选项配置。
+  - 桌面触控悬浮摇杆（80dp 至 220dp 动态阻尼缩放与方向锁定）；
+  - 步频与计步传感器仿真引擎（按配速换算步频并模拟加速度抖动）；
+  - 权限引导弹窗，自动检测精确定位权限与开发者选项配置。

@@ -1,22 +1,23 @@
 # FakeGPS-next
 
-> **基于 Apple Human Interface Guidelines 打造的高精度 Android 虚拟定位与道路巡航仿真引擎，支持系统级内核零特征注入拦截与多应用独立分流。**
+> 面向 Android 的虚拟定位与道路巡航仿真工具。界面遵循 Apple Human Interface Guidelines，支持系统框架级 Hook 注入与多应用独立分流。
 
 [![Latest Release](https://img.shields.io/github/v/release/Elysia-SHY/FakeGPS-next?color=007AFF&label=Latest%20Release&style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
-[![Android](https://img.shields.io/badge/Android-8.0_--_15_(API_26--35)-34C759.svg?style=flat-square)](https://developer.android.com)
+[![Android](https://img.shields.io/badge/Android-10_--_15_(API_29--35)-34C759.svg?style=flat-square)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose_·_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[English](#features) · [简体中文](#功能特性) · [下载最新版本 (v1.4.1)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
+[核心交互功能](#核心交互功能-features) · [架构亮点](#架构亮点-key-highlights) · [更新日志](#更新日志-changelog) · [下载最新版本](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
 > **当前版本**：`v1.4.1`（`versionCode = 18`）
-> 版本真源为 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode`，与 [`version.json`](version.json)、[`package.json`](package.json) 三处保持一致。
+>
+> 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，其余位置（[`version.json`](version.json)、[`package.json`](package.json)、本文档、[CHANGELOG.md](CHANGELOG.md)）与其保持一致。
 
 ---
 
-## 架构亮点与设计哲学 (Key Highlights)
+## 架构亮点 (Key Highlights)
 
 ```mermaid
 graph TD
@@ -44,83 +45,91 @@ graph TD
     subgraph Recovery [Hardware Auto-Recovery]
         C -->|Stop Mock| R[CoordinateConverter.flushRealLocation]
         R ==>|Single Request| L[NETWORK_PROVIDER / GPS_PROVIDER]
-        L ==>|200ms Fresh Fix| I
+        L ==>|Fresh Fix| I
     end
 ```
 
-### 1. 🔀 多租户独立应用分流路由 (Multi-Instance Routing)
-- **多应用独立坐标**：每个应用可指派专属虚拟位置与航线（例如钉钉在上海、微信在北京、高德地图走真实物理定位）。
-- **多开分身与 Work Profile 隔离**：联合索引 `(PackageName, UserId)`，支持主号与分身（User 999）分别绑定不同假坐标。
-- **真实物理透传**：未添加至分流列表的应用无感知透传真实物理卫星定位，避免影响日常导航。
-- **高可用跨进程 IPC**：基于 `HookConfigProvider` 与系统属性双通道极速缓存，纳秒级并发分流无死锁。
+### 多应用独立分流路由
 
-### 2. 🛡️ 系统内核级集中拦截 (system_server Hook)
-- **内核集中接管**：在 LSPosed 中**仅需勾选「系统框架 (system)」**，无需在各个目标 App 内部注入代码。
-- **0 注入特征防作弊**：目标应用进程内无任何 Xposed 类加载与 Hook 痕迹，彻底免除第三方反作弊扫描。
-- **底层抹除 Mock 标志**：系统分发的坐标天然携带系统官方签名，`isFromMockProvider` 与 `isMock()` 恒定为 `false`。
-- **AOSP 最小位移过滤抑制**：针对定点驻留模式动态消除 `minUpdateDistanceMeters` 限制并注入单调时钟，杜绝底层位移过滤导致丢包。
+- **每个应用一套坐标**：可分别为不同应用指定虚拟位置与航线。例如钉钉在上海、微信在北京，高德地图仍走真实定位。
+- **支持多开与工作资料**：分流规则以 `(PackageName, UserId)` 联合索引，主号与分身（如 User 999）可以绑定不同坐标。
+- **未配置的应用不受影响**：不在分流列表内的应用继续使用真实卫星定位，日常导航照常可用。
+- **跨进程 IPC**：通过 `HookConfigProvider` 与系统属性双通道缓存规则，避免在位置分发路径上反复读盘。
 
-### 3. 🏎️ 离线运动学物理仿真引擎 (Kinematics Pro Mode)
-- **三点外接圆向心加速度减速**：根据过弯曲率动态约束航速 ($v \le \sqrt{a_{\max}R}$)，杜绝机械直角转弯与急刹超速异常。
-- **步频双峰微动模型**：模拟人体行走/跑步时的双足落地周期加速度波动与轻微横向偏移。
-- **高斯地形起伏仿真**：结合路段距离与高斯扰动生成逼真道路海拔曲线，彻底消灭全平地瞬移痕迹。
+### 系统框架级集中拦截
 
-### 4. 🛰️ 动态多星座 GNSS 卫星星历合成 (Synthetic GNSS)
-- **16~24 颗动态卫星合成**：真实模拟北斗 (BDS)、GPS、GLONASS 多星座空间分布。
-- **天顶角仰角动态信噪比 (C/N0)**：依据星历仰角计算 24~42 dB-Hz 动态信噪比，并在室内/遮挡状态叠加多径衰减。
-- **规避静态反作弊封禁**：彻底解决“模拟定位开启后搜星数为 0、卫星信噪比全无”被风控平台识别封禁的问题。
+- **只需勾选系统框架**：在 LSPosed 中启用「系统框架 (system)」即可，不必逐个勾选目标应用。
+- **目标应用内不注入代码**：模块只在系统框架进程生效，目标应用进程里不加载 Xposed 类。这降低了被第三方反作弊扫描命中的概率，但不构成对检测的保证。
+- **去除 Mock 标记**：由系统框架分发的坐标不再携带 mock 标记，`isFromMockProvider` 与 `isMock()` 返回 `false`。
+- **抑制 AOSP 位移过滤**：定点驻留模式下动态放开 `minUpdateDistanceMeters` 限制并注入单调时钟，避免坐标因位移过小被底层丢弃。
 
-### 5. 🔄 云端版本与更新自动同步 (Version Sync Engine)
-- **三级梯级容灾链路**：结合 `jsdelivr CDN`、`raw.githubusercontent` 与 `GitHub Releases API`，国内免梯直连，无 60次/小时 速率限制。
-- **自动检测与语义化比对**：进入「关于」页自动静默检测云端最新版本，提供应用内直接查看更新日志与一键直达下载通道。
+### 离线运动学仿真引擎
+
+- **弯道减速**：按三点外接圆估算道路曲率，据此约束航速（`v ≤ √(a_max · R)`），减少直角转弯与急刹。
+- **步频微动模型**：按行走 / 跑步的落地周期模拟加速度波动与轻微横向偏移。
+- **地形起伏**：结合路段距离与高斯扰动生成道路海拔曲线，避免出现全程同一海拔。
+
+### 动态多星座 GNSS 星历合成
+
+- **多星座卫星**：合成 16 至 24 颗北斗 (BDS)、GPS、GLONASS 卫星的空间分布。
+- **动态信噪比**：按卫星仰角计算 24 至 42 dB-Hz 的载噪比，室内或遮挡场景叠加多径衰减。
+- **应对搜星异常**：避免开启模拟后出现搜星数为 0、信噪比空缺这类容易被风控标记的状态。
+
+### 云端版本与更新同步
+
+- **三级容灾链路**：依次尝试 jsDelivr CDN、`raw.githubusercontent` 与 GitHub Releases API，国内网络下可直接访问，且不受 API 每小时 60 次的限流约束。
+- **自动检测**：进入「关于」页时静默比对云端版本，可在应用内查看更新日志并跳转下载。
 
 ---
 
 ## 工作模式对比 (Operation Modes)
 
-| 核心特性 | 🟢 免 Root 模式 (Standard) | ⚡ Root 模式 (Advanced) | 🏛️ LSPosed 模块模式 (Ultimate) |
+| 核心特性 | 免 Root 模式 | Root 模式 | LSPosed 模块模式 |
 | :--- | :--- | :--- | :--- |
-| **设备门槛** | 无门槛，任何 Android 设备均可 | 需 Magisk / KernelSU / APatch | 需已激活 LSPosed 框架 |
-| **生效机制** | 开发者选项「模拟位置信息应用」 | AppOps 静默提权 + 传感器硬件注入 | system_server 系统级分发改写 |
-| **多应用独立分流** | ❌ 仅支持全局单点 | ❌ 仅支持全局单点 | ✅ 支持每应用独立绑定坐标与路线 |
-| **Mock 标志抹除** | ❌ 标志位显式保留 (isMock=true) | ❌ 依赖应用层规避 | ✅ 操作系统底层强制抹除为 false |
-| **宿主 0 注入特征** | ❌ 目标应用可直接检测 | ❌ 存在提权痕迹 | ✅ 仅勾选系统框架，目标应用 0 注入 |
-| **退出真机恢复速度** | 依赖系统卫星搜星 (15-60s) | 快速恢复 (<2s) | 瞬间自愈刷新 (<300ms) |
-| **步频与计步仿真** | ❌ 安全隐藏，不打扰使用 | ✅ 开放计步器传感器注入 | ✅ 开放计步器传感器注入 |
+| **设备门槛** | 无门槛 | 需 Magisk / KernelSU / APatch | 需已激活 LSPosed |
+| **生效机制** | 开发者选项中的「模拟位置信息应用」 | AppOps 提权 + 传感器注入 | system_server 层改写分发结果 |
+| **多应用独立分流** | 仅支持全局单点 | 仅支持全局单点 | 支持每应用绑定独立坐标与路线 |
+| **Mock 标记** | 保留（`isMock = true`） | 依赖应用层规避 | 在系统框架层去除 |
+| **目标应用内注入** | 无 | 存在提权痕迹 | 无，仅系统框架生效 |
+| **停止后恢复真机定位** | 依赖系统重新搜星（约 15 至 60 秒） | 通常在 2 秒内 | 通常快于 300 毫秒 |
+| **步频与计步仿真** | 不开放 | 开放传感器注入 | 开放传感器注入 |
 
 ---
 
 ## 快速上手 (Quick Start)
 
-### 方式一：LSPosed 系统级模式（推荐高级用户）
+### 方式一：LSPosed 系统框架模式
+
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
 2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.1-release.apk**；
-3. **作用域选择**：在 LSPosed 管理器中启用模块，**务必仅勾选【系统框架 (Android / android)】**（普通目标应用无需勾选）；
-4. 重启设备或软重启 `system_server` 后即可长效生效。
+3. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
+4. 重启设备，或软重启 `system_server` 后生效。
 
-### 方式二：免 Root 模式（开箱即用）
+### 方式二：免 Root 模式
+
 1. 安装 FakeGPS-next-v1.4.1-release.apk；
-2. 打开手机 **【系统设置】➔【开发者选项】➔【选择模拟位置信息应用】**，选中 **Fake GPS**；
-3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」** 即可。
+2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
+3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」**。
 
 ---
 
 ## 核心交互功能 (Features)
 
-- **地图图层双引擎**：内置 **高德地图路网 (含 Apple Maps 深色夜间滤镜)** 与 **OpenStreetMap (OSM)**，国内 GCJ-02 与国际 WGS-84 坐标精准自动转换。
-- **多应用独立分流管理**：首页抽屉式卡片列表，自由添加应用并配置专属经纬度坐标，未配置应用保持真机物理定位。
-- **全路网真实道路巡航**：支持自选驾车、骑行、步行三种路网拓扑模型，沿真实街道路网平滑移动；支持导入 **GPX** 路线文件。
-- **全局桌面悬浮摇杆**：具备阻尼物理回弹与航向锁定的桌面悬浮球，支持实时调节配速（步行 5km/h、跑步 12km/h、骑行 25km/h、驾车 60km/h、瞬移）。
-- **设备环境与运行诊断**：关于页面一键诊断显示设备型号、Android 系统 API 级别、CPU 架构与模块运行状态。
+- **地图图层双引擎**：内置高德路网（含 Apple Maps 风格的深色夜间滤镜）与 OpenStreetMap 两套底图，自动完成 GCJ-02 与 WGS-84 坐标转换。
+- **多应用分流管理**：首页以抽屉式卡片列表展示分流规则，可自由添加应用并配置专属坐标；未配置的应用保持真实定位。
+- **全路网道路巡航**：支持驾车、骑行、步行三种路网模型，沿真实道路平滑移动，可导入 GPX 路线文件。
+- **桌面悬浮摇杆**：具备阻尼回弹与航向锁定，可实时调整配速（步行 5 km/h、跑步 12 km/h、骑行 25 km/h、驾车 60 km/h，以及瞬移）。
+- **运行诊断**：关于页可一键查看设备型号、Android API 级别、CPU 架构与模块运行状态。
 
 ---
 
 ## 源码构建 (Build from Source)
 
 ### 环境要求
+
 - **JDK**：OpenJDK 17
 - **Android SDK**：API Level 34 (Android 14)
-- **Gradle**：8.4+
+- **Gradle**：8.4 及以上
 
 ```bash
 # 1. 克隆代码仓库
@@ -134,57 +143,56 @@ cd FakeGPS-next
 ./gradlew assembleRelease
 ```
 
-编译产物输出位置：`app/build/outputs/apk/release/app-release.apk`。
+编译产物位于 `app/build/outputs/apk/release/app-release.apk`。
 
 ---
 
 ## 更新日志 (Changelog)
 
-完整历史演进记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
+完整的历史演进记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-- **[v1.4.1]** (2026-09-12) — **安全加固**（不新增功能）：跨进程配置接口 `HookConfigProvider` 改为按调用方 uid 校验（仅放行自身 / system / root / shell），hook 配置文件权限由 `0666` 收紧为 `0644`（保留跨进程只读、去掉任意应用篡改通道），`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护；另修复一处导入冲突导致的编译问题。
-- **[v1.4.0]** (2026-09-12) — **可观测性专项**（不改业务逻辑）：新增统一诊断出口 `Diag`（App 进程走 `Log`、被注入进程镜像到 `XposedBridge`，内置 10 秒 / 5 条限流），新增 `Result.logFailure()`，系统性收口 94 处 `runCatching` 中的 63 处静默失败；修复在线更新把 `v1.3.9` 误算成 `139` 导致的**每次启动都误报更新**；下载 APK 新增签名证书比对，与已安装应用不一致即拒绝安装。
-- **[v1.3.9]** (2026-09-12) — 修复滑动时卡片模糊画面偏移漂移、精简自定义壁纸逻辑、上浮右侧 FAB 避让底栏、移除地图上的幽灵模糊斑。
-- **[v1.3.8]** (2026-09-12) — 全卡片通用毛玻璃（双 `HazeState`）、关于页支持自定义背景、底栏拖拽时页面实时跟随联动。
-- **[v1.3.7]** (2026-09-12) — 极致通透液态毛玻璃升级（彻底重构玻璃拟态管线，引入高透光率多阶微偏光晶体渐变底衬、135° 菲涅尔全反射微棱镜边框、物理厚度微倒角高光内沿及表面镜面掠射弧光，底层地图道路地标清晰穿透，质感晶莹流光溢彩）、纯净前景色渲染保护（折射高光与棱镜光影下沉至 drawBehind，100% 保持文字图标高对比度与纯净锐利度）、更新弹窗背景通透化适配。
-- **[v1.3.6]** (2026-09-12) — 全新 GitHub Release + jsDelivr CDN 在线更新机制（官方 API 检查、jsDelivr CDN 高速分发、全局启动弹窗与实时下载安装、Android 8~15 深度适配）、集成 Chris Banes Haze 现代液态毛玻璃渲染库（实现真高斯背景模糊质感）、关于页新增完整开源致谢与依赖项目清单（支持一键访问各开源项目 GitHub）。
-- **[v1.3.5]** (2026-09-12) — 代理加速网络全节点兼容（多源高可用并发竞速，彻底解决挂加速器/VPN无法拉取最新版问题）、APP 内直接极速下载与自动安装 APK（毛玻璃实时进度/速度、断点容灾轮询、Android 8~15 自动拉起安装器）、彻底修复路线模拟与定位搜索框文字上下截断裁切。
-- **[v1.3.4]** (2026-09-12) — 路线模拟全面支持 POI / 地名搜索（选点阶段新增毛玻璃搜索栏与联想下拉卡片，支持一键对齐与定点）、路线模式 UI 极简解叠降重（移除顶部巨幅横幅与冗余按钮、右侧浮动按钮上浮解耦避让）、分流控制面板纵向结构优化。
-- **[v1.3.3]** (2026-09-12) — 独立应用分流选点交互重构（准心浮动指示气泡、底部面板专属保存确认、按需落盘）、路线巡航纯全局解耦（广播 is_route 属性、双模零冲突运作、分流模式精简）。
-- **[v1.3.2]** (2026-09-12) — 介绍页 UI 全景重构（解决标签挤压变形、扩充底部防遮挡安全边距）、三级高可用云端版本与更新日志自动同步、新增设备环境与运行诊断面板。
-- **[v1.3.1]** (2026-09-12) — 系统框架级独立分流全面闭环（补全 HookConfigProvider 导出、解决派发监听器真实 CallerIdentity 解析）、定点驻留 AOSP 丢包抑制。
-- **[v1.3.0]** (2026-09-11) — 多应用独立分流路由首发（Multi-Target Routing）、离线物理动力学仿真引擎（Kinematics Pro）、动态多星座 GNSS 星历合成（Synthetic GNSS）。
-- **[v1.2.2]** (2026-09-11) — R8 生产级混淆瘦身（安装包降至 3.6MB）、MapView 内存泄漏根除、长航点跨进程传输异常修复。
-- **[v1.2.1]** (2026-09-10) — 根除退出后定位残留、废除破坏性系统设置、实现室内高精度 Wi-Fi 自愈刷新、解包 Android 12~15 LocationResult。
-- **[v1.2.0]** (2026-09-10) — 消除开启卡顿 ANR 隐患、引入 20 秒心跳超时 TTL 机制、注销 Test Provider 强力复位。
-- **[v1.1.0]** (2026-09-09) — 全面适配 Apple HIG 暗黑模式、高德夜间色阶矩阵滤镜、平板 UI 分屏适配。
-- **[v1.0.0]** (2026-09-09) — 正式版首发，防闪退权限引导向导、三模自适应架构打通。
+- **[v1.4.1]** (2026-09-12)：安全加固，不新增功能。跨进程接口 `HookConfigProvider` 改为按调用方 uid 校验，只放行应用自身、system、root 与 shell；hook 配置文件权限由 `0666` 收紧为 `0644`，保留跨进程只读，去掉任意应用改写坐标的通道；`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护。另修复一处导入冲突导致的编译问题。
+- **[v1.4.0]** (2026-09-12)：可观测性专项，不改业务逻辑。新增统一诊断出口 `Diag`（App 进程走 `Log`，被注入进程额外镜像到 `XposedBridge`，按标签限流 10 秒 5 条）与 `Result.logFailure()`，为 94 处 `runCatching` 中的 63 处补上失败记录；修复在线更新把 `v1.3.9` 解析成 `139` 导致每次启动都提示更新的问题；下载 APK 增加签名证书比对，与已安装应用不一致时拒绝安装。
+- **[v1.3.9]** (2026-09-12)：修复滑动时卡片毛玻璃画面偏移，精简自定义壁纸逻辑，上移右侧浮动按钮避让底栏，去掉地图上的模糊残影。
+- **[v1.3.8]** (2026-09-12)：卡片毛玻璃改为全局通用（双 `HazeState`），关于页支持自定义背景，底栏拖动时页面跟随联动。
+- **[v1.3.7]** (2026-09-12)：毛玻璃材质改为静态晶体微光方案：多层渐变半透明底衬、细高光描边、内侧倒角高光，高光绘制下沉到 `drawBehind` 以保持前景文字与图标的对比度；更新弹窗背景同步适配。
+- **[v1.3.6]** (2026-09-12)：新增 GitHub Release 与 jsDelivr CDN 在线更新（官方 API 检查、CDN 分发、启动弹窗与下载安装、Android 8 至 15 适配）；引入 Chris Banes Haze 毛玻璃渲染库；关于页新增开源致谢与依赖清单。
+- **[v1.3.5]** (2026-09-12)：版本同步改为多源并发竞速，解决挂加速器或 VPN 时拉取不到最新版的问题；应用内支持直接下载并安装 APK（含进度与速度显示、断点轮询）；修复路线模拟与定位搜索框文字被上下裁切。
+- **[v1.3.4]** (2026-09-12)：路线模拟支持 POI 与地名搜索（选点阶段新增搜索栏与联想下拉卡片）；路线模式 UI 精简，移除顶部横幅与冗余按钮；分流控制面板纵向结构优化。
+- **[v1.3.3]** (2026-09-12)：独立应用分流选点交互重构（准心指示、底部面板保存确认、按需落盘）；路线巡航与分流模式解耦，两者可同时使用。
+- **[v1.3.2]** (2026-09-12)：介绍页 UI 重构，解决标签挤压并扩充底部安全边距；新增云端版本与更新日志自动同步；新增设备环境与运行诊断面板。
+- **[v1.3.1]** (2026-09-12)：补全 `HookConfigProvider` 导出，解决派发监听器的 CallerIdentity 解析问题；定点驻留模式增加 AOSP 丢包抑制。
+- **[v1.3.0]** (2026-09-11)：多应用独立分流路由首发；离线物理动力学仿真引擎；动态多星座 GNSS 星历合成。
+- **[v1.2.2]** (2026-09-11)：启用 R8 混淆与资源压缩，安装包由 56.2 MB 降至 3.53 MB；修复 MapView 内存泄漏与长航点跨进程传输异常。
+- **[v1.2.1]** (2026-09-10)：解决退出后定位残留；不再改动系统扫描设置；实现室内 Wi-Fi 自愈刷新；适配 Android 12 至 15 的 LocationResult。
+- **[v1.2.0]** (2026-09-10)：修复开启模拟时的界面卡顿与 ANR 风险；引入 20 秒心跳超时；注销测试 Provider 以复位系统状态。
+- **[v1.1.0]** (2026-09-09)：适配 Apple HIG 暗黑模式；新增高德夜间色阶矩阵滤镜；支持平板分屏布局。
+- **[v1.0.0]** (2026-09-09)：正式版首发，包含权限引导向导与三模自适应架构。
 
 ---
 
-## 👤 开发者与 AI 协作 (Authors & AI Collaboration)
+## 开发者与 AI 协作 (Authors & AI Collaboration)
 
-> **本项目由 AI 辅助构建。**
+> 本项目由 AI 辅助构建。
 
-| 角色 | 署名 | 说明 |
+| 角色 | 署名 | 参与方向 |
 | :--- | :--- | :--- |
 | **项目所有者 · 主开发者** | **Elysia-SHY** | 需求定义、架构决策、真机验证与版本发布 |
-| **AI 辅助构建** | **ChatGPT**（OpenAI） | 架构设计评审、业务逻辑实现、疑难问题定位与修复方案 |
+| **AI 辅助构建** | **ChatGPT**（OpenAI） | 架构设计评审、业务逻辑实现、问题定位与修复方案 |
 | **AI 辅助构建** | **Claude**（Anthropic） | Kotlin / Jetpack Compose 实现、代码审查与重构、工程规范 |
 | **AI 辅助构建** | **Gemini**（Google DeepMind） | Android 系统层与 Xposed / LSPosed Hook 方案、跨版本兼容适配 |
-| **AI 辅助构建** | **DeepSeek 4.1 Flash**（DeepSeek） | 高频迭代实现、性能优化、文档与变更日志撰写 |
+| **AI 辅助构建** | **DeepSeek 4.1 Flash**（DeepSeek） | 迭代实现、性能优化、文档与变更日志撰写 |
 
-- 完整署名清单与开源项目致谢见 [AUTHORS.md](AUTHORS.md)。
-- AI 模型为辅助开发工具，不持有本项目著作权、不对项目用途承担责任；全部权利与责任归属项目所有者。
-
----
-
-## ⚖️ 免责声明 (Disclaimer)
-
-本项目仅用于 **移动应用开发调试、地理信息系统开发与测试、安全研究及学术探索**。使用者须严格遵守所在地区的法律法规，严禁将本项目用于任何违法违规、侵犯第三方合法权益或违背服务条款的场景。开发者对因使用本工具所产生的任何直接或间接后果概不承担责任。
+完整署名与开源项目致谢见 [AUTHORS.md](AUTHORS.md)。AI 模型属于辅助开发工具，不持有本项目著作权，也不对项目用途承担责任；全部权利与责任归属项目所有者。
 
 ---
 
-## 📄 开源许可证 (License)
+## 免责声明 (Disclaimer)
+
+本项目用于 **移动应用开发调试、地理信息系统开发与测试、安全研究及学术探索**。使用者须遵守所在地区的法律法规，不要将本项目用于违法违规、侵害第三方合法权益或违反服务条款的场景。开发者对使用本工具产生的任何直接或间接后果不承担责任。
+
+---
+
+## 开源许可证 (License)
 
 本项目基于 [Apache License 2.0](LICENSE) 许可证开源发布。
