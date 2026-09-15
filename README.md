@@ -11,7 +11,7 @@
 
 [核心交互功能](#核心交互功能-features) · [架构亮点](#架构亮点-key-highlights) · [更新日志](#更新日志-changelog) · [下载最新版本](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
-> **当前版本**：`v1.4.2`（`versionCode = 19`）
+> **当前版本**：`v1.4.3`（`versionCode = 20`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，其余位置（[`version.json`](version.json)、[`package.json`](package.json)、本文档、[CHANGELOG.md](CHANGELOG.md)）与其保持一致。
 
@@ -101,13 +101,13 @@ graph TD
 ### 方式一：LSPosed 系统框架模式
 
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.2-release.apk**；
+2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.3-release.apk**；
 3. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
 4. 重启设备，或软重启 `system_server` 后生效。
 
 ### 方式二：免 Root 模式
 
-1. 安装 FakeGPS-next-v1.4.2-release.apk；
+1. 安装 FakeGPS-next-v1.4.3-release.apk；
 2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
 3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」**。
 
@@ -168,6 +168,7 @@ APK 之所以必须提交进仓库，而不是只作为 Release 资产：应用�
 
 完整的历史演进记录见 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.4.3]** (2026-09-16)：新增右上角收藏夹入口，把地点收藏与航线收藏分开呈现。定位标签与路线标签的右上角工具胶囊里新增收藏夹按钮（紧邻底图切换），点按即打开本类收藏清单，不必再展开底部面板。「定位」列出以单点入库的收藏地点并显示 WGS-84 坐标，点按即把地图与十字准星移到该点并设为当前目标，不写入绘制航点与已选路线；「路线」列出手绘、GPX 导入与沿路规划的航线，显示折点数与总里程，点按即载入为当前路线并标注当前已载入的那条。两类收藏同源，按航点数区分（收藏地点恒为 1 个航点、航线至少 2 个），因此无需给 `RouteEntity` 增加类型列与数据库迁移，升级不丢既有数据；弹层内可直接删除，带二次确认。
 - **[v1.4.2]** (2026-09-15)：修复两处收藏缺陷，并把发布流程改为 GitHub Actions 自动构建。其一，首页（定位标签）「收藏此点」失效：该按钮此前复用 `saveCurrentRoute()`，而后者读取手绘航点并要求至少 2 个点，定位标签下航点恒为空，函数在 `size < 2` 守卫处直接返回，收藏既不落库也不报错，界面却仍提示成功；现新增 `MapViewModel.saveLocationPoint()` 以单点构造 `Route` 入库并回传真实结果。其二，release 构建下「收藏路线」必闪退：`RouteRepository.toDomain()` 的 `object : TypeToken<List<WayPoint>>() {}` 在 R8 处理后丢失泛型签名，Gson 抛 `IllegalStateException: TypeToken must be created with a type argument`，且该句位于 `runCatching` 之外，异常直接终止进程；现改用 `TypeToken.getParameterized()` 运行时组装类型，`MultiTargetRepository` 的同类写法一并修正，并在 `proguard-rules.pro` 补入 Gson 保留规则。此外，地址未解析完成时收藏命名回退为「纬度, 经度」，坐标非法时拒绝入库并记入 `Diag`。本版同时包含 v1.4.1 之后 main 上已合入的「稳定晶体玻璃」UI 回滚。
 - **[v1.4.1]** (2026-09-12)：安全加固，不新增功能。跨进程接口 `HookConfigProvider` 改为按调用方 uid 校验，只放行应用自身、system、root 与 shell；hook 配置文件权限由 `0666` 收紧为 `0644`，保留跨进程只读，去掉任意应用改写坐标的通道；`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护。另修复一处导入冲突导致的编译问题。
 - **[v1.4.0]** (2026-09-12)：可观测性专项，不改业务逻辑。新增统一诊断出口 `Diag`（App 进程走 `Log`，被注入进程额外镜像到 `XposedBridge`，按标签限流 10 秒 5 条）与 `Result.logFailure()`，为 94 处 `runCatching` 中的 63 处补上失败记录；修复在线更新把 `v1.3.9` 解析成 `139` 导致每次启动都提示更新的问题；下载 APK 增加签名证书比对，与已安装应用不一致时拒绝安装。

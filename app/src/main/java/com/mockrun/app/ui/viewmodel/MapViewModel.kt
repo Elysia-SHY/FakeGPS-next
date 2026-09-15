@@ -35,6 +35,20 @@ class MapViewModel @Inject constructor(
     val savedRoutes: StateFlow<List<Route>> = routeRepository.routes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ---- 收藏夹的两类派生视图 ----
+    // 收藏地点由 saveLocationPoint() 以单点 Route 入库，而航线（手绘、GPX 导入、
+    // 沿路规划）以及路线库的保存入口都要求至少 2 个航点，所以用航点数即可稳定
+    // 区分「地点收藏」与「航线收藏」，无需给 RouteEntity 增加类型列与迁移。
+    /** 地点收藏：定位标签的收藏夹内容。 */
+    val bookmarkedLocations: StateFlow<List<Route>> = savedRoutes
+        .map { routes -> routes.filter { it.waypoints.size <= 1 } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** 航线收藏：路线标签（路线模拟）的收藏夹内容。 */
+    val savedTracks: StateFlow<List<Route>> = savedRoutes
+        .map { routes -> routes.filter { it.waypoints.size >= 2 } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // ---- Location Search State ----
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

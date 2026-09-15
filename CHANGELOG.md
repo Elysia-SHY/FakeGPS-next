@@ -8,6 +8,25 @@
 
 ---
 
+## [1.4.3] - 2026-09-16
+
+> 本版在 v1.4.2 的基础上新增右上角收藏夹入口，把地点收藏与航线收藏分开呈现。
+
+### 新增 (Added)
+
+- **右上角收藏夹入口**（`MapScreen` / `BookmarkBottomSheet`）：定位标签与路线标签的右上角工具胶囊里新增收藏夹按钮，紧邻底图切换按钮。此前收藏只能从底部面板的展开态里翻到，现在点按即达。
+  - **定位标签 → 地点收藏**：列出以单点入库的收藏地点，条目显示名称与 WGS-84 坐标。点按即把地图与十字准星移到该点并写回当前目标坐标；**不写入** `_selectedRoute` / `_drawnWaypoints`，因此不会把单点收藏误当成航线、污染路线模拟的既有状态。
+  - **路线标签 → 航线收藏**：列出手绘、GPX 导入与沿路规划的航线，条目显示折点数与总里程；点按即 `selectRoute()` 载入为当前路线，行为与路线库一致，并标注当前已载入的那条。
+  - **数据分流**：两类收藏同源，`MapViewModel` 新增两个派生 `StateFlow` —— `bookmarkedLocations`（`waypoints.size <= 1`）与 `savedTracks`（`waypoints.size >= 2`）。收藏地点由 `saveLocationPoint()` 恒以单点入库，而所有航线保存入口都要求至少 2 个航点，因此按航点数即可稳定区分，**无需给 `RouteEntity` 增加类型列与数据库迁移**，升级不丢既有数据。
+  - **弹层交互**：新建 `app/src/main/java/com/mockrun/app/ui/components/BookmarkBottomSheet.kt`，沿用 `AppPickerBottomSheet` 的 `ModalBottomSheet` 风格；支持空态引导、当前载入标记，以及带二次确认的删除。
+
+### 说明 (Notes)
+
+- 底部面板原有的「⭐ 常用与收藏轨迹」抽屉未改动，仍作为面板展开态下的快捷入口；右上角入口是同一份数据的另一处视图。
+- 本版签名与 v1.4.2 相同（CI 固定密钥 `keystore/fakegps-signing.jks`），可直接覆盖安装。
+
+---
+
 ## [1.4.2] - 2026-09-15
 
 > 本版对 v1.4.1 之后 `main` 上累积的改动做一次发版：一处首页收藏功能缺陷的修复，加上此前已合入但未随任何 tag 发布的 UI 回滚。

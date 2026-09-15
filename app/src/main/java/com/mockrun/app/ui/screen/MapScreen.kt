@@ -68,6 +68,8 @@ import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.ui.components.AppPickerBottomSheet
+import com.mockrun.app.ui.components.BookmarkBottomSheet
+import com.mockrun.app.ui.components.BookmarkKind
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -446,6 +448,10 @@ fun MapScreen(
     val simState by simulationViewModel.state.collectAsState()
     val joystickLocation by simulationViewModel.joystickLocation.collectAsState()
     val savedRoutes by mapViewModel.savedRoutes.collectAsState()
+    // 收藏夹：定位标签读地点收藏，路线标签读航线收藏
+    val bookmarkedLocations by mapViewModel.bookmarkedLocations.collectAsState()
+    val savedTracks by mapViewModel.savedTracks.collectAsState()
+    val selectedRoute by mapViewModel.selectedRoute.collectAsState()
     val searchQuery by mapViewModel.searchQuery.collectAsState()
     val searchResults by mapViewModel.searchResults.collectAsState()
     val isSearching by mapViewModel.isSearching.collectAsState()
@@ -472,6 +478,7 @@ fun MapScreen(
     var routeNameInput by remember { mutableStateOf("") }
     var currentMapType by remember { mutableStateOf(MapSourceType.AUTONAVI_AUTO) }
     var showMapTypeMenu by remember { mutableStateOf(false) }
+    var showBookmarkSheet by remember { mutableStateOf(false) }
 
     val isSystemDark = LocalIosColors.current.isDark
     val shouldApplyDarkMap = when (currentMapType) {
@@ -948,6 +955,19 @@ fun MapScreen(
                                         )
                                     }
                                 }
+                            }
+
+                            // 收藏夹入口（紧邻底图切换按钮）：定位标签看地点收藏，路线标签看航线收藏
+                            IconButton(
+                                onClick = { showBookmarkSheet = true },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Bookmark,
+                                    contentDescription = if (activeMapTab == MapTab.LOCATION) "地点收藏" else "航线收藏",
+                                    tint = IosBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
 
                             // GPX Import Button (Only in ROUTE mode)
@@ -1527,6 +1547,45 @@ fun MapScreen(
                 }
             },
             shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // 收藏夹：右上角入口打开，内容随当前标签切换（定位=地点收藏，路线=航线收藏）
+    if (showBookmarkSheet) {
+        val isLocationTab = activeMapTab == MapTab.LOCATION
+        BookmarkBottomSheet(
+            kind = if (isLocationTab) BookmarkKind.LOCATION else BookmarkKind.TRACK,
+            items = if (isLocationTab) bookmarkedLocations else savedTracks,
+            selectedRouteId = selectedRoute?.id,
+            onDismissRequest = { showBookmarkSheet = false },
+            onSelect = { route ->
+                showBookmarkSheet = false
+                val target = route.waypoints.firstOrNull()
+                if (target != null) {
+                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                    val (tLat, tLon) = if (isGcjMap) {
+                        CoordinateConverter.wgs84ToGcj02(target.latitude, target.longitude)
+                    } else {
+                        target.latitude to target.longitude
+                    }
+                    mapViewRef?.controller?.apply {
+                        setZoom(16.5)
+                        animateTo(GeoPoint(tLat, tLon))
+                    }
+                    centerAimingCoord = target.latitude to target.longitude
+                    if (isLocationTab) {
+                        // 地点收藏：只把准星与目标点移到该坐标。收藏点是单点，
+                        // 不写入 _selectedRoute / _drawnWaypoints，避免污染航线状态。
+                        simulationViewModel.updateSelectedTarget(target.latitude, target.longitude)
+                        Toast.makeText(context, "已跳转到收藏地点", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // 航线收藏：载入为当前路线，行为与路线库一致
+                        mapViewModel.selectRoute(route)
+                        Toast.makeText(context, "已载入航线「${route.name}」", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDelete = { route -> mapViewModel.deleteRoute(route.id) }
         )
     }
 
