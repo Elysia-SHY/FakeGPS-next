@@ -2,31 +2,37 @@
 
 > **版本真源**：`app/build.gradle.kts` 的 `versionCode` / `versionName`。`version.json`、`package.json`、README 与 CHANGELOG 均以其为准同步。
 
-## 当前状态 (Current State)，更新于 2026-09-14
+## 当前状态 (Current State)，更新于 2026-09-15
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.1`（tag `v1.4.1` → `17dcab5`） |
-| **Android 内部版本** | `versionCode = 18` |
-| **Android 显示版本** | `versionName = "v1.4.1"` |
-| **main 分支 HEAD** | `3b7463e`（回滚提交，未发版） |
-| **HEAD 与 v1.4.1 差异** | 仅 UI：液态玻璃相关代码回退至 `0a1eeb0`（v1.3.7）基线，版本号未变 |
+| **最新已发布版本** | `v1.4.2`（tag `v1.4.2` → `3625525`） |
+| **Android 内部版本** | `versionCode = 19` |
+| **Android 显示版本** | `versionName = "v1.4.2"` |
+| **本版产物提交** | `3625525`（= tag `v1.4.2`，CI 提交构建产物；其后仅文档类提交） |
+| **HEAD 与 v1.4.1 差异** | 修复首页收藏失效与 release 下收藏闪退；发布迁移至 GitHub Actions 并切换 CI 固定签名；UI 回退至 v1.3.7 基线 |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.1-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.1-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.2-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.2-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
+| **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
+| **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥） |
 
-### v1.4.1 构建信息
+### v1.4.2 构建信息
 
-- **构建时间**：2026-09-12 18:04
-- **构建命令**：`./gradlew assembleRelease --no-daemon`
+- **构建时间**：2026-09-15 17:08 UTC（由 CI 产出）
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
 - **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
-- **APK SHA-256**：`8c4ffa2264012f1c4f7a08a13cda37ab044412948b8e387756406db31e8985c0`
+- **APK SHA-256**：`3b321e3df529b17e1a17eb80cd31b2768e0b72554b44efaeefd87b7f26f3a9c9`
+- **签名证书**：`CN=FakeGPS-next, OU=CI Release, O=Elysia-SHY, C=CN`
+- **下载路径验证**：Release 资产、jsDelivr `@v1.4.2`、raw `@v1.4.2` 三路均已实测可解析（HTTP 206）
 
 ### 已知版本治理问题（待处理）
 
 1. **v1.3.8 与 v1.3.9 从未打 tag、未发 Release**，仅存在于提交历史（`96e4004` / `1ac36a2`）。
 2. **versionCode 时序错乱**：`v1.3.7=16` > `v1.3.9=15` > `v1.3.8=14`。v1.3.7 实际是 v1.3.9 之后的回退重发基线。
-3. `main` 的 UI 代码（HEAD `3b7463e`）与 `v1.4.1` 标签不一致。下次发版前需确认是沿用回滚后的 UI，还是回到 v1.4.1 的 UI。
+3. **签名不连续（v1.4.2 起）**：CI 改用固定密钥 `keystore/fakegps-signing.jks`，与 v1.4.1 及更早版本的 debug 签名（证书 SHA-256 `f4d59c6d…`）不同，**无法覆盖安装**，升级需先卸载——会清除本机收藏与分流配置。若要恢复签名连续，把项目一直使用的 `~/.android/debug.keystore` 以 base64 填入仓库 Secret `ANDROID_KEYSTORE_BASE64`（配套 `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`）后重跑一次 workflow 即可。
+4. **`gradlew` 可执行位**：仓库长期以 `100644` 跟踪该脚本（Windows 提交时丢失权限位），已在本版修正为 `100755`，workflow 同时改用 `sh ./gradlew` 以免再受权限位影响。
 
 > **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
 
@@ -34,11 +40,13 @@
 
 ## 版本演进与变更日志 (Version History)
 
-### [Unreleased] main @ `3b7463e`（2026-09-12）
+### [1.4.2] - 2026-09-15
 
-- **回滚至 v1.3.7 UI 基线**：撤销 `c9ca650` 至 `8c7bc10` 的液态玻璃改动，`LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0`；`LiquidGlassShader.kt` 删除。
-- **原因**：多轮 iOS 26 风格玻璃效果迭代后，真机背景模糊表现仍未达预期，项目所有者要求停止迭代。
-- **版本号保持 `v1.4.1`（18）不变**。详见 [CHANGELOG.md](CHANGELOG.md)。
+- **修复首页「收藏此点」失效**：`saveCurrentRoute()` 读取手绘航点并要求 >= 2 个点，而定位标签下该列表恒为空，收藏静默返回却仍提示成功。新增 `MapViewModel.saveLocationPoint()` 以单点构造 `Route` 入库，并按实际结果反馈。
+- **修复 release 构建下「收藏路线」必闪退**：`RouteRepository.toDomain()` 的 `object : TypeToken<List<WayPoint>>() {}` 在 R8 下丢失泛型签名，Gson 抛 `IllegalStateException`，且该语句位于 `runCatching` 之外，异常直接终止进程。改用 `TypeToken.getParameterized()`；`MultiTargetRepository` 的同类写法一并修正（此前不崩溃，但分流规则整批读不出来）；`proguard-rules.pro` 补入 Gson 的 TypeToken 保留规则。
+- **发布流程迁移到 GitHub Actions**：新增 `.github/workflows/release.yml`，一次触发完成构建 → 提交 APK 进仓库树 → 打 tag → 创建 Release；签名切换为 CI 固定密钥。
+- **回滚至 v1.3.7 UI 基线**（承自 `3b7463e`）：撤销 `c9ca650` 至 `8c7bc10` 的液态玻璃改动，`LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0`；`LiquidGlassShader.kt` 删除。原因：多轮 iOS 26 风格玻璃效果迭代后，真机背景模糊表现仍未达预期，项目所有者要求停止迭代。
+- 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### [1.3.9] - 2026-09-12
 
