@@ -17,6 +17,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.lang.reflect.Type
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,6 +41,17 @@ class MultiTargetRepository @Inject constructor(
         const val SETTINGS_GLOBAL_KEY = "fake_gps_multitarget"
         const val SYSTEM_FILE_PATH = "/data/system/fake_gps_multitarget.json"
         const val LOCAL_TMP_FILE_PATH = "/data/local/tmp/fake_gps_multitarget.json"
+
+        /**
+         * `List<MultiTargetRule>` 的泛型类型，运行时显式组装。
+         *
+         * 不能写成 `object : TypeToken<List<MultiTargetRule>>() {}`：该匿名子类在
+         * release 构建被 R8 处理后泛型签名丢失，Gson 会抛
+         * `IllegalStateException: TypeToken must be created with a type argument`。
+         * 此处虽有 runCatching 兜底不会终止进程，但分流规则会整批读不出来。
+         */
+        private val RULE_LIST_TYPE: Type =
+            TypeToken.getParameterized(List::class.java, MultiTargetRule::class.java).type
     }
 
     private val gson = Gson()
@@ -57,8 +69,7 @@ class MultiTargetRepository @Inject constructor(
         val json = sp.getString(KEY_RULES_JSON, null)
         if (!json.isNullOrEmpty()) {
             runCatching {
-                val type = object : TypeToken<List<MultiTargetRule>>() {}.type
-                val list: List<MultiTargetRule> = gson.fromJson(json, type)
+                val list: List<MultiTargetRule> = gson.fromJson(json, RULE_LIST_TYPE)
                 _rules.value = list
                 com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
             }.logFailure(

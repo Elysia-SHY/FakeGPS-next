@@ -8,9 +8,35 @@
 
 ---
 
-## [Unreleased] main @ `3b7463e`（2026-09-12）
+## [1.4.2] - 2026-09-15
 
-> 尚未打 tag，尚未发 Release。本节描述 `main` 分支相对 `v1.4.1` 的差异。
+> 本版对 v1.4.1 之后 `main` 上累积的改动做一次发版：一处首页收藏功能缺陷的修复，加上此前已合入但未随任何 tag 发布的 UI 回滚。
+
+### 修复 (Fixed)
+
+- **首页「收藏此点」失效**（`MapViewModel` / `MapScreen`）：定位标签底部面板的收藏按钮此前调用 `MapViewModel.saveCurrentRoute()`，而该方法读取的是手绘航点 `_drawnWaypoints`，并要求 `size >= 2` 才继续。定位标签下用户从不绘制航线，该列表恒为空，函数在 `if (points.size < 2) return` 处直接返回——收藏既不落库也不报错；而调用方仍无条件弹出「已收藏当前位置」，形成"提示成功、列表为空"的假成功。
+  - **修复**：新增 `MapViewModel.saveLocationPoint(latitude, longitude, name, onResult)`，以单点构造 `Route` 直接入库，并在主线程回传真实结果。`MapScreen` 的 `onSaveLocation` 改为传入十字准星坐标 `activeCoord`，Toast 依据入库结果区分「已收藏当前位置」与「收藏失败，请重试」。
+  - **命名回退**：反向地理编码尚未返回或解析失败（占位文案 / `无效坐标`）时，改用「纬度, 经度」命名，不再产生「收藏地点: 正在获取当前地址...」这类条目；名称按 50 字符截断。
+  - **坐标校验**：`NaN` 或超出经纬度范围时拒绝入库并写入 `Diag` 日志，不再静默丢弃。
+  - **未改动**：路线标签的「保存路线」链路未动。该入口仅在 `READY` 阶段可达，此时航点必然 `>= 2`，不存在同类静默失败。
+  - **影响面**：首页收藏为纯本地入库，不触碰 `_selectedRoute` / `_drawnWaypoints`，因此不改变路线模拟的既有状态。收藏点以单点 `Route` 存入同一张表，在路线库显示为「1 航点 · 0.00 km」，可载入定位但不可用于路线模拟——相关入口原本就有 `>= 2` 校验，不会触发 `RouteSimulator` 的 `require(waypoints.size >= 2)`。
+
+- **release 构建下「收藏路线」必闪退**（`RouteRepository` / `MultiTargetRepository`）
+  - **现场**：真机崩溃栈为 `java.lang.IllegalStateException: TypeToken must be created with a type argument: new TypeToken<...>() {}; When using code shrinkers (ProGuard, R8, ...) make sure that generic signatures are preserved.`，栈顶落在 `RouteRepository.toDomain()` 使用的 `object : TypeToken<List<WayPoint>>() {}` 上。
+  - **原因**：该匿名子类在 R8 处理后丢失泛型父类签名，Gson 无法从 `TypeToken` 反推 `List<WayPoint>`，构造时直接抛异常。而这句写在 `runCatching` **之外**（`val type = ...` 在 `runCatching { ... }` 之前），异常沿 Flow 收集链上行到主线程并终止进程。触发条件是「保存出第一条路线后数据库 Flow 重新发射」，因此表现为**点一次收藏就闪退**。
+  - **同类点**：`MultiTargetRepository.loadRules()` 有相同写法，因其位于 `runCatching` 之内不会崩溃，代价是多目标分流规则整批读不出来（静默失效，界面显示为空列表）。
+  - **修复**：两处均改为 `TypeToken.getParameterized(List::class.java, X::class.java).type`，在运行时显式组装参数化类型，彻底不依赖泛型签名是否被保留。
+  - **加固**：`app/proguard-rules.pro` 补入 Gson 官方的 `TypeToken` 保留规则（`-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken`）作为第二道防线，并为 `sun.misc.Unsafe` 补 `-dontwarn`。
+  - **两处缺陷的关联**：这同时是首页收藏的「下一跳」。首页收藏此前因 `size < 2` 守卫从未真正入库，所以掩盖了这个崩溃；一旦首页收藏修好、真正写入数据库，同一崩溃路径立刻会被触发。二者必须同版修复，否则首页收藏会从「点了没反应」变成「点了闪退」。
+
+- **收藏路线链路其余复查结论（未改动）**：路线标签的「收藏/保存路线」入口只在 `READY` 阶段可达（`RouteBottomPanel` 的「完成规划」按钮 `enabled = waypoints.size >= 2`），此时航点必然 >= 2，不存在首页那种静默失败；`RouteSimulationScreen` 以 `hasValidRoute = (selectedRoute?.waypoints?.size ?: 0) >= 2` 拦截单点路线，`Route` 与 `WayPoint` 均为 `Serializable`，Intent 传递无隐患。
+
+### 变更 (Changed)
+
+- **发布流程改为 GitHub Actions 自动构建**（新增 `.github/workflows/release.yml`）：一次触发即完成「构建 release APK → 校验签名 → 把 APK 提交进仓库树 → 将 tag 指向该提交 → 创建/更新 GitHub Release」，并输出 APK 的 SHA-256 与签名证书指纹。
+  - APK 之所以必须提交进仓库而非只作为 Release 资产：应用内更新的主下载路径是 jsDelivr 的 `/gh/{owner}/{repo}@{tag}/{file}.apk`，而 jsDelivr 只服务仓库文件、不服务 Release 资产。因此流程顺序被固定为「先提交、后打 tag」。
+- **发布签名改为 CI 固定密钥**（`keystore/fakegps-signing.jks`，或 workflow 中从 Secrets 读取的密钥）：`app/build.gradle.kts` 在检测到 `FAKEGPS_KEYSTORE` 环境变量时启用 `ci` 签名配置，否则回退 debug 签名，本地构建行为不变。
+  - **升级注意**：该密钥与 v1.4.1 及更早版本的 debug 签名（证书 SHA-256 `f4d59c6d…`）**不同**，因此本版**无法覆盖安装**，需先卸载旧版——这会清除本机收藏与分流配置。若要保持签名连续，可把原 `~/.android/debug.keystore` 以 base64 填入仓库 Secret `ANDROID_KEYSTORE_BASE64`（连同 `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`），再重新触发一次 workflow，产物即恢复为原签名。
 
 ### 回滚 (Reverted)
 
@@ -18,12 +44,12 @@
   - `LiquidGlassModifier.kt` 与 `RouteLibraryScreen.kt` 恢复至 `0a1eeb0` 的状态：`LocalHazeState` 退回 `compositionLocalOf<Any?> { null }`，移除 `hazeChild` 调用、`LiquidGlassBackdrop` 包装器与 `sharedLiquidGlassPaint` 单例。
   - `LiquidGlassShader.kt`（AGSL 着色器）已于 `8c7bc10` 删除。
   - **原因**：几轮 iOS 26 风格的玻璃效果迭代后，真机上的背景模糊表现仍未达预期，项目所有者要求停止迭代。
-  - **结果**：`main` 的 UI 代码等同于 v1.3.7 发布基线。**版本号仍为 `v1.4.1`（versionCode 18）**，未随回滚变动。
+  - **结果**：`main` 的 UI 代码等同于 v1.3.7 发布基线。回滚当时未改版本号（仍为 `v1.4.1` / versionCode 18），该回滚现随本版一并发布。
 
 ### 说明 (Notes)
 
 - Haze 依赖仍保留在 `app/build.gradle.kts`，但当前没有代码引用它。
-- 本次回滚未重新打包，`v1.4.1` 的 APK 产物仍是当前可下载版本。
+- 本版为重新打包产物，仓库内 Release APK 同步更新为 `FakeGPS-next-v1.4.2-release.apk`。
 
 ---
 

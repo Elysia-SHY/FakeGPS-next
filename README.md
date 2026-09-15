@@ -11,7 +11,7 @@
 
 [核心交互功能](#核心交互功能-features) · [架构亮点](#架构亮点-key-highlights) · [更新日志](#更新日志-changelog) · [下载最新版本](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 
-> **当前版本**：`v1.4.1`（`versionCode = 18`）
+> **当前版本**：`v1.4.2`（`versionCode = 19`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，其余位置（[`version.json`](version.json)、[`package.json`](package.json)、本文档、[CHANGELOG.md](CHANGELOG.md)）与其保持一致。
 
@@ -101,13 +101,13 @@ graph TD
 ### 方式一：LSPosed 系统框架模式
 
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.1-release.apk**；
+2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.2-release.apk**；
 3. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
 4. 重启设备，或软重启 `system_server` 后生效。
 
 ### 方式二：免 Root 模式
 
-1. 安装 FakeGPS-next-v1.4.1-release.apk；
+1. 安装 FakeGPS-next-v1.4.2-release.apk；
 2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
 3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」**。
 
@@ -145,12 +145,30 @@ cd FakeGPS-next
 
 编译产物位于 `app/build/outputs/apk/release/app-release.apk`。
 
+> 本地构建未设置 `FAKEGPS_KEYSTORE` 环境变量，release 使用 AGP 的 debug 签名，与仓库内已发布的 APK **签名身份不同**。
+
+### 自动构建与发布 (GitHub Actions)
+
+仓库内置了发布流水线 [`.github/workflows/release.yml`](.github/workflows/release.yml)，在 GitHub 上点击 **Actions → Build & Publish Release APK → Run workflow** 即可（也可 push `v*` 标签触发）。
+
+流水线一次完成：构建 release APK → 校验签名 → **把 APK 提交进仓库树** → 将 tag 指向该提交 → 创建/更新 GitHub Release，并在 Job Summary 中输出 APK 的 SHA-256 与签名证书指纹。
+
+APK 之所以必须提交进仓库，而不是只作为 Release 资产：应用内更新的主下载路径是 jsDelivr 的 `/gh/{owner}/{repo}@{tag}/{file}.apk`，而 jsDelivr 的 `/gh/` 端点**只服务仓库文件，不服务 Release 资产**（详见 [`.gitignore`](.gitignore) 中的说明）。因此流程被固定为「先提交 APK，再创建 tag」。
+
+签名密钥的解析顺序：
+
+1. 仓库 Secret `ANDROID_KEYSTORE_BASE64`（另需 `ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`）。把项目一直使用的 `~/.android/debug.keystore` 以 base64 填入即可让 CI 产物与历史版本签名连续、支持直接覆盖安装。
+2. 未配置 Secret 时，回退到仓库内随源码提交的固定密钥 `keystore/fakegps-signing.jks`（alias `fakegps`，口令 `android`，仅用于 CI 出包，无保密价值）。它保证了 CI 产物在多次运行之间签名稳定。
+
+> **升级提示**：若 CI 使用的密钥与设备上已安装版本不同，Android 会拒绝覆盖安装，需先卸载旧版（会清除本机收藏与分流配置）。应用内的下载安装同样会做签名比对，不一致时拒绝安装。
+
 ---
 
 ## 更新日志 (Changelog)
 
 完整的历史演进记录见 [CHANGELOG.md](CHANGELOG.md)。
 
+- **[v1.4.2]** (2026-09-15)：修复两处收藏缺陷，并把发布流程改为 GitHub Actions 自动构建。其一，首页（定位标签）「收藏此点」失效：该按钮此前复用 `saveCurrentRoute()`，而后者读取手绘航点并要求至少 2 个点，定位标签下航点恒为空，函数在 `size < 2` 守卫处直接返回，收藏既不落库也不报错，界面却仍提示成功；现新增 `MapViewModel.saveLocationPoint()` 以单点构造 `Route` 入库并回传真实结果。其二，release 构建下「收藏路线」必闪退：`RouteRepository.toDomain()` 的 `object : TypeToken<List<WayPoint>>() {}` 在 R8 处理后丢失泛型签名，Gson 抛 `IllegalStateException: TypeToken must be created with a type argument`，且该句位于 `runCatching` 之外，异常直接终止进程；现改用 `TypeToken.getParameterized()` 运行时组装类型，`MultiTargetRepository` 的同类写法一并修正，并在 `proguard-rules.pro` 补入 Gson 保留规则。此外，地址未解析完成时收藏命名回退为「纬度, 经度」，坐标非法时拒绝入库并记入 `Diag`。本版同时包含 v1.4.1 之后 main 上已合入的「稳定晶体玻璃」UI 回滚。
 - **[v1.4.1]** (2026-09-12)：安全加固，不新增功能。跨进程接口 `HookConfigProvider` 改为按调用方 uid 校验，只放行应用自身、system、root 与 shell；hook 配置文件权限由 `0666` 收紧为 `0644`，保留跨进程只读，去掉任意应用改写坐标的通道；`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护。另修复一处导入冲突导致的编译问题。
 - **[v1.4.0]** (2026-09-12)：可观测性专项，不改业务逻辑。新增统一诊断出口 `Diag`（App 进程走 `Log`，被注入进程额外镜像到 `XposedBridge`，按标签限流 10 秒 5 条）与 `Result.logFailure()`，为 94 处 `runCatching` 中的 63 处补上失败记录；修复在线更新把 `v1.3.9` 解析成 `139` 导致每次启动都提示更新的问题；下载 APK 增加签名证书比对，与已安装应用不一致时拒绝安装。
 - **[v1.3.9]** (2026-09-12)：修复滑动时卡片毛玻璃画面偏移，精简自定义壁纸逻辑，上移右侧浮动按钮避让底栏，去掉地图上的模糊残影。

@@ -89,6 +89,9 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
+/** 反向地理编码尚未返回时的占位文案；收藏命名据此判断地址是否可用。 */
+private const val ADDRESS_PLACEHOLDER = "正在获取当前地址..."
+
 /** High-speed AutoNavi (高德地图) Vector Tile Source (Domestic CDN, No Key Required) */
 val AutoNaviVectorTileSource = object : OnlineTileSourceBase(
     "AutoNavi-Vector",
@@ -487,7 +490,7 @@ fun MapScreen(
                 ?: (39.9042 to 116.4074)
         )
     }
-    var currentAddressText by remember { mutableStateOf("正在获取当前地址...") }
+    var currentAddressText by remember { mutableStateOf(ADDRESS_PLACEHOLDER) }
     var currentZoom by remember { mutableDoubleStateOf(16.0) }
 
     val roadOrigin by mapViewModel.roadOrigin.collectAsState()
@@ -1373,8 +1376,23 @@ fun MapScreen(
                         }
                     },
                     onSaveLocation = {
-                        mapViewModel.saveCurrentRoute("收藏地点: $currentAddressText")
-                        Toast.makeText(context, "已收藏当前位置", Toast.LENGTH_SHORT).show()
+                        // 收藏作用于十字准星坐标，与 drawnWaypoints 无关：
+                        // 定位标签下从未绘制航线，必须走单点收藏入库，否则静默失败。
+                        val (bookmarkLat, bookmarkLon) = activeCoord
+                        val addressLabel = currentAddressText
+                            .takeIf { it.isNotBlank() && it != ADDRESS_PLACEHOLDER && it != "无效坐标" }
+                            ?: "%.6f, %.6f".format(bookmarkLat, bookmarkLon)
+                        mapViewModel.saveLocationPoint(
+                            latitude = bookmarkLat,
+                            longitude = bookmarkLon,
+                            name = "收藏地点: ${addressLabel.take(50)}"
+                        ) { saved ->
+                            Toast.makeText(
+                                context,
+                                if (saved) "已收藏当前位置" else "收藏失败，请重试",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     },
                     onSelectSavedRoute = { route ->
                         mapViewModel.selectRoute(route)

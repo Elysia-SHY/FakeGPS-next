@@ -1,3 +1,4 @@
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -11,6 +12,17 @@ plugins {
 
 val currentBuildTime: String = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
 
+/**
+ * GitHub Actions 发布构建使用的固定签名密钥。
+ *
+ * 不设置该环境变量时（本地开发），release 回退到 AGP 的 debug 签名，行为与以往一致。
+ * CI 上则统一用同一份密钥，保证历代发布的 APK 签名身份相同、可相互覆盖安装。
+ * 路径由 workflow 从 `FAKEGPS_KEYSTORE` 注入，口令另见三个同名环境变量。
+ */
+val ciKeystoreFile: File? = System.getenv("FAKEGPS_KEYSTORE")
+    ?.let { File(it) }
+    ?.takeIf { it.exists() }
+
 android {
     namespace = "com.mockrun.app"
     compileSdk = 34
@@ -19,18 +31,34 @@ android {
         applicationId = "com.mockrun.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 18
-        versionName = "v1.4.1"
+        versionCode = 19
+        versionName = "v1.4.2"
         buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        // 仅在 CI 注入了密钥时注册；本地构建不声明，避免干扰 debug 签名。
+        if (ciKeystoreFile != null) {
+            create("ci") {
+                storeFile = ciKeystoreFile
+                storePassword = System.getenv("FAKEGPS_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FAKEGPS_KEY_ALIAS")
+                keyPassword = System.getenv("FAKEGPS_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (ciKeystoreFile != null) {
+                signingConfigs.getByName("ci")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

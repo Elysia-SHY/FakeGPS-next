@@ -6,6 +6,8 @@ import com.mockrun.app.data.parser.GpxParser
 import com.mockrun.app.data.repository.RouteRepository
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.WayPoint
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -161,6 +163,41 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 收藏地图上的单个地点。
+     *
+     * 首页（定位标签）的「收藏此点」作用于十字准星上的当前坐标，此时用户从未绘制过
+     * 航线，[_drawnWaypoints] 恒为空。复用 [saveCurrentRoute] 会在其 `size < 2`
+     * 守卫处静默返回，导致收藏动作既不落库也不报错。收藏语义本就是单点，
+     * 因此这里直接以单点构造 Route 入库，并回传真实结果供 UI 展示。
+     *
+     * @param onResult 在主线程回调是否入库成功；返回 false 表示坐标非法或写库失败。
+     */
+    fun saveLocationPoint(
+        latitude: Double,
+        longitude: Double,
+        name: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        if (latitude.isNaN() || longitude.isNaN() ||
+            latitude !in -90.0..90.0 || longitude !in -180.0..180.0
+        ) {
+            Diag.w(TAG, "saveLocationPoint rejected invalid coords: $latitude, $longitude")
+            onResult(false)
+            return
+        }
+        viewModelScope.launch {
+            val route = Route(
+                name = name.ifBlank { "收藏地点" },
+                waypoints = listOf(WayPoint(latitude, longitude))
+            )
+            val savedId = runCatching { routeRepository.saveRoute(route) }
+                .logFailure(TAG, "persist bookmark '${route.name}'")
+                .getOrNull()
+            onResult(savedId != null && savedId > 0L)
+        }
+    }
+
     fun renameRoute(route: Route, newName: String) {
         if (newName.isBlank()) return
         viewModelScope.launch {
@@ -218,5 +255,9 @@ class MapViewModel @Inject constructor(
         } else {
             _selectedRoute.value = null
         }
+    }
+
+    private companion object {
+        private const val TAG = "MapViewModel"
     }
 }
