@@ -2,43 +2,50 @@
 
 > **版本真源**：`app/build.gradle.kts` 的 `versionCode` / `versionName`。`version.json`、`package.json`、README 与 CHANGELOG 均以其为准同步。
 
-## 当前状态 (Current State)，更新于 2026-09-15
+## 当前状态 (Current State)，更新于 2026-09-16
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.2`（tag `v1.4.2` → `3625525`） |
-| **Android 内部版本** | `versionCode = 19` |
-| **Android 显示版本** | `versionName = "v1.4.2"` |
-| **本版产物提交** | `3625525`（= tag `v1.4.2`，CI 提交构建产物；其后仅文档类提交） |
-| **HEAD 与 v1.4.1 差异** | 修复首页收藏失效与 release 下收藏闪退；发布迁移至 GitHub Actions 并切换 CI 固定签名；UI 回退至 v1.3.7 基线 |
+| **最新已发布版本** | `v1.4.3`（tag `v1.4.3` → `cbb1edd`） |
+| **Android 内部版本** | `versionCode = 20` |
+| **Android 显示版本** | `versionName = "v1.4.3"` |
+| **本版产物提交** | `cbb1edd`（= tag `v1.4.3`，CI 提交构建产物；其后仅文档类提交） |
+| **相对 v1.4.2 差异** | 新增右上角收藏夹入口（定位标签=地点收藏，路线标签=航线收藏），业务逻辑其余不变 |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.2-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.2-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.3-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.3-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
-| **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥） |
+| **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
 
-### v1.4.2 构建信息
+### v1.4.3 构建信息
 
-- **构建时间**：2026-09-15 17:08 UTC（由 CI 产出）
+- **构建时间**：2026-09-15 17:34 UTC（由 CI 产出）
 - **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
 - **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
 - **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
-- **APK SHA-256**：`3b321e3df529b17e1a17eb80cd31b2768e0b72554b44efaeefd87b7f26f3a9c9`
-- **签名证书**：`CN=FakeGPS-next, OU=CI Release, O=Elysia-SHY, C=CN`
-- **下载路径验证**：Release 资产、jsDelivr `@v1.4.2`、raw `@v1.4.2` 三路均已实测可解析（HTTP 206）
+- **APK SHA-256**：`1d79a9e1918cfe3bc79cea0e6b38f620cc27aaf1852a54493e815f04c3db99f3`
+- **签名证书**：`CN=FakeGPS-next, OU=CI Release, O=Elysia-SHY, C=CN`（与 v1.4.2 同一张证书，可直接覆盖安装）
+- **下载路径验证**：Release 资产、jsDelivr `@v1.4.3`、raw `@v1.4.3` 三路均已实测可解析
 
 ### 已知版本治理问题（待处理）
 
 1. **v1.3.8 与 v1.3.9 从未打 tag、未发 Release**，仅存在于提交历史（`96e4004` / `1ac36a2`）。
 2. **versionCode 时序错乱**：`v1.3.7=16` > `v1.3.9=15` > `v1.3.8=14`。v1.3.7 实际是 v1.3.9 之后的回退重发基线。
-3. **签名不连续（v1.4.2 起）**：CI 改用固定密钥 `keystore/fakegps-signing.jks`，与 v1.4.1 及更早版本的 debug 签名（证书 SHA-256 `f4d59c6d…`）不同，**无法覆盖安装**，升级需先卸载——会清除本机收藏与分流配置。若要恢复签名连续，把项目一直使用的 `~/.android/debug.keystore` 以 base64 填入仓库 Secret `ANDROID_KEYSTORE_BASE64`（配套 `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`）后重跑一次 workflow 即可。
-4. **`gradlew` 可执行位**：仓库长期以 `100644` 跟踪该脚本（Windows 提交时丢失权限位），已在本版修正为 `100755`，workflow 同时改用 `sh ./gradlew` 以免再受权限位影响。
+3. **签名断点位于 v1.4.2**：该版起 CI 改用固定密钥 `keystore/fakegps-signing.jks`，与 v1.4.1 及更早版本的 debug 签名（证书 SHA-256 `f4d59c6d…`）不同，**从 v1.4.1 升级到 v1.4.2/1.4.3 需先卸载**——会清除本机收藏与分流配置；v1.4.2 → v1.4.3 及之后的版本之间签名一致，可直接覆盖。若要恢复与旧版的签名连续，把项目一直使用的 `~/.android/debug.keystore` 以 base64 填入仓库 Secret `ANDROID_KEYSTORE_BASE64`（配套 `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`）后重跑一次 workflow。
+4. **`gradlew` 可执行位**：仓库长期以 `100644` 跟踪该脚本（Windows 提交时丢失权限位），已在 v1.4.2 修正为 `100755`，workflow 同时改用 `sh ./gradlew` 以免再受权限位影响。
 
 > **头部维护说明**：此前头部长期停留在 `1.2.1 / versionCode = 4`，与实际严重脱节。已按 `app/build.gradle.kts`（Android 版本的唯一真源）重建。后续请以 `build.gradle.kts` 为准同步此处。
 
 ---
 
 ## 版本演进与变更日志 (Version History)
+
+### [1.4.3] - 2026-09-16
+
+- **新增右上角收藏夹入口**：定位标签与路线标签的右上角工具胶囊新增收藏夹按钮（紧邻底图切换）。定位标签列出单点收藏的地点（点按跳转定位、设为当前目标，不写入绘制航点与已选路线）；路线标签列出航线（点按载入为当前路线，标注当前已载入项）。
+- **数据分流**：`MapViewModel` 新增 `bookmarkedLocations`（`waypoints.size <= 1`）与 `savedTracks`（`waypoints.size >= 2`）两个派生 `StateFlow`，按航点数区分两类收藏，无需 DB 迁移。
+- **新增组件** `ui/components/BookmarkBottomSheet.kt`（ModalBottomSheet 风格，含空态引导与二次确认删除）。
+- 详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### [1.4.2] - 2026-09-15
 
