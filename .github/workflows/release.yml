@@ -121,7 +121,9 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        # 用 `sh` 调用而非 `./gradlew`：仓库长期以 100644 跟踪该脚本（Windows 上提交时
+        # 丢失可执行位），不依赖权限位更稳。可执行位已在同一提交中一并修正。
+        run: sh ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Stage APK and checksum
         id: stage
