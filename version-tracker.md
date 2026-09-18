@@ -6,26 +6,30 @@
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.7`（新增「Root 注入模式」开关，Root / 免 Root 彻底分离）— 源码已就绪，待 CI 构建与发布 |
+| **最新已发布版本** | `v1.4.7`（新增「Root 注入模式」开关，Root / 免 Root 彻底分离） |
 | **Android 内部版本** | `versionCode = 24` |
 | **Android 显示版本** | `versionName = "v1.4.7"` |
-| **本版产物提交** | 待 CI 构建回提（含 `FakeGPS-next-v1.4.7-release.apk`） |
+| **本版产物提交** | `6f1e0cd`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.7-release.apk`） |
 | **相对 v1.4.6 差异** | 新增「Root 注入模式」总开关：开启=Root 自动授予模拟权限+恢复硬件高精度（LSPosed 激活则叠加框架增强）；关闭=免 Root，应用完全不调用 su，仅依赖开发者选项手动勾选模拟位置应用 |
 | **上一条已发布版本** | `v1.4.6`（tag `v1.4.6` → `ccd914e8`，versionCode = 23） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.7-release.apk`（待构建） |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.7-release.apk`（待 CI 构建回提，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.7-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.7-release.apk`（已回提，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
 
-### v1.4.7 构建信息（待 CI 构建）
+### v1.4.7 构建信息
 
+- **构建时间**：2026-09-18（CI run `35352644981`，已 success）
 - **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
 - **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
 - **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK 大小**：3,910,528 bytes
+- **APK SHA-256**：`e91ed44f6dd5abb6812bc2d4d898556b0990593d6ba164a2c20589a8af6e9065`
+- **tag / 提交**：`v1.4.7` → `6f1e0cd969915015aff0105262dd07d38c55e35f`（APK 已回提进仓库树，jsDelivr CDN 依赖此路径）
 - **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.7
-- **本次改动要点**：新增 `InjectionMode`/`InjectionModePrefs`（`fake_gps_injection_mode_prefs`，默认 ROOT）；`LocationMockScreen` 设置页新增「Root 注入模式」开关，并将 `grantMockLocation`、Root 行重授权、一键恢复高精度、微信一键关闭蓝牙/Wi-Fi 扫描均收敛到 ROOT 模式；`SimulationViewModel.stop*` 的 `restoreScanningHardware` 仅在 ROOT 模式执行；`RouteSimulationScreen` 高阶入口随模式联动；所有停止/销毁/任务划掉路径仍无条件 `forceCleanAllTestProviders`+`flushRealLocation`（防卡死沿用 v1.4.5 修复）
-- **编译/构建验证**：CI `assembleRelease` 通过后回填 SHA-256 与 run id；**未做真机验证**
+- **本次改动要点**：新增 `InjectionMode`/`InjectionModePrefs`（`fake_gps_injection_mode_prefs`，默认 ROOT）；`LocationMockScreen` 设置页新增「Root 注入模式」开关，并将 `grantMockLocation`、`LaunchedEffect` 自动授权、Root 行重授权、一键恢复高精度、微信一键关闭蓝牙/Wi-Fi 扫描均收敛到 ROOT 模式；`SimulationViewModel.stop*` 的 `restoreScanningHardware` 仅在 ROOT 模式执行；`RouteSimulationScreen` 高阶入口随模式联动；切换为免 Root 立即调用 `restoreScanningHardware()` 撤销此前 Root 关闭的扫描；所有停止/销毁/任务划掉路径仍无条件 `forceCleanAllTestProviders`+`flushRealLocation`（防卡死沿用 v1.4.5 修复，该清理**不**绑定模式）
+- **编译/构建验证**：CI `assembleRelease` 通过；dex 字符串扫描确认 `Root 注入模式` / `已切换为免 Root 模式` / `免 Root：仅依赖开发者选项模拟位置` / `恢复系统高精度定位` 均已落地；**未做真机验证**
 
 ### v1.4.6 构建信息
 
