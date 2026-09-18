@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.6",
-  "versionCode": 23,
+  "versionName": "v1.4.7",
+  "versionCode": 24,
   "releaseDate": "2026-09-18",
-  "releaseNotes": "重做「微信/打卡软件仍显示真实位置」排查板块（虚拟定位页顶部横幅与弹窗）：\n\n1. 板块职责收敛为只做 Root 功能：一键关闭蓝牙 / Wi-Fi 与背景扫描。通过 root 命令关闭 WLAN 始终扫描、蓝牙始终扫描、Wi-Fi 唤醒，并直接关闭 Wi-Fi 与蓝牙射频，从系统层面阻止微信/打卡软件通过周边路由器 MAC 或蓝牙信标反查真实经纬度。\n\n2. 移除原有的「微信强停/权限」入口与「免 Root 4 步」说明，板块不再涉及打开微信应用详情或改微信权限。\n\n3. 未获取 Root 时，按钮改为跳转系统定位设置，引导用户手动关闭「WLAN 扫描」与「蓝牙扫描」开关。\n\n4. 顶部横幅副文案同步更新为「Root 一键关闭蓝牙 / Wi-Fi 与背景扫描，阻止定位反查」。\n\n本版与 v1.4.5 共用同一签名密钥，可直接覆盖安装。",
+  "releaseNotes": "新增「Root 注入模式」开关，将 Root 模式与免 Root 模式彻底分开：\n\n1. 设置页新增「Root 注入模式」总开关：开启（默认）= Root 模式，应用通过 su 自动授予 android:mock_location 应用 op、恢复硬件高精度定位；关闭 = 免 Root 模式，应用完全不调用 su，仅依赖用户在【开发者选项】中手动把本应用勾选为「模拟位置信息应用」，随后用应用进程 LocationManager.addTestProvider 注入。\n\n2. 免 Root 模式下，下列行为一律不触发 Root 命令：启动时不自动授予模拟权限、停止模拟时不再调用 restoreScanningHardware、微信排查板块的一键关闭蓝牙 / Wi-Fi 与背景扫描改为跳转系统设置手动关闭、Root 权限状态与一键恢复高精度定位入口均提示「免 Root 模式」。\n\n3. Root 模式下若 LSPosed 已激活，仍自动叠加 system_server 框架层抗检测增强；LSPosed 与模式开关正交，单独控制。\n\n4. 防卡死：无论哪种模式，停止模拟 / 服务销毁 / 任务划掉均无条件执行 forceCleanAllTestProviders + flushRealLocation，清掉所有测试 Provider 并冲刷真实硬件定位，杜绝系统定位停留在伪造坐标（沿用 v1.4.5 修复）。切到免 Root 模式时若此前 Root 曾关闭扫描，会立即 restoreScanningHardware 把硬件复原。\n\n5. 路线模拟页的 Root 专属高阶仿真入口随模式开关联动显隐。\n\n本版与 v1.4.6 共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.6/FakeGPS-next-v1.4.6-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.7/FakeGPS-next-v1.4.7-release.apk"
 }

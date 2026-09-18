@@ -31,8 +31,8 @@ android {
         applicationId = "com.mockrun.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 23
-        versionName = "v1.4.6"
+        versionCode = 24
+        versionName = "v1.4.7"
         buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

@@ -8,6 +8,29 @@
 
 ---
 
+## [1.4.7] - 2026-09-18
+
+> 本版新增「Root 注入模式」总开关，将 Root 模式与免 Root 模式彻底分离。
+
+### 新增 (Added)
+
+- **「Root 注入模式」总开关（设置页）。** 开启（默认）= Root 模式：应用通过 su 自动授予 `android:mock_location` 应用 op、调用 `restoreScanningHardware()` 恢复硬件高精度定位；若 LSPosed 已激活，自动叠加 `system_server` 框架层抗检测增强。关闭 = 免 Root 模式：应用完全不调用 su，仅依赖用户在【开发者选项】中手动把本应用勾选为「模拟位置信息应用」，随后用应用进程 `LocationManager.addTestProvider` 注入（`PermissionHelper` 的开发者选项勾选校验保持不变，即"只有那个开发者选项里面的那个"）。
+- **新增 `InjectionMode` / `InjectionModePrefs`**（`fake_gps_injection_mode_prefs`，默认 `ROOT`），供界面与 ViewModel 统一读取模式。
+
+### 变更 (Changed)
+
+- 免 Root 模式下下列行为一律不触发 Root 命令：进入页面不再自动 `grantMockLocation`；`SimulationViewModel.stop*` 停止模拟时不再调用 `restoreScanningHardware()`；微信排查板块的「一键关闭蓝牙 / Wi-Fi 与背景扫描」改为跳转系统设置手动关闭；Root 权限状态行与「恢复系统高精度定位」入口均提示「免 Root 模式」。
+- 路线模拟页的 Root 专属高阶仿真入口（步频/计步、GPS 底层仿真与抗检测）随模式开关联动显隐。
+
+### 修复 (Fixed) / 安全
+
+- **防系统定位卡死（沿用 v1.4.5 修复并加固）。** 无论何种模式，停止模拟 / 服务销毁 / 任务划掉均无条件执行 `MockLocationEngine.forceCleanAllTestProviders` 与 `CoordinateConverter.flushRealLocation`，清掉全部测试 Provider 并冲刷真实硬件定位，杜绝系统定位停留在伪造坐标。切到免 Root 模式时若此前 Root 曾关闭硬件扫描，会立即 `restoreScanningHardware()` 把硬件复原。
+
+### 说明 (Notes)
+
+- LSPosed 开关与「Root 注入模式」开关正交：前者控制框架层抗检测增强，后者控制是否使用 Root 注入，两者独立。
+- 已通过编译验证；**未做真机验证**。
+
 ## [1.4.6] - 2026-09-18
 
 > 本版重做「微信/打卡软件仍显示真实位置」排查板块（虚拟定位页顶部横幅与弹窗），职责收敛为只做 Root 功能。

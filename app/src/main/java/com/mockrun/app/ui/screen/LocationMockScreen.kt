@@ -48,6 +48,8 @@ import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.PermissionHelper
+import com.mockrun.app.util.InjectionMode
+import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.util.logFailure
 import androidx.compose.ui.text.style.TextAlign
@@ -113,6 +115,9 @@ fun LocationMockScreen(
     var isLsposedHookActive by remember {
         mutableStateOf(XposedStatusHelper.isLsposedHookReallyActive(context))
     }
+    var isRootMode by remember {
+        mutableStateOf(InjectionModePrefs.isRootMode(context))
+    }
     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
     var isBatteryIgnoring by remember {
         mutableStateOf(
@@ -149,7 +154,8 @@ fun LocationMockScreen(
         isRootAvailable = rootBridge.isRootAvailable()
         isDevMockLocationEnabled = XposedStatusHelper.isMockLocationAppSelected(context)
         isLsposedHookActive = XposedStatusHelper.isLsposedHookReallyActive(context)
-        if (isRootAvailable) {
+        isRootMode = InjectionModePrefs.isRootMode(context)
+        if (isRootAvailable && isRootMode) {
             rootBridge.grantMockLocation(context.packageName)
         }
     }
@@ -602,6 +608,32 @@ fun LocationMockScreen(
 
             IosHairlineDivider(startIndent = 58.dp)
 
+            // Item 0.5: Injection Mode Switch (Root vs No-Root)
+            IosListRow(
+                title = "Root 注入模式",
+                subtitle = if (isRootMode) "已开启：自动配置模拟权限与硬件高精度定位" else "免 Root：仅依赖开发者选项模拟位置，不调用 Root",
+                icon = Icons.Default.Lock,
+                iconBackground = if (isRootMode) IosColors.SystemGreen else IosColors.SystemOrange,
+                trailingContent = {
+                    IosSwitch(
+                        checked = isRootMode,
+                        onCheckedChange = { enabled ->
+                            isRootMode = enabled
+                            InjectionModePrefs.setMode(
+                                context,
+                                if (enabled) InjectionMode.ROOT else InjectionMode.NO_ROOT
+                            )
+                            // 切到免 Root：把硬件恢复为正常高精度，避免定位卡在异常状态
+                            if (!enabled && isRootAvailable) {
+                                coroutineScope.launch { rootBridge.restoreScanningHardware() }
+                            }
+                        }
+                    )
+                }
+            )
+
+            IosHairlineDivider(startIndent = 58.dp)
+
             // Item 1: LSPosed
             IosListRow(
                 title = "LSPosed 系统框架",
@@ -625,18 +657,28 @@ fun LocationMockScreen(
             // Item 2: Root
             IosListRow(
                 title = "Root 权限状态",
-                subtitle = if (isRootAvailable) "已授权 · 硬件高精度模式" else "免 Root 模式",
+                subtitle = when {
+                    isRootMode && isRootAvailable -> "已授权 · 硬件高精度模式"
+                    isRootMode && !isRootAvailable -> "Root 模式已选 · 未检测到 Root 权限"
+                    else -> "免 Root 模式 · 仅开发者选项模拟位置"
+                },
                 icon = Icons.Default.CheckCircle,
-                iconBackground = if (isRootAvailable) IosColors.SystemGreen else IosColors.SystemOrange,
-                trailingText = if (isRootAvailable) "已授权" else "未检测到",
+                iconBackground = if (isRootMode && isRootAvailable) IosColors.SystemGreen else IosColors.SystemOrange,
+                trailingText = when {
+                    isRootMode && isRootAvailable -> "已授权"
+                    isRootMode && !isRootAvailable -> "未检测到"
+                    else -> "已关闭"
+                },
                 showChevron = true,
                 onClick = {
-                    if (isRootAvailable) {
+                    if (isRootMode && isRootAvailable) {
                         coroutineScope.launch {
                             rootBridge.restoreScanningHardware()
                             rootBridge.grantMockLocation(context.packageName)
                             Toast.makeText(context, "已配置底层模拟权限与高精度定位", Toast.LENGTH_SHORT).show()
                         }
+                    } else if (isRootAvailable) {
+                        Toast.makeText(context, "已切换为免 Root 模式，本应用不会调用 Root 注入", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, "免 Root 模式下可通过系统设置优化", Toast.LENGTH_SHORT).show()
                     }
@@ -741,13 +783,13 @@ fun LocationMockScreen(
         IosInsetGroupCard {
             IosListRow(
                 title = "恢复系统高精度定位",
-                subtitle = if (isRootAvailable) "配置模拟权限与 Wi-Fi/蓝牙辅助定位" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",
+                subtitle = if (isRootMode && isRootAvailable) "配置模拟权限与 Wi-Fi/蓝牙辅助定位" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",
                 icon = Icons.Default.Build,
-                iconBackground = if (isRootAvailable) IosColors.SystemGreen else IosColors.SystemBlue,
-                trailingText = if (isRootAvailable) "立即配置" else "使用指南",
+                iconBackground = if (isRootMode && isRootAvailable) IosColors.SystemGreen else IosColors.SystemBlue,
+                trailingText = if (isRootMode && isRootAvailable) "立即配置" else "使用指南",
                 showChevron = true,
                 onClick = {
-                    if (isRootAvailable) {
+                    if (isRootMode && isRootAvailable) {
                         coroutineScope.launch {
                             rootBridge.restoreScanningHardware()
                             rootBridge.grantMockLocation(context.packageName)
@@ -888,7 +930,7 @@ fun LocationMockScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                if (rootBridge.isRootAvailable()) {
+                                if (isRootMode && rootBridge.isRootAvailable()) {
                                     val ok = rootBridge.disableWifiBluetoothScan()
                                     if (ok) {
                                         Toast.makeText(context, "已关闭蓝牙 / Wi-Fi 与背景扫描", Toast.LENGTH_SHORT).show()
@@ -909,7 +951,7 @@ fun LocationMockScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (isRootAvailable) "一键关闭蓝牙 / Wi-Fi 与背景扫描" else "未 Root：去系统设置关闭扫描开关",
+                            if (isRootMode && isRootAvailable) "一键关闭蓝牙 / Wi-Fi 与背景扫描" else "去系统设置关闭扫描开关",
                             style = IosTypography.Caption1,
                             fontWeight = FontWeight.Bold
                         )

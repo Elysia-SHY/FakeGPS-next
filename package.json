@@ -1,6 +1,6 @@
 {
   "name": "fakegps-next",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "FakeGPS-next: Android System-Level Deep Hook Virtual Location & Route Simulation",
   "private": true,
   "author": "Elysia-SHY (https://github.com/Elysia-SHY)",

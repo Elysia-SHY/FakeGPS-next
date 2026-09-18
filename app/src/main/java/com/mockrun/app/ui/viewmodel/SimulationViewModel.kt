@@ -16,6 +16,7 @@ import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.location.SensorMockData
 import com.mockrun.app.location.SensorMockEngine
 import com.mockrun.app.location.SimulationStateRepository
+import com.mockrun.app.util.InjectionModePrefs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.mockrun.app.data.repository.MultiTargetRepository
 import com.mockrun.app.domain.model.MultiTargetRule
@@ -143,7 +144,7 @@ class SimulationViewModel @Inject constructor(
         com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
         com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
         viewModelScope.launch(Dispatchers.IO) {
-            if (rootBridge.isRootAvailable()) {
+            if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
                 rootBridge.restoreScanningHardware()
             }
         }
@@ -207,7 +208,7 @@ class SimulationViewModel @Inject constructor(
         com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
         com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
         viewModelScope.launch(Dispatchers.IO) {
-            if (rootBridge.isRootAvailable()) {
+            if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
                 rootBridge.restoreScanningHardware()
             }
         }

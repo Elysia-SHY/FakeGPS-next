@@ -40,6 +40,7 @@ import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.location.CadenceMode
 import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.location.SensorMockEngine
+import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.ui.theme.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
@@ -83,7 +84,7 @@ fun RouteSimulationScreen(
     }
 
     LaunchedEffect(Unit) {
-        isRootActive = rootBridge.isRootAvailable()
+        isRootActive = InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()
     }
 
     fun applySpeed(speed: Float) {
