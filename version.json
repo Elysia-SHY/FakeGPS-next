@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.9",
-  "versionCode": 26,
-  "releaseDate": "2026-09-18",
-  "releaseNotes": "修复 Root 模式仍被「需设置模拟位置应用」弹窗挡住的问题（v1.4.8 未彻底解决）：\n\n1. 根因定位：地图选点页与虚拟定位页各有一处独立的权限预检（MapScreen 的 ensurePermissionAndStart、LocationMockScreen 主控按钮），它们在调用 ViewModel 之前就自行判断权限并直接弹出引导对话框，v1.4.8 加到 ViewModel 里的自动授权根本没机会执行。\n\n2. 统一收口：SimulationViewModel 新增公开的 resolveInjectionPermission(context)，先按当前注入模式决定是否自动授予模拟权限（Root 模式：appops 授予 android:mock_location + 开启全局开发者选项开关；免 Root 模式：不动），再返回权限校验结果。地图选点页与虚拟定位页的预检全部改为在协程中调用它，不再各自为政。\n\n3. Root 检测加固：RootSuBridge.isRootAvailable() 改为始终直接尝试 su -c id（不再因固定路径下找不到 su 二进制就短路判为无 root），且只缓存「确认有 root」的结论、不再把一次失败永久缓存。修复 KernelSU 等 su 不在固定路径的机型被误判为无 root、从而 Root 模式从不自动授权的问题。\n\n4. 免 Root 模式行为不变：完全不调用 su，仍由用户在【开发者选项】手动勾选模拟位置应用。防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 forceCleanAllTestProviders + flushRealLocation。\n\n本版与 v1.4.8 共用同一签名密钥，可直接覆盖安装。",
+  "versionName": "v1.5.0",
+  "versionCode": 27,
+  "releaseDate": "2026-09-19",
+  "releaseNotes": "Root 模式权限链路重构与稳定性修复：\n\n1. 新增 PermissionCoordinator：把所有注入入口（地图选点页、虚拟定位页、路线页、摇杆服务）的注入前权限判定与自动授权统一收口，避免各页面各自判定产生行为分歧。\n\n2. 修复 Root 模式误弹「需设置模拟位置应用」：mock_location 应用 op 由 su 在外部进程写入，App 进程内 AppOpsManager 读取带缓存，授权后立刻校验会读到旧值而误判。现改为以 Root 授权命令的退出码为准直接放行，真正的兜底由注入时 MockLocationService.register（addTestProvider）把关。\n\n3. 授权命令健壮性：appops 与 settings put 分开执行、互不短路，并依次尝试 appops set / cmd appops set / appops set --uid 三种写法；settings put global development_settings_enabled 仅作尽力而为。\n\n4. 工程结构分层整理：core（data / designsystem / location）、feature（map / mock / route / settings）、ui（components / navigation / viewmodel）、hook、util。\n\n5. 免 Root 模式行为不变：完全不调用 su，仍由用户在【开发者选项】手动勾选模拟位置应用。防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 forceCleanAllTestProviders + flushRealLocation。\n\n本版与 v1.4.7 共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.9/FakeGPS-next-v1.4.9-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.5.0/FakeGPS-next-v1.5.0-release.apk"
 }
