@@ -9,7 +9,7 @@
 | **最新已发布版本** | `v1.4.6`（重做微信排查板块，只做 Root 关闭蓝牙/Wi-Fi 与背景扫描） |
 | **Android 内部版本** | `versionCode = 23` |
 | **Android 显示版本** | `versionName = "v1.4.6"` |
-| **本版产物提交** | 待 CI 提交构建产物后回填 |
+| **本版产物提交** | `6c5e34d`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.6-release.apk`） |
 | **相对 v1.4.5 差异** | 微信排查板块收敛为只做 Root「一键关闭蓝牙/Wi-Fi 与背景扫描」；移除微信强停/权限入口与免 Root 4 步；未 Root 引导跳转系统设置手动关扫描 |
 | **上一条已发布版本** | `v1.4.5`（tag `v1.4.5` → `7791b8f`，versionCode = 22） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
@@ -20,14 +20,16 @@
 
 ### v1.4.6 构建信息
 
-- **构建时间**：待 CI 构建（run 待回填）
+- **构建时间**：2026-09-18（CI run `35336174406`，10:48 UTC 完成）
 - **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
 - **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
 - **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
-- **APK 大小 / SHA-256**：待 CI 构建回填
+- **APK 大小**：3,907,144 bytes
+- **APK SHA-256**：`9f00144ed0cab0227aa1207d5a0e1a94f4dda79a2324633b0dcc6d928e1e6ebe`
 - **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.6
 - **签名证书**：与 v1.4.2 起同一张固定证书（CN=FakeGPS-next），可直接覆盖安装 v1.4.5
 - **本次改动要点**：微信排查板块收敛为只做 Root「一键关闭蓝牙/Wi-Fi 与背景扫描」（`RootSuBridge.disableWifiBluetoothScan`）；移除微信强停/权限入口与免 Root 4 步；未 Root 引导跳转系统设置手动关扫描
+- **编译/构建验证**：CI `assembleRelease` 通过；**未做真机验证**
 
 ### v1.4.5 构建信息
 
