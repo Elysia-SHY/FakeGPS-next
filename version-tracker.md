@@ -9,7 +9,7 @@
 | **最新已发布版本** | `v1.4.4`（由 `d294304` 上的 Hook 改动触发构建） |
 | **Android 内部版本** | `versionCode = 21` |
 | **Android 显示版本** | `versionName = "v1.4.4"` |
-| **本版产物提交** | 待 CI 提交构建产物后回填 |
+| **本版产物提交** | `0f52f6b`（= tag `v1.4.4`，CI 提交构建产物） |
 | **相对 v1.4.3 差异** | 只改系统层 Hook：Provider 状态查询、注册登记、硬件静默时主动喂点、伪造点零值补齐 |
 | **上一条已发布版本** | `v1.4.3`（tag `v1.4.3` → `cbb1edd`，versionCode = 20） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
@@ -17,6 +17,18 @@
 | **仓库内 Release 产物** | `FakeGPS-next-v1.4.4-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.4.4 构建信息
+
+- **构建时间**：2026-09-18（由 CI 产出，run `35319615574`）
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK 大小**：3,906,652 bytes
+- **APK SHA-256**：`03a4c3489967a05131b5b8863440f0f7ec5f1ae55fcf51f1a8fa163c3bac82cb`
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.4
+- **签名证书**：`CN=FakeGPS-next, OU=CI Release, O=Elysia-SHY, C=CN`（与 v1.4.2 同一张证书，可直接覆盖安装）
+- **编译验证**：`./gradlew :app:compileDebugKotlin` 通过；**未做真机验证**
 
 ### v1.4.3 构建信息
 
