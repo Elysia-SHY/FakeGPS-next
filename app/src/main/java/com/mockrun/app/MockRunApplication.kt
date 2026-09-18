@@ -1,7 +1,7 @@
-package com.mockrun.app
+﻿package com.mockrun.app
 
 import android.app.Application
-import com.mockrun.app.location.RootSuBridge
+import com.mockrun.app.core.location.RootSuBridge
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
 import dagger.hilt.android.HiltAndroidApp

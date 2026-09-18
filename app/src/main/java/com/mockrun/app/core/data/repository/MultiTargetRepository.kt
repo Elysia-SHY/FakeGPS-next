@@ -1,0 +1,265 @@
+﻿package com.mockrun.app.core.data.repository
+
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import android.provider.Settings
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.mockrun.app.domain.model.MultiTargetRule
+import com.mockrun.app.domain.model.TargetMockMode
+import com.mockrun.app.core.location.RootSuBridge
+import com.mockrun.app.util.Diag
+import com.mockrun.app.util.logFailure
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.lang.reflect.Type
+import javax.inject.Inject
+import javax.inject.Singleton
+
+data class InstalledAppItem(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable?,
+    val isSystem: Boolean = false,
+    val userId: Int = 0
+)
+
+@Singleton
+class MultiTargetRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val rootBridge: RootSuBridge
+) {
+    companion object {
+        private const val TAG = "MultiTargetRepo"
+        private const val PREFS_NAME = "multi_target_prefs"
+        private const val KEY_RULES_JSON = "key_rules_json"
+        const val SETTINGS_GLOBAL_KEY = "fake_gps_multitarget"
+        const val SYSTEM_FILE_PATH = "/data/system/fake_gps_multitarget.json"
+        const val LOCAL_TMP_FILE_PATH = "/data/local/tmp/fake_gps_multitarget.json"
+
+        /**
+         * `List<MultiTargetRule>` 的泛型类型，运行时显式组装。
+         *
+         * 不能写成 `object : TypeToken<List<MultiTargetRule>>() {}`：该匿名子类在
+         * release 构建被 R8 处理后泛型签名丢失，Gson 会抛
+         * `IllegalStateException: TypeToken must be created with a type argument`。
+         * 此处虽有 runCatching 兜底不会终止进程，但分流规则会整批读不出来。
+         */
+        private val RULE_LIST_TYPE: Type =
+            TypeToken.getParameterized(List::class.java, MultiTargetRule::class.java).type
+    }
+
+    private val gson = Gson()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val _rules = MutableStateFlow<List<MultiTargetRule>>(emptyList())
+    val rules: StateFlow<List<MultiTargetRule>> = _rules.asStateFlow()
+
+    init {
+        loadRules()
+    }
+
+    private fun loadRules() {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val json = sp.getString(KEY_RULES_JSON, null)
+        if (!json.isNullOrEmpty()) {
+            runCatching {
+                val list: List<MultiTargetRule> = gson.fromJson(json, RULE_LIST_TYPE)
+                _rules.value = list
+                com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
+            }.logFailure(
+                TAG,
+                "parse saved multi-target rules — stored routing config not applied, list will look empty"
+            )
+        }
+    }
+
+    fun addOrUpdateRule(rule: MultiTargetRule) {
+        val current = _rules.value.toMutableList()
+        val index = current.indexOfFirst { it.key == rule.key }
+        if (index >= 0) {
+            current[index] = rule
+        } else {
+            current.add(rule)
+        }
+        persistRules(current)
+    }
+
+    fun removeRule(key: String) {
+        val current = _rules.value.filterNot { it.key == key }
+        persistRules(current)
+    }
+
+    fun toggleRule(key: String, isEnabled: Boolean) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(isEnabled = isEnabled) else it
+        }
+        persistRules(current)
+    }
+
+    fun updateCoordinates(key: String, lat: Double, lon: Double) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(latitude = lat, longitude = lon) else it
+        }
+        persistRules(current)
+    }
+
+    fun setRuleMode(key: String, mode: TargetMockMode) {
+        val current = _rules.value.map {
+            if (it.key == key) it.copy(mode = mode) else it
+        }
+        persistRules(current)
+    }
+
+    private fun persistRules(list: List<MultiTargetRule>) {
+        _rules.value = list
+        val json = gson.toJson(list)
+
+        // 1. In-process HookStateBridge (Instant for ContentProvider queries)
+        com.mockrun.app.hook.HookStateBridge.setMultiTargetRules(json)
+
+        // 2. Multi-target SharedPreferences
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_RULES_JSON, json)
+            .apply()
+
+        // 3. XSharedPreferences compatible shared_prefs ("hook_config") with world-readable permissions
+        runCatching {
+            val hookSp = context.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
+            hookSp.edit()
+                .putString("multitarget_rules_json", json)
+                .putInt("multitarget_rules_count", list.size)
+                .apply()
+            val prefsFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
+            if (prefsFile.exists()) {
+                // Readable by others on purpose (the hook reads it from arbitrary processes).
+                // Writable by others is not granted — see HookConfigProvider for the same reasoning.
+                prefsFile.setReadable(true, false)
+            }
+        }.logFailure(TAG, "write multi-target rules into XSharedPreferences (hook_config)", Diag.Level.DEBUG)
+
+        // 4. Settings.Global (Zero-IPC fast channel)
+        runCatching {
+            Settings.Global.putString(context.contentResolver, SETTINGS_GLOBAL_KEY, json)
+        }.logFailure(TAG, "write multi-target rules into Settings.Global", Diag.Level.DEBUG)
+
+        // 5. Local Cache File
+        runCatching {
+            val cacheFile = java.io.File(context.cacheDir, "multitarget_rules.json")
+            cacheFile.writeText(json)
+            cacheFile.setReadable(true, false)
+        }.logFailure(TAG, "write multi-target rules cache file", Diag.Level.DEBUG)
+
+        // 6. Asynchronous Root push to system_server directories
+        scope.launch {
+            if (rootBridge.isRootAvailable()) {
+                val escapedJson = json.replace("'", "'\\''")
+                val ver = System.currentTimeMillis()
+                val cmd = buildString {
+                    append("echo '$escapedJson' > $SYSTEM_FILE_PATH 2>/dev/null; ")
+                    // 0644 rather than 0666: the hook must be able to READ these from any process,
+                    // but with 0666 any app on the device could rewrite the routing rules.
+                    append("chmod 644 $SYSTEM_FILE_PATH 2>/dev/null; ")
+                    append("echo '$escapedJson' > $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
+                    append("chmod 644 $LOCAL_TMP_FILE_PATH 2>/dev/null; ")
+                    append("settings put global $SETTINGS_GLOBAL_KEY '$escapedJson' 2>/dev/null; ")
+                    append("setprop debug.fakegps.multitarget 1 2>/dev/null; ")
+                    append("setprop debug.fakegps.rules_ver $ver 2>/dev/null")
+                }
+                rootBridge.executeCommand(cmd)
+            }
+        }
+    }
+
+    /**
+     * Query all installed applications to populate the application selector.
+     * Prioritizes user applications over system applications and guarantees complete enumeration.
+     */
+    suspend fun getInstalledUserApps(): List<InstalledAppItem> = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
+        val items = mutableListOf<InstalledAppItem>()
+        val seenPackages = mutableSetOf<String>()
+
+        // 1. Query all launchable activities
+        val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN, null).apply {
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = runCatching {
+            pm.queryIntentActivities(mainIntent, 0)
+        }.logFailure(TAG, "query launchable activities for the app picker", Diag.Level.DEBUG)
+            .getOrDefault(emptyList())
+
+        for (resolve in resolveInfos) {
+            val pkg = resolve.activityInfo?.packageName ?: continue
+            if (pkg == context.packageName) continue // Skip Fake GPS itself
+            if (seenPackages.add(pkg)) {
+                val appName = runCatching { resolve.loadLabel(pm).toString() }
+                    .logFailure(TAG, "load app label for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
+                    ?.takeIf { it.isNotBlank() } ?: pkg
+                val icon = runCatching { resolve.loadIcon(pm) }
+                    .logFailure(TAG, "load app icon for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
+                val appInfo = resolve.activityInfo?.applicationInfo
+                val isSystem = if (appInfo != null) {
+                    ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0) &&
+                            ((appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0)
+                } else false
+
+                items.add(
+                    InstalledAppItem(
+                        packageName = pkg,
+                        appName = appName,
+                        icon = icon,
+                        isSystem = isSystem,
+                        userId = 0
+                    )
+                )
+            }
+        }
+
+        // 2. Query all installed applications to discover apps without standard launcher entry
+        val allInstalled = runCatching {
+            pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        }.logFailure(TAG, "enumerate installed applications", Diag.Level.DEBUG)
+            .getOrDefault(emptyList())
+
+        for (appInfo in allInstalled) {
+            val pkg = appInfo.packageName ?: continue
+            if (pkg == context.packageName) continue
+            if (seenPackages.add(pkg)) {
+                val isSystem = ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0) &&
+                        ((appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0)
+                val appName = runCatching { pm.getApplicationLabel(appInfo).toString() }
+                    .logFailure(TAG, "load application label for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
+                    ?.takeIf { it.isNotBlank() } ?: pkg
+                val icon = runCatching { pm.getApplicationIcon(appInfo) }
+                    .logFailure(TAG, "load application icon for $pkg", Diag.Level.DEBUG)
+                    .getOrNull()
+
+                items.add(
+                    InstalledAppItem(
+                        packageName = pkg,
+                        appName = appName,
+                        icon = icon,
+                        isSystem = isSystem,
+                        userId = 0
+                    )
+                )
+            }
+        }
+
+        // Prioritize non-system (user-installed) apps first, then alphabetical
+        items.sortedWith(
+            compareBy<InstalledAppItem> { it.isSystem }
+                .thenBy { it.appName.lowercase() }
+        )
+    }
+}

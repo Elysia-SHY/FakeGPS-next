@@ -16,9 +16,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mockrun.app.ui.theme.IosColors
-import com.mockrun.app.ui.theme.IosFrostedCapsule
-import com.mockrun.app.ui.theme.IosGray
+import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosFrostedCapsule
+import com.mockrun.app.core.designsystem.IosGray
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
 

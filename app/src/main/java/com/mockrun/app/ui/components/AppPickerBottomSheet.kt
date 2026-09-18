@@ -1,4 +1,4 @@
-package com.mockrun.app.ui.components
+﻿package com.mockrun.app.ui.components
 
 import android.graphics.drawable.Drawable
 import androidx.compose.animation.AnimatedVisibility
@@ -30,10 +30,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-import com.mockrun.app.data.repository.InstalledAppItem
+import com.mockrun.app.core.data.repository.InstalledAppItem
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
-import com.mockrun.app.ui.theme.*
+import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.Dispatchers

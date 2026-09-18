@@ -1,4 +1,4 @@
-package com.mockrun.app.ui.components
+﻿package com.mockrun.app.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -23,9 +23,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mockrun.app.ui.theme.IosColors
-import com.mockrun.app.ui.theme.bouncyClickable
-import com.mockrun.app.ui.theme.liquidGlass
+import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.bouncyClickable
+import com.mockrun.app.core.designsystem.liquidGlass
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt

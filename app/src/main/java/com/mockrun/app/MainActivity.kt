@@ -10,7 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.mockrun.app.ui.navigation.AppNavigation
-import com.mockrun.app.ui.theme.MockRunTheme
+import com.mockrun.app.core.designsystem.MockRunTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

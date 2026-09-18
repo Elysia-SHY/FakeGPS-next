@@ -10,15 +10,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.SimulationState
-import com.mockrun.app.location.CadenceMode
-import com.mockrun.app.location.MockLocationService
-import com.mockrun.app.location.RootSuBridge
-import com.mockrun.app.location.SensorMockData
-import com.mockrun.app.location.SensorMockEngine
-import com.mockrun.app.location.SimulationStateRepository
+import com.mockrun.app.core.location.CadenceMode
+import com.mockrun.app.core.location.MockLocationService
+import com.mockrun.app.core.location.RootSuBridge
+import com.mockrun.app.core.location.SensorMockData
+import com.mockrun.app.core.location.SensorMockEngine
+import com.mockrun.app.core.location.SimulationStateRepository
 import com.mockrun.app.util.InjectionModePrefs
+import com.mockrun.app.core.location.PermissionCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
-import com.mockrun.app.data.repository.MultiTargetRepository
+import com.mockrun.app.core.data.repository.MultiTargetRepository
 import com.mockrun.app.domain.model.MultiTargetRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +33,8 @@ class SimulationViewModel @Inject constructor(
     private val stateRepo: SimulationStateRepository,
     val sensorEngine: SensorMockEngine,
     val rootBridge: RootSuBridge,
-    val multiTargetRepo: MultiTargetRepository
+    val multiTargetRepo: MultiTargetRepository,
+    val permissionCoordinator: PermissionCoordinator
 ) : ViewModel() {
 
     val state: StateFlow<SimulationState> = stateRepo.state
@@ -123,10 +125,10 @@ class SimulationViewModel @Inject constructor(
         com.mockrun.app.hook.HookStateBridge.update(context, true, latitude, longitude)
 
         if (stateRepo.isJoystickActive.value) {
-            val intent = Intent(context, com.mockrun.app.location.FloatingJoystickService::class.java).apply {
-                action = com.mockrun.app.location.FloatingJoystickService.ACTION_SET_LOCATION
-                putExtra(com.mockrun.app.location.FloatingJoystickService.EXTRA_LATITUDE, latitude)
-                putExtra(com.mockrun.app.location.FloatingJoystickService.EXTRA_LONGITUDE, longitude)
+            val intent = Intent(context, com.mockrun.app.core.location.FloatingJoystickService::class.java).apply {
+                action = com.mockrun.app.core.location.FloatingJoystickService.ACTION_SET_LOCATION
+                putExtra(com.mockrun.app.core.location.FloatingJoystickService.EXTRA_LATITUDE, latitude)
+                putExtra(com.mockrun.app.core.location.FloatingJoystickService.EXTRA_LONGITUDE, longitude)
             }
             context.startService(intent)
         } else {
@@ -143,8 +145,8 @@ class SimulationViewModel @Inject constructor(
     fun stopPointMock(context: Context) {
         stateRepo.setPointMock(false)
         com.mockrun.app.hook.HookStateBridge.update(context, false)
-        com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
-        com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
+        com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+        com.mockrun.app.core.location.CoordinateConverter.flushRealLocation(context)
         viewModelScope.launch(Dispatchers.IO) {
             if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
                 rootBridge.restoreScanningHardware()
@@ -157,9 +159,9 @@ class SimulationViewModel @Inject constructor(
     }
 
     fun setJoystickSize(context: Context, sizeDp: Int) {
-        val intent = Intent(context, com.mockrun.app.location.FloatingJoystickService::class.java).apply {
-            action = com.mockrun.app.location.FloatingJoystickService.ACTION_SET_SIZE
-            putExtra(com.mockrun.app.location.FloatingJoystickService.EXTRA_SIZE_DP, sizeDp)
+        val intent = Intent(context, com.mockrun.app.core.location.FloatingJoystickService::class.java).apply {
+            action = com.mockrun.app.core.location.FloatingJoystickService.ACTION_SET_SIZE
+            putExtra(com.mockrun.app.core.location.FloatingJoystickService.EXTRA_SIZE_DP, sizeDp)
         }
         context.startService(intent)
     }
@@ -183,7 +185,7 @@ class SimulationViewModel @Inject constructor(
             stopPointMock(context)
         }
         if (stateRepo.isJoystickActive.value) {
-            context.stopService(Intent(context, com.mockrun.app.location.FloatingJoystickService::class.java))
+            context.stopService(Intent(context, com.mockrun.app.core.location.FloatingJoystickService::class.java))
         }
 
         stateRepo.prepareRoute(route)
@@ -199,17 +201,11 @@ class SimulationViewModel @Inject constructor(
     }
 
     /**
-     * Root 模式下先自动授予模拟权限（`android:mock_location` app-op + 全局开发者选项开关），
-     * 再返回权限校验结果；免 Root 模式直接返回校验结果，仅依赖用户在开发者选项手动勾选。
-     *
-     * 所有注入入口（本 ViewModel、地图选点页的 `ensurePermissionAndStart`、虚拟定位页主控按钮）
-     * 都统一走这里，保证 Root 模式不会被「需设置模拟位置应用」的权限门挡住。UI 侧需在协程中调用。
+     * 统一权限与注入环境校验入口。
+     * 由 PermissionCoordinator 统一处理 Root 自动授权时序、appops 命令及免 Root 引导。
      */
     suspend fun resolveInjectionPermission(context: Context): com.mockrun.app.util.PermissionIssueType {
-        if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
-            rootBridge.grantMockLocation(context.packageName)
-        }
-        return com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
+        return permissionCoordinator.resolvePermission(context)
     }
 
     fun pauseSimulation(context: Context) {
@@ -222,8 +218,8 @@ class SimulationViewModel @Inject constructor(
 
     fun stopSimulation(context: Context) {
         com.mockrun.app.hook.HookStateBridge.update(context, false)
-        com.mockrun.app.location.MockLocationEngine.forceCleanAllTestProviders(context)
-        com.mockrun.app.location.CoordinateConverter.flushRealLocation(context)
+        com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+        com.mockrun.app.core.location.CoordinateConverter.flushRealLocation(context)
         viewModelScope.launch(Dispatchers.IO) {
             if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
                 rootBridge.restoreScanningHardware()

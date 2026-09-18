@@ -82,7 +82,7 @@
 
         <!-- Mock Location Foreground Service (stopWithTask=false ensures survival when swiped away) -->
         <service
-            android:name=".location.MockLocationService"
+            android:name=".core.location.MockLocationService"
             android:enabled="true"
             android:exported="false"
             android:stopWithTask="false"
@@ -90,7 +90,7 @@
 
         <!-- Floating Joystick Foreground Service -->
         <service
-            android:name=".location.FloatingJoystickService"
+            android:name=".core.location.FloatingJoystickService"
             android:enabled="true"
             android:exported="false"
             android:stopWithTask="false"
@@ -106,7 +106,7 @@
              MockLocationService via startService() directly — so nothing in-process depends on
              being able to send here. -->
         <receiver
-            android:name=".location.AdbCommandReceiver"
+            android:name=".core.location.AdbCommandReceiver"
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.WRITE_SECURE_SETTINGS">

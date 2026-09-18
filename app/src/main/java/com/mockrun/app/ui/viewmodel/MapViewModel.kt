@@ -1,9 +1,9 @@
-package com.mockrun.app.ui.viewmodel
+﻿package com.mockrun.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mockrun.app.data.parser.GpxParser
-import com.mockrun.app.data.repository.RouteRepository
+import com.mockrun.app.core.data.parser.GpxParser
+import com.mockrun.app.core.data.repository.RouteRepository
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.util.Diag
@@ -14,11 +14,11 @@ import kotlinx.coroutines.launch
 import java.io.InputStream
 import javax.inject.Inject
 
-import com.mockrun.app.location.LocationSearchService
-import com.mockrun.app.location.SearchResultItem
-import com.mockrun.app.location.RoadRoutingHelper
-import com.mockrun.app.location.RoadRouteResult
-import com.mockrun.app.location.RoadMode
+import com.mockrun.app.core.location.LocationSearchService
+import com.mockrun.app.core.location.SearchResultItem
+import com.mockrun.app.core.location.RoadRoutingHelper
+import com.mockrun.app.core.location.RoadRouteResult
+import com.mockrun.app.core.location.RoadMode
 
 @HiltViewModel
 class MapViewModel @Inject constructor(

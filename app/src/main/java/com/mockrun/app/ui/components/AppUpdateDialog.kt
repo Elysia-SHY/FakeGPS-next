@@ -1,4 +1,4 @@
-package com.mockrun.app.ui.components
+﻿package com.mockrun.app.ui.components
 
 import android.content.Intent
 import android.net.Uri
@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.mockrun.app.data.repository.DownloadStatus
-import com.mockrun.app.data.repository.RemoteReleaseInfo
-import com.mockrun.app.data.repository.VersionSyncManager
-import com.mockrun.app.ui.theme.IosColors
-import com.mockrun.app.ui.theme.liquidGlass
+import com.mockrun.app.core.data.repository.DownloadStatus
+import com.mockrun.app.core.data.repository.RemoteReleaseInfo
+import com.mockrun.app.core.data.repository.VersionSyncManager
+import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.util.Diag
 
 @Composable

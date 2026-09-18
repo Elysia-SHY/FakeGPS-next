@@ -1,4 +1,4 @@
-package com.mockrun.app.ui.components
+﻿package com.mockrun.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -22,9 +22,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.domain.model.Route
-import com.mockrun.app.ui.theme.IosColors
-import com.mockrun.app.ui.theme.IosTypography
-import com.mockrun.app.ui.theme.bouncyClickable
+import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosTypography
+import com.mockrun.app.core.designsystem.bouncyClickable
 
 /**
  * 收藏夹的两种视图。

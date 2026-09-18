@@ -3,8 +3,8 @@
 import android.content.Context
 import androidx.room.Room
 import com.google.gson.Gson
-import com.mockrun.app.data.db.RouteDao
-import com.mockrun.app.data.db.RouteDatabase
+import com.mockrun.app.core.data.db.RouteDao
+import com.mockrun.app.core.data.db.RouteDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
