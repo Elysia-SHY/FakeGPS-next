@@ -8,6 +8,25 @@
 
 ---
 
+## [1.5.0] - 2026-09-19
+
+> 修复 Root 模式下「点开启仍弹需设置模拟位置应用」的真凶（v1.4.9 仍未解决）：授权命令写入的是外部进程的 app-op，而 App 进程内读取带缓存。
+
+### 修复 (Fixed)
+
+- **app-op 读取缓存导致误判弹窗。** `mock_location` app-op 由 root（su）在外部进程写入，App 进程内 `AppOpsManager` 的读取结果在写入后一段时间内可能仍是旧值。授权完成后立刻校验会误判「未设置模拟位置应用」并弹窗，稍后缓存刷新设置页又显示「已勾选」——即「设置页已勾选、一点开启就弹窗」。`resolveInjectionPermission` 现改为 Root 模式下**以 root 授权命令的退出码为准**直接放行；真正的兜底交给注入时 `MockLocationService.register()`（`addTestProvider`），底层确实不可用时给出明确报错。
+- **授权命令不再短路。** `grantMockLocation` 不再用 `&&` 串联 `settings put global development_settings_enabled 1` 与 `appops set`（前者被 ROM 拒绝会导致后者永不执行）。现改为分开执行：`appops` 依次尝试 `appops set` / `cmd appops set` / `appops set --uid` 三种写法，任一成功即算授予；`settings put` 仅作尽力而为，失败不影响 app-op。
+
+### 变更 (Changed)
+
+- 设置页「开发者选项模拟位置」一行在 Root 模式下的文案由「Root 已自动授权」改为「Root 已代为设置 · 无需你手动打开开发者选项」，明确是 App 代设、用户无需操作。
+
+### 说明 (Notes)
+
+- **机制澄清**：本应用走标准 `addTestProvider` 通道，Android 将该通道锁在 `android:mock_location` app-op（即开发者选项的「模拟位置应用」）上，Root 的职责就是替你点好这个标记；LSPosed 是其后叠加的抗检测层，不替代注入通道。想完全不设该标记，需要自研 `system_server` 层注入引擎（相当于自带一个 LSP 框架），属另一量级工程。
+- 防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 `forceCleanAllTestProviders` + `flushRealLocation`。
+- 已通过编译验证；**未做真机验证**（本机无 Android 设备）。
+
 ## [1.4.9] - 2026-09-18
 
 > 本版彻底修复 Root 模式仍弹「需设置模拟位置应用」引导的问题：v1.4.8 只改了 ViewModel 的校验前授权，但两处 UI 预检在调用 ViewModel 之前就自行弹窗，导致自动授权从未执行。

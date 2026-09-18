@@ -6,17 +6,26 @@
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.9`（统一权限校验入口，彻底修复 Root 模式仍弹「需设置模拟位置应用」） |
-| **Android 内部版本** | `versionCode = 26` |
-| **Android 显示版本** | `versionName = "v1.4.9"` |
-| **本版产物提交** | `eface1aa`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.9-release.apk`，tag `v1.4.9` 指向它） |
-| **相对 v1.4.8 差异** | 新增 `SimulationViewModel.resolveInjectionPermission()` 统一权限入口，MapScreen `ensurePermissionAndStart` 与 LocationMockScreen 主控按钮的独立预检改为调用它（此前绕过了 ViewModel 的自动授权）；`RootSuBridge.isRootAvailable()` 改为始终 `su -c id` 判定且只缓存正向结论 |
-| **上一条已发布版本** | `v1.4.8`（tag `v1.4.8` → `62e6c22`，versionCode = 25） |
+| **最新已发布版本** | `v1.5.0`（修复 app-op 读取缓存导致 Root 模式误弹「需设置模拟位置应用」） |
+| **Android 内部版本** | `versionCode = 27` |
+| **Android 显示版本** | `versionName = "v1.5.0"` |
+| **本版产物提交** | 待 CI 构建回填 |
+| **相对 v1.4.7 差异** | `resolveInjectionPermission` 在 Root 模式下以 root 授权命令退出码为准放行（规避 AppOpsManager 读缓存误判）；`grantMockLocation` 分离 `settings put` 与 `appops set` 并支持三种 appops 写法；`isRootAvailable()` 改为始终 `su -c id` 判定；两处 UI 预检统一走 `resolveInjectionPermission` |
+| **上一条已发布版本** | `v1.4.7`（tag `v1.4.7` → `6f1e0cd`，versionCode = 24）。**v1.4.8 / v1.4.9 已于 2026-09-19 删除（Release 与 tag 一并移除）**，因均未解决 Root 模式弹窗问题 |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.9-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.9-release.apk`（待回提，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.5.0-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.5.0-release.apk`（待回提，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.5.0 构建信息（待 CI 构建）
+
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.5.0
+- **本次改动要点**：`SimulationViewModel.resolveInjectionPermission` 在 Root 模式下改为以 `grantMockLocation` 的返回值放行（不再立刻用 `checkPrimaryPermissions` 读可能过期的 AppOps 缓存）；`RootSuBridge.grantMockLocation` 去掉 `&&` 串联，`appops` 依次尝试三种写法、`settings put` 独立尽力而为；`LocationMockScreen` 文案由「Root 已自动授权」改为「Root 已代为设置 · 无需你手动打开开发者选项」。防卡死逻辑未改动。
+- **编译/构建验证**：CI `assembleRelease` 通过后回填 SHA-256 与 run id；**未做真机验证**
 
 ### v1.4.9 构建信息
 
