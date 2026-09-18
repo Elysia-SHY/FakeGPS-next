@@ -1,1 +1,1 @@
-1d79a9e1918cfe3bc79cea0e6b38f620cc27aaf1852a54493e815f04c3db99f3  FakeGPS-next-v1.4.3-release.apk
+03a4c3489967a05131b5b8863440f0f7ec5f1ae55fcf51f1a8fa163c3bac82cb  FakeGPS-next-v1.4.4-release.apk
