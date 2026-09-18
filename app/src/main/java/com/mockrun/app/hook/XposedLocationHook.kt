@@ -32,6 +32,15 @@ data class SpoofLocation(
 /** Logcat/Xposed tag for this hook. Kept short — it appears in `system_server` logs. */
 private const val TAG = "LocationHook"
 
+/**
+ * 硬件侧超过这个时长没有任何一次真实分发，就判定为"静默"（GPS 关闭、室内无信号、
+ * 或 ROM 根本不上报），此时开始主动向已注册的分发对象喂点。
+ */
+private const val PUSH_IDLE_THRESHOLD_MS = 2_000L
+
+/** 主动喂点的间隔。 */
+private const val PUSH_INTERVAL_MS = 1_000L
+
 class XposedLocationHook : IXposedHookLoadPackage {
 
     private var xSharedPrefs: XSharedPreferences? = null
@@ -41,6 +50,26 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private var lastSpoofedLocation: Location? = null
     @Volatile
     private var currentProcessPackage: String = ""
+
+    /**
+     * 已注册的定位分发对象（`LocationManagerService$Receiver` / `LocationProviderManager$*Registration`）。
+     *
+     * 弱引用：这些对象由 system_server 自己持有，进程内数量随应用注册/注销变化，用强引用会阻止 GC 并
+     * 让已销毁的注册者继续被喂点。随 GC 自动失效正好符合"注销即停止"的语义。
+     */
+    private val dispatchTargets: MutableSet<Any> = java.util.Collections.synchronizedSet(
+        java.util.Collections.newSetFromMap(java.util.WeakHashMap<Any, Boolean>())
+    )
+
+    /** 各 AOSP 版本里"把定位结果交给某个注册者"的方法名不同，逐个尝试。 */
+    private val dispatchMethodNames = listOf("acceptLocationChange", "onLocationChanged", "callLocationChangedLocked")
+
+    /** 最近一次成功分发的时间（elapsedRealtime）。为 0 表示还没有过任何分发。 */
+    @Volatile
+    private var lastDispatchAt: Long = 0L
+
+    @Volatile
+    private var pushThreadStarted = false
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName ?: return
@@ -128,6 +157,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
         // 1.6 Hook System-level GNSS Status (Synthesize BDS/GPS Constellation)
         hookSystemGnssStatus(lpparam)
+
+        // 1.7 Provider 状态查询 + 注册登记（伪造状态下让"GPS 已开启"成立，并记住分发对象）
+        hookLmsProviderState(lpparam)
+
+        // 1.8 硬件静默时的主动喂点线程（常驻守护线程，只在需要时才真正推送）
+        startProactivePush()
     }
 
     private fun hookSystemGnssStatus(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -478,6 +513,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             if (receiverClass != null) {
                 XposedBridge.hookAllMethods(receiverClass, "callLocationChangedLocked", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        dispatchTargets.add(param.thisObject)
+                        lastDispatchAt = SystemClock.elapsedRealtime()
                         val (targetPkg, targetUid) = extractIdentityFromObject(param.thisObject)
                         val spoof = getActiveLocation(targetPkg, targetUid) ?: return
                         if (!spoof.isActive) return
@@ -516,6 +553,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
             runCatching {
                 val hookDispatch = object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
+                        dispatchTargets.add(param.thisObject)
+                        lastDispatchAt = SystemClock.elapsedRealtime()
                         val (targetPkg, targetUid) = extractIdentityFromObject(param.thisObject)
                         val spoof = getActiveLocation(targetPkg, targetUid) ?: return
                         if (!spoof.isActive) {
@@ -566,6 +605,154 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(locRegClass, "acceptLocationChange", hookDispatch)
                 XposedBridge.hookAllMethods(locRegClass, "onLocationChanged", hookDispatch)
             }.logFailure(TAG, "register dispatch hooks on ${locRegClass.name}")
+        }
+    }
+
+    private fun isLocationProviderName(name: String): Boolean =
+        name == LocationManager.GPS_PROVIDER ||
+            name == LocationManager.NETWORK_PROVIDER ||
+            name == LocationManager.PASSIVE_PROVIDER ||
+            name == "fused"
+
+    /**
+     * Provider 状态查询与注册登记。
+     *
+     * 只替换定位结果是不够的：相当一部分应用先查"GPS 是否可用 / 哪个 provider 最好"，查询失败就直接
+     * 不请求定位，伪造点根本没有机会被投递。所以伪造生效时必须让这几个查询返回一致的结果，否则会
+     * 出现"位置明明是对的，但某个应用不动"的现象。
+     */
+    private fun hookLmsProviderState(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val lmsClasses = listOfNotNull(
+            XposedHelpers.findClassIfExists("com.android.server.location.LocationManagerService", lpparam.classLoader),
+            XposedHelpers.findClassIfExists("com.android.server.LocationManagerService", lpparam.classLoader)
+        )
+        if (lmsClasses.isEmpty()) {
+            Diag.w(TAG, "provider-state hook: LocationManagerService not resolved on this ROM")
+            return
+        }
+
+        for (lmsClass in lmsClasses) {
+            // 1. isProviderEnabled / isProviderEnabledForUser
+            val enabledHook = object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (param.result !is Boolean) return
+                    val provider = param.args.firstOrNull { it is String } as? String ?: return
+                    if (!isLocationProviderName(provider)) return
+                    val spoof = getGlobalActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    param.result = true
+                }
+            }
+            runCatching { XposedBridge.hookAllMethods(lmsClass, "isProviderEnabled", enabledHook) }
+                .logFailure(TAG, "hook ${lmsClass.simpleName}.isProviderEnabled")
+            runCatching { XposedBridge.hookAllMethods(lmsClass, "isProviderEnabledForUser", enabledHook) }
+                .logFailure(TAG, "hook ${lmsClass.simpleName}.isProviderEnabledForUser")
+
+            // 2. getBestProvider：应用据此挑 provider，挑不到定位类 provider 就不会走到我们的分支
+            runCatching {
+                XposedBridge.hookAllMethods(lmsClass, "getBestProvider", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getGlobalActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        val current = param.result as? String
+                        if (current == null || !isLocationProviderName(current)) {
+                            param.result = LocationManager.GPS_PROVIDER
+                        }
+                    }
+                })
+            }.logFailure(TAG, "hook ${lmsClass.simpleName}.getBestProvider")
+
+            // 3. getProviders：保证列表里有 gps，否则部分应用认为"无可用 provider"直接放弃
+            runCatching {
+                XposedBridge.hookAllMethods(lmsClass, "getProviders", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val spoof = getGlobalActiveLocation() ?: return
+                        if (!spoof.isActive) return
+                        val raw = param.result as? List<*> ?: return
+                        val providers = ArrayList<String>()
+                        for (item in raw) {
+                            if (item is String) providers.add(item)
+                        }
+                        if (!providers.contains(LocationManager.GPS_PROVIDER)) {
+                            providers.add(LocationManager.GPS_PROVIDER)
+                            param.result = providers
+                        }
+                    }
+                })
+            }.logFailure(TAG, "hook ${lmsClass.simpleName}.getProviders")
+
+            // 4. requestLocationUpdatesLocked：注册阶段就把分发对象记下来。
+            //    只依赖分发钩子的话，硬件从不上报时我们永远拿不到这个对象，也就无从主动喂点。
+            runCatching {
+                XposedBridge.hookAllMethods(lmsClass, "requestLocationUpdatesLocked", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val registration = param.args.firstOrNull { arg ->
+                            arg != null && (
+                                arg.javaClass.name.contains("Receiver") ||
+                                    arg.javaClass.name.contains("Registration")
+                                )
+                        } ?: return
+                        dispatchTargets.add(registration)
+                    }
+                })
+            }.logFailure(TAG, "hook ${lmsClass.simpleName}.requestLocationUpdatesLocked")
+        }
+    }
+
+    /**
+     * 启动主动喂点线程。常驻守护线程，每 [PUSH_INTERVAL_MS] 醒来一次；没有可推送对象时不做任何事。
+     *
+     * 必要性：分发钩子是"来一个换一个"，依赖硬件真的上报。GPS 关闭、室内无信号、或 ROM 不上报时，
+     * 钩子一次都不触发，应用会一直停在旧坐标上。这条线程补的就是这个空档。
+     */
+    private fun startProactivePush() {
+        if (pushThreadStarted) return
+        pushThreadStarted = true
+        Thread({
+            while (true) {
+                runCatching { Thread.sleep(PUSH_INTERVAL_MS) }
+                    .logFailure(TAG, "proactive push: sleep interrupted", Diag.Level.DEBUG)
+                runCatching { pushSpoofedFixIfIdle() }
+                    .logFailure(TAG, "proactive push tick", Diag.Level.DEBUG)
+            }
+        }, "fakeloc-push").apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun pushSpoofedFixIfIdle() {
+        if (dispatchTargets.isEmpty()) return
+
+        // 硬件在正常上报时不要重复喂，否则等于把刷新率翻倍
+        val idleFor = SystemClock.elapsedRealtime() - lastDispatchAt
+        if (lastDispatchAt != 0L && idleFor < PUSH_IDLE_THRESHOLD_MS) return
+
+        loadMultiTargetRules()
+        for (target in dispatchTargets.toList()) {
+            runCatching {
+                val (pkg, uid) = extractIdentityFromObject(target)
+                val spoof = getActiveLocation(pkg, uid) ?: return@runCatching
+                if (!spoof.isActive) return@runCatching
+
+                val location = createSpoofedLocation(LocationManager.GPS_PROVIDER, spoof)
+                for (name in dispatchMethodNames) {
+                    val method = target.javaClass.declaredMethods
+                        .firstOrNull { it.name == name && it.parameterTypes.size == 1 } ?: continue
+                    val argType = method.parameterTypes[0]
+                    val arg = when {
+                        Location::class.java.isAssignableFrom(argType) -> location
+                        argType.name.contains("LocationResult") ->
+                            createLocationResult(argType, location) ?: continue
+                        else -> continue
+                    }
+                    method.isAccessible = true
+                    // 反射调用会再次进入本文件的分发钩子，把入参换成同一个伪造点，因此这一步是幂等的
+                    method.invoke(target, arg)
+                    lastDispatchAt = SystemClock.elapsedRealtime()
+                    break
+                }
+            }.logFailure(TAG, "proactive push to ${target.javaClass.simpleName}", Diag.Level.DEBUG)
         }
     }
 
@@ -1798,7 +1985,41 @@ class XposedLocationHook : IXposedHookLoadPackage {
             Diag.Level.DEBUG
         )
 
+        applyPlausibleDefaults(loc)
+
         lastSpoofedLocation = loc
         return loc
+    }
+
+    /**
+     * 把伪造点里"一眼假"的零值补成合理的默认量。
+     *
+     * 真实 GNSS 结果几乎不会出现 altitude / bearing / speed / accuracy 同时为 0，而配置里往往只有
+     * 经纬度，其余字段保持默认 0。部分地图与运动类应用据此判定"无效定位"并直接丢弃该点，表现为
+     * "坐标是对的，但对方不认"。另外 extras["satellites"] 是很多 ROM 与应用读取的卫星数，
+     * 缺省会让星数显示为 0。
+     */
+    private fun applyPlausibleDefaults(loc: Location) {
+        runCatching {
+            if (loc.altitude == 0.0) loc.altitude = 200.0
+            if (loc.bearing == 0f) loc.bearing = 1.2f
+            if (loc.speed == 0f) loc.speed = 1.2f
+            if (loc.accuracy == 0f) loc.accuracy = 3.0f
+
+            val extras = loc.extras ?: Bundle()
+            if (!extras.containsKey("satellites")) {
+                extras.putInt("satellites", 20)
+                loc.extras = extras
+            }
+
+            if (loc.time == 0L) loc.time = System.currentTimeMillis()
+            if (loc.elapsedRealtimeNanos == 0L) {
+                loc.elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+            }
+        }.logFailure(
+            TAG,
+            "apply plausible defaults — spoofed fix may keep zero-valued fields",
+            Diag.Level.DEBUG
+        )
     }
 }
