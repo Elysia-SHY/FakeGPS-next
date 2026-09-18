@@ -9,7 +9,7 @@
 | **最新已发布版本** | `v1.4.5`（修复 root 模式停止后的定位残留） |
 | **Android 内部版本** | `versionCode = 22` |
 | **Android 显示版本** | `versionName = "v1.4.5"` |
-| **本版产物提交** | 待 CI 提交构建产物后回填 |
+| **本版产物提交** | `7791b8f`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.5-release.apk`） |
 | **相对 v1.4.4 差异** | 划掉卡片不再自愈复活续租；伪造配置改用 elapsedRealtime 单调时钟租约判定是否过期 |
 | **上一条已发布版本** | `v1.4.4`（tag `v1.4.4` → `0f52f6b`，versionCode = 21） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
@@ -17,6 +17,19 @@
 | **仓库内 Release 产物** | `FakeGPS-next-v1.4.5-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.4.5 构建信息
+
+- **构建时间**：2026-09-18（CI run `35329693343`，09:31 UTC 完成）
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK 大小**：3,909,136 bytes
+- **APK SHA-256**：`360e7c535455b1bf45d8defb649a35362d7cb31f1bd260bc27a259aa7caa913a`
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.5
+- **签名证书**：`CN=FakeGPS-next, OU=CI Release, O=Elysia-SHY, C=CN`（与 v1.4.2 起同一张固定证书，可直接覆盖安装 v1.4.4）
+- **编译/构建验证**：CI `assembleRelease` 通过；**未做真机验证**
+- **本次修复要点**：划掉应用卡片不再自愈复活续租（真正停止并清理所有持久通道）；伪造配置改用 `elapsedRealtime` 单调时钟租约，重启后残留或系统时间倒退都不再被当成有效
 
 ### v1.4.4 构建信息
 
