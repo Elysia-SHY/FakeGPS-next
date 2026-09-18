@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.3",
-  "versionCode": 20,
-  "releaseDate": "2026-09-16",
-  "releaseNotes": "本版新增右上角收藏夹入口，把地点收藏与航线收藏分开呈现。\n\n1. 收藏夹入口：定位标签与路线标签的右上角工具胶囊里新增收藏夹按钮，紧邻底图切换按钮。此前收藏只能从底部面板的展开态里翻到，现在一次点按直达。\n\n2. 定位标签 → 地点收藏：列出所有以单点入库的收藏地点，条目显示 WGS-84 坐标；点按即把地图与十字准星移到该点并设为当前目标，不改动绘制航点与已选路线。\n\n3. 路线标签 → 航线收藏：列出手绘、GPX 导入与沿路规划的航线，条目显示折点数与总里程；点按即载入为当前路线，行为与路线库一致，并标注当前已载入的那条。\n\n4. 两类收藏同源，按航点数区分（收藏地点恒为 1 个航点，航线至少 2 个），因此无需给 RouteEntity 增加类型列与数据库迁移，升级不丢既有数据。\n\n5. 收藏夹弹层内可直接删除，带二次确认。\n\n沿用 v1.4.2 的两项修复：首页「收藏此点」失效、release 构建下「收藏路线」闪退。本版与 v1.4.2 使用同一签名密钥，可直接覆盖安装。",
+  "versionName": "v1.4.4",
+  "versionCode": 21,
+  "releaseDate": "2026-09-18",
+  "releaseNotes": "本版只改系统层 Hook，不动界面，解决「坐标是对的但目标应用不动」的三类情况。\n\n1. Provider 状态查询：伪造生效时 isProviderEnabled 与 isProviderEnabledForUser 返回已开启，getBestProvider 与 getProviders 保证 gps 在列。此前这些查询与伪造状态不一致，部分应用查完就判定无可用定位源，根本不发请求，伪造点也就没有投递机会。\n\n2. 注册登记：除分发钩子外，在 requestLocationUpdatesLocked 也记录分发对象。此前只有硬件真的上报过才能拿到这些对象。\n\n3. 主动喂点：GPS 关闭、室内无信号或 ROM 不上报时，守护线程按 1 秒间隔主动向各注册者推送伪造点；硬件正常上报时不重复推送，不改变原有刷新率。\n\n4. 伪造点补齐：海拔、方位角、速度为 0 时填入合理默认值，精度与时间戳同样补齐，并写入 extras 卫星数。真实卫星定位结果不会各项全为 0，全 0 会被部分应用判为无效定位而丢弃。\n\n稳定性：分发对象用弱引用保存，应用注销即停止推送；全部新增路径在 ROM 差异导致签名不匹配时退化为一条日志，不影响系统进程。本版与 v1.4.2 之后使用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.3/FakeGPS-next-v1.4.3-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.4/FakeGPS-next-v1.4.4-release.apk"
 }
