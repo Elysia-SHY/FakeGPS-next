@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.5",
-  "versionCode": 22,
+  "versionName": "v1.4.6",
+  "versionCode": 23,
   "releaseDate": "2026-09-18",
-  "releaseNotes": "本版修一个 root 模式下的残留问题：停止模拟后位置仍然停在伪造点，重启也不恢复。\n\n1. 关闭应用即真正停止。此前从最近任务划掉卡片会被当成进程被杀，服务自愈复活后继续写入伪造坐标，表现为「应用关了位置还是假的」。现在划掉卡片会停掉注入协程、把所有持久通道写成已停止，再结束前台服务。\n\n2. 伪造配置改用单调时钟租约。原先只靠系统时间判断配置是否过期，一旦时间未同步或被改到过去，陈旧配置会被当成有效一直伪造，重启也一样。现在额外记录 elapsedRealtime：跨开机残留或超过 30 秒未续租的配置一律判为无效，真实定位随即恢复。\n\n3. 停止时仍然会清理全部通道：系统属性、/data/system 与 /data/local/tmp 下的配置文件、Settings.Global 与共享偏好，并恢复定位模式与 WiFi、蓝牙、AGPS 扫描开关。\n\n本版与 v1.4.2 之后使用同一签名密钥，可直接覆盖安装。",
+  "releaseNotes": "重做「微信/打卡软件仍显示真实位置」排查板块（虚拟定位页顶部横幅与弹窗）：\n\n1. 板块职责收敛为只做 Root 功能：一键关闭蓝牙 / Wi-Fi 与背景扫描。通过 root 命令关闭 WLAN 始终扫描、蓝牙始终扫描、Wi-Fi 唤醒，并直接关闭 Wi-Fi 与蓝牙射频，从系统层面阻止微信/打卡软件通过周边路由器 MAC 或蓝牙信标反查真实经纬度。\n\n2. 移除原有的「微信强停/权限」入口与「免 Root 4 步」说明，板块不再涉及打开微信应用详情或改微信权限。\n\n3. 未获取 Root 时，按钮改为跳转系统定位设置，引导用户手动关闭「WLAN 扫描」与「蓝牙扫描」开关。\n\n4. 顶部横幅副文案同步更新为「Root 一键关闭蓝牙 / Wi-Fi 与背景扫描，阻止定位反查」。\n\n本版与 v1.4.5 共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.5/FakeGPS-next-v1.4.5-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.6/FakeGPS-next-v1.4.6-release.apk"
 }

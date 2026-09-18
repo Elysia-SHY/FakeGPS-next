@@ -263,7 +263,7 @@ fun LocationMockScreen(
                         color = IosColors.SystemOrange
                     )
                     Text(
-                        text = "关闭系统 WLAN 扫描 / 检查精确位置与强停微信",
+                        text = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
                         style = IosTypography.Caption1,
                         color = IosColors.SecondaryLabel
                     )
@@ -875,86 +875,44 @@ fun LocationMockScreen(
                     }
 
                     Column {
-                        Text("【免 ROOT 模式：4 步解决方案】", style = IosTypography.Headline, color = IosColors.SystemBlue)
+                        Text("处理方式（Root 功能）", style = IosTypography.Headline, color = IosColors.SystemPurple)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "① 关闭系统 WLAN 扫描：进入系统设置，关闭「WLAN 扫描」与「蓝牙扫描」（避免后台通过路由器 MAC 反查真实位置）。\n" +
-                            "② 检查微信权限：系统设置 -> 微信应用信息 -> 权限 -> 位置信息 -> 建议选【精确位置】。\n" +
-                            "③ 临时改用移动流量：断开家用 Wi-Fi，改用手机蜂窝网络。\n" +
-                            "④ 强行停止微信：开启 FakeGPS 虚拟定位后，进入手机设置点击微信的【强行停止】刷新缓存，再重新打开微信。",
+                            "点击下方按钮将关闭 WLAN 始终扫描、蓝牙始终扫描，并直接关闭 Wi-Fi 与蓝牙射频，让微信 / 打卡软件无法通过周边路由器 MAC 或蓝牙信标反查真实经纬度。\n" +
+                            "未获取 Root 时，按钮会跳转到系统定位设置，请手动关闭「WLAN 扫描」与「蓝牙扫描」开关。",
                             style = IosTypography.Callout,
                             color = IosColors.SecondaryLabel
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                }.logFailure("LocationMockScreen", "open location settings").onFailure {
-                                    Toast.makeText(context, "请在系统设置中搜索「扫描」", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("关闭扫描", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                runCatching {
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = Uri.parse("package:com.tencent.mm")
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                if (rootBridge.isRootAvailable()) {
+                                    val ok = rootBridge.disableWifiBluetoothScan()
+                                    if (ok) {
+                                        Toast.makeText(context, "已关闭蓝牙 / Wi-Fi 与背景扫描", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Root 命令执行失败，请检查授权", Toast.LENGTH_SHORT).show()
                                     }
-                                    context.startActivity(intent)
-                                }.logFailure("LocationMockScreen", "open wechat app details").onFailure {
-                                    Toast.makeText(context, "未能直接打开微信应用信息", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemGreen),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("微信强停/权限", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    if (isRootAvailable) {
-                        Column {
-                            Text("【ROOT / LSPosed 模式建议】", style = IosTypography.Headline, color = IosColors.SystemPurple)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "① 打开 LSPosed 管理器，在 FakeGPS 模块的作用域中勾选【微信 (com.tencent.mm)】与【系统框架】；\n" +
-                                "② 如停止模拟后未立刻复原真机定位，可恢复硬件扫描：",
-                                style = IosTypography.Callout,
-                                color = IosColors.SecondaryLabel
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Button(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        val ok = rootBridge.restoreScanningHardware()
-                                        if (ok) {
-                                            CoordinateConverter.flushRealLocation(context)
-                                            Toast.makeText(context, "已恢复硬件扫描并刷新位置", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Root 命令执行未完成", Toast.LENGTH_SHORT).show()
-                                        }
+                                } else {
+                                    runCatching {
+                                        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                    }.logFailure("LocationMockScreen", "open location settings").onFailure {
+                                        Toast.makeText(context, "请在系统设置中关闭 WLAN 扫描 / 蓝牙扫描", Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("恢复硬件扫描与系统定位", style = IosTypography.Caption1, fontWeight = FontWeight.Bold)
+                                }
                             }
-                        }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (isRootAvailable) "一键关闭蓝牙 / Wi-Fi 与背景扫描" else "未 Root：去系统设置关闭扫描开关",
+                            style = IosTypography.Caption1,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             },

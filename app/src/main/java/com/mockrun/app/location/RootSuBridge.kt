@@ -84,8 +84,18 @@ class RootSuBridge @Inject constructor() {
         return executeCommand("settings put secure location_mode 3 && settings put global wifi_scan_always_enabled 1 && settings put global ble_scan_always_enabled 1 && settings put global assisted_gps_enabled 1")
     }
 
-    @Deprecated("Disabling scanning permanently breaks indoor positioning. Use restoreScanningHardware instead.")
-    suspend fun disableScanningHardware(): Boolean {
-        return restoreScanningHardware()
+    /**
+     * 一键关闭蓝牙 / Wi‑Fi 与背景扫描（Root only）。
+     * 用于阻止微信等内嵌腾讯定位 SDK 的应用通过周边路由器 MAC / 蓝牙信标反查真实经纬度。
+     * 关闭：WLAN 始终扫描、BLE 始终扫描、Wi‑Fi 唤醒，并直接关闭 Wi‑Fi 与蓝牙射频本身。
+     */
+    suspend fun disableWifiBluetoothScan(): Boolean {
+        return executeCommand(
+            "settings put global wifi_scan_always_enabled 0 && " +
+            "settings put global ble_scan_always_enabled 0 && " +
+            "settings put global wifi_wakeup_enabled 0 && " +
+            "svc wifi disable && " +
+            "svc bluetooth disable"
+        )
     }
 }

@@ -6,17 +6,28 @@
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.5`（修复 root 模式停止后的定位残留） |
-| **Android 内部版本** | `versionCode = 22` |
-| **Android 显示版本** | `versionName = "v1.4.5"` |
-| **本版产物提交** | `7791b8f`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.5-release.apk`） |
-| **相对 v1.4.4 差异** | 划掉卡片不再自愈复活续租；伪造配置改用 elapsedRealtime 单调时钟租约判定是否过期 |
-| **上一条已发布版本** | `v1.4.4`（tag `v1.4.4` → `0f52f6b`，versionCode = 21） |
+| **最新已发布版本** | `v1.4.6`（重做微信排查板块，只做 Root 关闭蓝牙/Wi-Fi 与背景扫描） |
+| **Android 内部版本** | `versionCode = 23` |
+| **Android 显示版本** | `versionName = "v1.4.6"` |
+| **本版产物提交** | 待 CI 提交构建产物后回填 |
+| **相对 v1.4.5 差异** | 微信排查板块收敛为只做 Root「一键关闭蓝牙/Wi-Fi 与背景扫描」；移除微信强停/权限入口与免 Root 4 步；未 Root 引导跳转系统设置手动关扫描 |
+| **上一条已发布版本** | `v1.4.5`（tag `v1.4.5` → `7791b8f`，versionCode = 22） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
 | **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.5-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.5-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.6-release.apk`（将被 git 跟踪，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.4.6 构建信息
+
+- **构建时间**：待 CI 构建（run 待回填）
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK 大小 / SHA-256**：待 CI 构建回填
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.6
+- **签名证书**：与 v1.4.2 起同一张固定证书（CN=FakeGPS-next），可直接覆盖安装 v1.4.5
+- **本次改动要点**：微信排查板块收敛为只做 Root「一键关闭蓝牙/Wi-Fi 与背景扫描」（`RootSuBridge.disableWifiBluetoothScan`）；移除微信强停/权限入口与免 Root 4 步；未 Root 引导跳转系统设置手动关扫描
 
 ### v1.4.5 构建信息
 
