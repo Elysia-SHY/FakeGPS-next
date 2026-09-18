@@ -47,7 +47,6 @@ import com.mockrun.app.location.KeepAliveHelper
 import com.mockrun.app.location.RootSuBridge
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.util.Diag
-import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.InjectionMode
 import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.util.PermissionIssueType
@@ -349,13 +348,16 @@ fun LocationMockScreen(
                             }
                             Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
                         } else {
-                            val issue = PermissionHelper.checkPrimaryPermissions(context)
-                            if (issue != PermissionIssueType.NONE) {
-                                permissionIssueDialogType = issue
-                            } else {
-                                simulationViewModel.startPointMock(context, activeLat, activeLon)
-                                simulationViewModel.updateSelectedTarget(activeLat, activeLon)
-                                Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                            // 统一走 ViewModel：Root 模式先自动授权再校验，免 Root 模式维持手动勾选校验
+                            coroutineScope.launch {
+                                val issue = simulationViewModel.resolveInjectionPermission(context)
+                                if (issue != PermissionIssueType.NONE) {
+                                    permissionIssueDialogType = issue
+                                } else {
+                                    simulationViewModel.startPointMock(context, activeLat, activeLon)
+                                    simulationViewModel.updateSelectedTarget(activeLat, activeLon)
+                                    Toast.makeText(context, "虚拟定位已开启！", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }

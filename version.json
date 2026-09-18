@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.8",
-  "versionCode": 25,
+  "versionName": "v1.4.9",
+  "versionCode": 26,
   "releaseDate": "2026-09-18",
-  "releaseNotes": "修复 Root 模式下仍被要求打开【开发者选项】手动勾选模拟位置应用的问题：\n\n1. RootSuBridge.grantMockLocation 现在除 appops 授予 android:mock_location 应用 op 外，额外执行 settings put global development_settings_enabled 1：部分 OEM（ColorOS / MIUI 等）在 LocationManager.addTestProvider 时除校验 app-op 外，还要求全局开发者选项开关为开启，否则即使 app-op 已允许仍会拒绝注入；Root 模式下一并置位，用户不再需要手动打开开发者选项。\n\n2. SimulationViewModel.startPointMock / startSimulation 在注入前若处于 Root 模式且检测到 Root 权限，会同步调用 grantMockLocation 自动授权后再校验权限门。这样无论用户在设置页中途切换 Root 开关、还是服务自愈重启，都不会被「请前往开发者选项勾选模拟位置应用」挡住（覆盖地图页、路线页、摇杆服务等所有入口）。\n\n3. 设置页「Root 注入模式」开关切到开启时立即自动授权；「开发者选项模拟位置」一行在 Root 模式下文案改为「Root 已自动授权 / Root 模式将自动授权，无需手动勾选」，点击改为触发 Root 自动授权而非跳转开发者选项。\n\n4. 防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 forceCleanAllTestProviders + flushRealLocation。免 Root 模式不调用任何 su，依旧只依赖用户在开发者选项手动勾选。\n\n本版与 v1.4.7 共用同一签名密钥，可直接覆盖安装。",
+  "releaseNotes": "修复 Root 模式仍被「需设置模拟位置应用」弹窗挡住的问题（v1.4.8 未彻底解决）：\n\n1. 根因定位：地图选点页与虚拟定位页各有一处独立的权限预检（MapScreen 的 ensurePermissionAndStart、LocationMockScreen 主控按钮），它们在调用 ViewModel 之前就自行判断权限并直接弹出引导对话框，v1.4.8 加到 ViewModel 里的自动授权根本没机会执行。\n\n2. 统一收口：SimulationViewModel 新增公开的 resolveInjectionPermission(context)，先按当前注入模式决定是否自动授予模拟权限（Root 模式：appops 授予 android:mock_location + 开启全局开发者选项开关；免 Root 模式：不动），再返回权限校验结果。地图选点页与虚拟定位页的预检全部改为在协程中调用它，不再各自为政。\n\n3. Root 检测加固：RootSuBridge.isRootAvailable() 改为始终直接尝试 su -c id（不再因固定路径下找不到 su 二进制就短路判为无 root），且只缓存「确认有 root」的结论、不再把一次失败永久缓存。修复 KernelSU 等 su 不在固定路径的机型被误判为无 root、从而 Root 模式从不自动授权的问题。\n\n4. 免 Root 模式行为不变：完全不调用 su，仍由用户在【开发者选项】手动勾选模拟位置应用。防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 forceCleanAllTestProviders + flushRealLocation。\n\n本版与 v1.4.8 共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.8/FakeGPS-next-v1.4.8-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.9/FakeGPS-next-v1.4.9-release.apk"
 }

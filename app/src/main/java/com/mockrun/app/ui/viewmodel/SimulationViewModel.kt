@@ -102,8 +102,7 @@ class SimulationViewModel @Inject constructor(
 
     fun startPointMock(context: Context, latitude: Double, longitude: Double): Boolean {
         // Root 模式：注入前自动授予模拟权限（含全局开发者选项开关），避免弹「请前往开发者选项勾选」
-        ensureMockLocationAppOp(context)
-        val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
+        val issue = runBlocking(Dispatchers.IO) { resolveInjectionPermission(context) }
         if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
             when (issue) {
                 com.mockrun.app.util.PermissionIssueType.LOCATION_PERMISSION_MISSING ->
@@ -167,8 +166,7 @@ class SimulationViewModel @Inject constructor(
 
     fun startSimulation(context: Context, route: Route, speedKmh: Float): Boolean {
         // Root 模式：注入前自动授予模拟权限（含全局开发者选项开关），避免弹「请前往开发者选项勾选」
-        ensureMockLocationAppOp(context)
-        val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
+        val issue = runBlocking(Dispatchers.IO) { resolveInjectionPermission(context) }
         if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
             when (issue) {
                 com.mockrun.app.util.PermissionIssueType.LOCATION_PERMISSION_MISSING ->
@@ -201,18 +199,17 @@ class SimulationViewModel @Inject constructor(
     }
 
     /**
-     * Root 模式下，注入前同步确保 mock_location app-op 已授予（grantMockLocation 同时会开启
-     * 全局开发者选项开关 development_settings_enabled=1）。免 Root 模式不调用，保持仅依赖用户
-     * 在开发者选项中手动勾选。这样无论用户在设置页中途切换 Root 开关、还是服务自愈重启，
-     * 都不会被「请前往开发者选项勾选模拟位置应用」的权限门挡住。
+     * Root 模式下先自动授予模拟权限（`android:mock_location` app-op + 全局开发者选项开关），
+     * 再返回权限校验结果；免 Root 模式直接返回校验结果，仅依赖用户在开发者选项手动勾选。
+     *
+     * 所有注入入口（本 ViewModel、地图选点页的 `ensurePermissionAndStart`、虚拟定位页主控按钮）
+     * 都统一走这里，保证 Root 模式不会被「需设置模拟位置应用」的权限门挡住。UI 侧需在协程中调用。
      */
-    private fun ensureMockLocationAppOp(context: Context) {
-        if (!InjectionModePrefs.isRootMode(context)) return
-        runBlocking(Dispatchers.IO) {
-            if (rootBridge.isRootAvailable()) {
-                rootBridge.grantMockLocation(context.packageName)
-            }
+    suspend fun resolveInjectionPermission(context: Context): com.mockrun.app.util.PermissionIssueType {
+        if (InjectionModePrefs.isRootMode(context) && rootBridge.isRootAvailable()) {
+            rootBridge.grantMockLocation(context.packageName)
         }
+        return com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
     }
 
     fun pauseSimulation(context: Context) {

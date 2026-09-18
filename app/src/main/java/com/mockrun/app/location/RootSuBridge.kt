@@ -20,27 +20,31 @@ class RootSuBridge @Inject constructor() {
     private var isRootedCache: Boolean? = null
 
     suspend fun isRootAvailable(): Boolean = withContext(Dispatchers.IO) {
-        isRootedCache?.let { return@withContext it }
+        // 只缓存"确认有 root"的结论；未确认时每次重探（用户可能稍后才在 Root 管理器里授权）。
+        // 旧实现把"未找到 su 二进制"直接缓存为 false 并短路，导致 KernelSU 等 su 不在固定路径
+        // 或路径不可 stat 的机型被误判为无 root，Root 模式于是从不自动授权。
+        if (isRootedCache == true) return@withContext true
 
+        // 权威判据：直接尝试 su -c id，成功即认为有 root（不依赖固定路径）
+        Diag.d(TAG, "probing root with 'su -c id'")
+        val executed = executeCommand("id")
+        if (executed) {
+            isRootedCache = true
+            return@withContext true
+        }
+
+        // 回退判断：区分"su 存在但被拒"与"根本没有 su"，仅用于日志排障
         val paths = arrayOf(
             "/system/bin/su", "/system/xbin/su", "/sbin/su",
             "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/xbin/su",
             "/data/local/bin/su", "/data/local/su"
         )
-        val fileFound = paths.any { File(it).exists() }
-        if (!fileFound) {
-            Diag.i(TAG, "no su binary on any known path — running unrooted")
-            isRootedCache = false
-            return@withContext false
-        }
-
-        Diag.d(TAG, "su binary present, probing with 'id'")
-        val executed = executeCommand("id")
-        isRootedCache = executed
-        if (!executed) {
+        if (paths.any { File(it).exists() }) {
             Diag.w(TAG, "su binary exists but 'su -c id' did not succeed — root likely denied")
+        } else {
+            Diag.i(TAG, "no su binary on known paths and 'su -c id' failed — running unrooted")
         }
-        executed
+        false
     }
 
     suspend fun executeCommand(cmd: String): Boolean = withContext(Dispatchers.IO) {

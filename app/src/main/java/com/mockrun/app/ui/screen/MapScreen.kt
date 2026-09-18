@@ -38,7 +38,6 @@ import com.mockrun.app.ui.screen.tabs.RouteConfigDialog
 import com.mockrun.app.ui.screen.tabs.RouteStage
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.util.Diag
-import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.util.logFailure
 import com.mockrun.app.ui.theme.LiquidGlassDefaults
@@ -509,11 +508,15 @@ fun MapScreen(
     var permissionIssueDialogType by remember { mutableStateOf<PermissionIssueType?>(null) }
 
     val ensurePermissionAndStart: (() -> Unit) -> Unit = { onPermitted ->
-        val issue = PermissionHelper.checkPrimaryPermissions(context)
-        if (issue != PermissionIssueType.NONE) {
-            permissionIssueDialogType = issue
-        } else {
-            onPermitted()
+        // 统一走 ViewModel：Root 模式会先自动授予模拟权限（app-op + 全局开发者选项）再校验，
+        // 避免 Root 用户仍被「需设置模拟位置应用」挡住；免 Root 模式维持原有手动勾选校验。
+        coroutineScope.launch {
+            val issue = simulationViewModel.resolveInjectionPermission(context)
+            if (issue != PermissionIssueType.NONE) {
+                permissionIssueDialogType = issue
+            } else {
+                onPermitted()
+            }
         }
     }
     val continuousDrawRef = rememberUpdatedState(isContinuousDrawMode)

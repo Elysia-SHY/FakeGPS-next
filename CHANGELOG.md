@@ -8,6 +8,20 @@
 
 ---
 
+## [1.4.9] - 2026-09-18
+
+> 本版彻底修复 Root 模式仍弹「需设置模拟位置应用」引导的问题：v1.4.8 只改了 ViewModel 的校验前授权，但两处 UI 预检在调用 ViewModel 之前就自行弹窗，导致自动授权从未执行。
+
+### 修复 (Fixed)
+
+- **统一权限校验入口。** `SimulationViewModel` 新增公开 `resolveInjectionPermission(context)`：Root 模式先 `grantMockLocation`（`android:mock_location` app-op + 全局开发者选项开关）再返回校验结果，免 Root 模式直接返回校验结果、不调用 su。`MapScreen` 的 `ensurePermissionAndStart` 与 `LocationMockScreen` 主控按钮的预检改为在协程中调用它，不再各自 `checkPrimaryPermissions` 后直接弹窗。
+- **Root 检测加固。** `RootSuBridge.isRootAvailable()` 改为始终直接尝试 `su -c id` 判定，不再"固定路径下找不到 su 二进制就直接判无 root"；且只缓存确认有 root 的结论，一次失败不再被永久缓存。修复 KernelSU 等 su 不在固定路径的机型被误判为无 root、导致 Root 模式从不自动授权的问题。
+
+### 说明 (Notes)
+
+- 免 Root 模式行为不变：完全不调用 su，仍由用户在【开发者选项】手动勾选。防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 `forceCleanAllTestProviders` + `flushRealLocation`。
+- 已通过编译验证；**未做真机验证**（本机无 Android 设备）。
+
 ## [1.4.8] - 2026-09-18
 
 > 本版修复 Root 模式下仍被要求打开【开发者选项】手动勾选「模拟位置信息应用」的问题，使 Root 模式真正自服务、无需手动操作开发者选项。
