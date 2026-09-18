@@ -8,6 +8,21 @@
 
 ---
 
+## [1.4.8] - 2026-09-18
+
+> 本版修复 Root 模式下仍被要求打开【开发者选项】手动勾选「模拟位置信息应用」的问题，使 Root 模式真正自服务、无需手动操作开发者选项。
+
+### 修复 (Fixed)
+
+- **Root 模式不再强弹开发者选项勾选引导。** `RootSuBridge.grantMockLocation` 现除 `appops set <pkg> android:mock_location allow` 外，追加 `settings put global development_settings_enabled 1`：ColorOS / MIUI 等 OEM 在 `LocationManager.addTestProvider` 时除校验 app-op 外还要求全局开发者选项开关为开启，否则即使 app-op 已允许仍拒绝注入；Root 模式下一并置位，用户无需手动打开开发者选项。
+- **注入前自动授权覆盖所有入口。** `SimulationViewModel.startPointMock` / `startSimulation` 在权限校验门前，若处于 Root 模式且检测到 Root 权限，会同步调用 `grantMockLocation` 自动授权后再放行。无论用户在设置页中途切换 Root 开关、还是服务自愈重启（地图页、路线页、摇杆服务等入口），都不会被「请前往开发者选项勾选模拟位置应用」挡住。
+- **设置页交互优化。** 「Root 注入模式」开关切到开启时立即自动授权；「开发者选项模拟位置」一行在 Root 模式下文案改为「Root 已自动授权 / Root 模式将自动授权，无需手动勾选」，其点击改为触发 Root 自动授权而非跳转开发者选项。
+
+### 说明 (Notes)
+
+- 防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 `forceCleanAllTestProviders` + `flushRealLocation`。免 Root 模式不调用任何 su，依旧只依赖用户在开发者选项手动勾选。
+- 已通过编译验证；**未做真机验证**（本机无 Android 设备）。
+
 ## [1.4.7] - 2026-09-18
 
 > 本版新增「Root 注入模式」总开关，将 Root 模式与免 Root 模式彻底分离。

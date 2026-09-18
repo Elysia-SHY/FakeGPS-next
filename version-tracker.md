@@ -6,17 +6,26 @@
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.7`（新增「Root 注入模式」开关，Root / 免 Root 彻底分离） |
-| **Android 内部版本** | `versionCode = 24` |
-| **Android 显示版本** | `versionName = "v1.4.7"` |
-| **本版产物提交** | `6f1e0cd`（CI 构建并回提 APK 的提交，含 `FakeGPS-next-v1.4.7-release.apk`） |
-| **相对 v1.4.6 差异** | 新增「Root 注入模式」总开关：开启=Root 自动授予模拟权限+恢复硬件高精度（LSPosed 激活则叠加框架增强）；关闭=免 Root，应用完全不调用 su，仅依赖开发者选项手动勾选模拟位置应用 |
-| **上一条已发布版本** | `v1.4.6`（tag `v1.4.6` → `ccd914e8`，versionCode = 23） |
+| **最新已发布版本** | `v1.4.8`（修复 Root 模式仍强弹「开发者选项」勾选引导） |
+| **Android 内部版本** | `versionCode = 25` |
+| **Android 显示版本** | `versionName = "v1.4.8"` |
+| **本版产物提交** | 待 CI 构建回填 |
+| **相对 v1.4.7 差异** | `grantMockLocation` 追加 `settings put global development_settings_enabled 1`；`SimulationViewModel.start*` 注入前在 Root 模式自动授权再校验；设置页 Root 开关切换即授权、开发者选项行在 Root 模式下文案与点击行为改为自动授权 |
+| **上一条已发布版本** | `v1.4.7`（tag `v1.4.7` → `6f1e0cd`，versionCode = 24） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.7-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.7-release.apk`（已回提，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.8-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.8-release.apk`（待回提，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.4.8 构建信息（待 CI 构建）
+
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.4.8
+- **本次改动要点**：`RootSuBridge.grantMockLocation` 由单条 `appops set ... allow` 改为 `settings put global development_settings_enabled 1 && appops set <pkg> android:mock_location allow`（ColorOS / MIUI 需全局开发者选项开关为开启才放行 `addTestProvider`）；`SimulationViewModel` 新增 `ensureMockLocationAppOp()`，在 `startPointMock` / `startSimulation` 校验权限门之前，若为 Root 模式且已获 Root 权限则 `runBlocking` 同步自动授权；`LocationMockScreen` 的「Root 注入模式」开关切到开启时立即 `grantMockLocation`，「开发者选项模拟位置」行在 Root 模式下文案改为自动授权说明、点击改为触发授权而非跳转开发者选项。防卡死逻辑（无条件 `forceCleanAllTestProviders`+`flushRealLocation`）未改动。
+- **编译/构建验证**：CI `assembleRelease` 通过后回填 SHA-256 与 run id；**未做真机验证**
 
 ### v1.4.7 构建信息
 

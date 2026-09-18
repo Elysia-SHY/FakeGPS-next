@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.7",
-  "versionCode": 24,
+  "versionName": "v1.4.8",
+  "versionCode": 25,
   "releaseDate": "2026-09-18",
-  "releaseNotes": "新增「Root 注入模式」开关，将 Root 模式与免 Root 模式彻底分开：\n\n1. 设置页新增「Root 注入模式」总开关：开启（默认）= Root 模式，应用通过 su 自动授予 android:mock_location 应用 op、恢复硬件高精度定位；关闭 = 免 Root 模式，应用完全不调用 su，仅依赖用户在【开发者选项】中手动把本应用勾选为「模拟位置信息应用」，随后用应用进程 LocationManager.addTestProvider 注入。\n\n2. 免 Root 模式下，下列行为一律不触发 Root 命令：启动时不自动授予模拟权限、停止模拟时不再调用 restoreScanningHardware、微信排查板块的一键关闭蓝牙 / Wi-Fi 与背景扫描改为跳转系统设置手动关闭、Root 权限状态与一键恢复高精度定位入口均提示「免 Root 模式」。\n\n3. Root 模式下若 LSPosed 已激活，仍自动叠加 system_server 框架层抗检测增强；LSPosed 与模式开关正交，单独控制。\n\n4. 防卡死：无论哪种模式，停止模拟 / 服务销毁 / 任务划掉均无条件执行 forceCleanAllTestProviders + flushRealLocation，清掉所有测试 Provider 并冲刷真实硬件定位，杜绝系统定位停留在伪造坐标（沿用 v1.4.5 修复）。切到免 Root 模式时若此前 Root 曾关闭扫描，会立即 restoreScanningHardware 把硬件复原。\n\n5. 路线模拟页的 Root 专属高阶仿真入口随模式开关联动显隐。\n\n本版与 v1.4.6 共用同一签名密钥，可直接覆盖安装。",
+  "releaseNotes": "修复 Root 模式下仍被要求打开【开发者选项】手动勾选模拟位置应用的问题：\n\n1. RootSuBridge.grantMockLocation 现在除 appops 授予 android:mock_location 应用 op 外，额外执行 settings put global development_settings_enabled 1：部分 OEM（ColorOS / MIUI 等）在 LocationManager.addTestProvider 时除校验 app-op 外，还要求全局开发者选项开关为开启，否则即使 app-op 已允许仍会拒绝注入；Root 模式下一并置位，用户不再需要手动打开开发者选项。\n\n2. SimulationViewModel.startPointMock / startSimulation 在注入前若处于 Root 模式且检测到 Root 权限，会同步调用 grantMockLocation 自动授权后再校验权限门。这样无论用户在设置页中途切换 Root 开关、还是服务自愈重启，都不会被「请前往开发者选项勾选模拟位置应用」挡住（覆盖地图页、路线页、摇杆服务等所有入口）。\n\n3. 设置页「Root 注入模式」开关切到开启时立即自动授权；「开发者选项模拟位置」一行在 Root 模式下文案改为「Root 已自动授权 / Root 模式将自动授权，无需手动勾选」，点击改为触发 Root 自动授权而非跳转开发者选项。\n\n4. 防卡死逻辑不变：停止 / 销毁 / 任务划掉仍无条件 forceCleanAllTestProviders + flushRealLocation。免 Root 模式不调用任何 su，依旧只依赖用户在开发者选项手动勾选。\n\n本版与 v1.4.7 共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.7/FakeGPS-next-v1.4.7-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.8/FakeGPS-next-v1.4.8-release.apk"
 }

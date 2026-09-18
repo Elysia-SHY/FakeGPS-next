@@ -76,8 +76,17 @@ class RootSuBridge @Inject constructor() {
         return executeCommand("cmd sensor_privacy disable 0 2 2>/dev/null; input keyevent 0")
     }
 
+    /**
+     * 授予本应用「模拟位置信息应用」权限（android:mock_location app-op）。
+     * 同时开启全局「开发者选项」开关：部分 OEM（ColorOS / MIUI 等）在 addTestProvider 时
+     * 除校验 app-op 外，还要求 Settings.Global.DEVELOPMENT_SETTINGS_ENABLED = 1，否则即使
+     * app-op 已允许仍会拒绝注入；Root 模式下一并置位，用户无需手动打开开发者选项点选。
+     */
     suspend fun grantMockLocation(packageName: String): Boolean {
-        return executeCommand("appops set $packageName android:mock_location allow")
+        return executeCommand(
+            "settings put global development_settings_enabled 1 && " +
+            "appops set $packageName android:mock_location allow"
+        )
     }
 
     suspend fun restoreScanningHardware(): Boolean {

@@ -587,20 +587,33 @@ fun LocationMockScreen(
             // Item 0: Developer Options Mock Location App Check
             IosListRow(
                 title = "开发者选项模拟位置",
-                subtitle = if (isDevMockLocationEnabled) "已将本应用勾选为系统模拟位置信息应用" else "未勾选 · 点击前往【开发者选项】勾选",
+                subtitle = when {
+                    isRootMode && isDevMockLocationEnabled -> "Root 已自动授权 · 本应用为系统模拟位置信息应用"
+                    isRootMode -> "Root 模式将自动授权，无需手动勾选"
+                    isDevMockLocationEnabled -> "已将本应用勾选为系统模拟位置信息应用"
+                    else -> "未勾选 · 点击前往【开发者选项】勾选"
+                },
                 icon = Icons.Default.Settings,
                 iconBackground = if (isDevMockLocationEnabled) IosColors.SystemGreen else IosColors.SystemOrange,
                 trailingText = if (isDevMockLocationEnabled) "已勾选" else "未勾选",
-                showChevron = !isDevMockLocationEnabled,
+                showChevron = !isDevMockLocationEnabled && !isRootMode,
                 onClick = {
-                    try {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
+                    if (isRootMode && isRootAvailable) {
+                        coroutineScope.launch {
+                            rootBridge.grantMockLocation(context.packageName)
+                            isDevMockLocationEnabled = XposedStatusHelper.isMockLocationAppSelected(context)
+                            Toast.makeText(context, "Root 已自动配置模拟位置权限", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
                         try {
-                            context.startActivity(Intent(Settings.ACTION_SETTINGS))
-                        } catch (ex: Exception) {
-                            Toast.makeText(context, "请在系统设置中开启开发者选项并选择模拟位置应用", Toast.LENGTH_LONG).show()
+                            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            try {
+                                context.startActivity(Intent(Settings.ACTION_SETTINGS))
+                            } catch (ex: Exception) {
+                                Toast.makeText(context, "请在系统设置中开启开发者选项并选择模拟位置应用", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 }
@@ -623,8 +636,11 @@ fun LocationMockScreen(
                                 context,
                                 if (enabled) InjectionMode.ROOT else InjectionMode.NO_ROOT
                             )
-                            // 切到免 Root：把硬件恢复为正常高精度，避免定位卡在异常状态
-                            if (!enabled && isRootAvailable) {
+                            if (enabled && isRootAvailable) {
+                                // 切到 Root：立即自动授予模拟权限（含全局开发者选项开关），无需手动打开开发者选项
+                                coroutineScope.launch { rootBridge.grantMockLocation(context.packageName) }
+                            } else if (!enabled && isRootAvailable) {
+                                // 切到免 Root：把硬件恢复为正常高精度，避免定位卡在异常状态
                                 coroutineScope.launch { rootBridge.restoreScanningHardware() }
                             }
                         }

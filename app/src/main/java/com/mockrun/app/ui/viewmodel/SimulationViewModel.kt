@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
@@ -100,6 +101,8 @@ class SimulationViewModel @Inject constructor(
     }
 
     fun startPointMock(context: Context, latitude: Double, longitude: Double): Boolean {
+        // Root 模式：注入前自动授予模拟权限（含全局开发者选项开关），避免弹「请前往开发者选项勾选」
+        ensureMockLocationAppOp(context)
         val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
         if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
             when (issue) {
@@ -163,6 +166,8 @@ class SimulationViewModel @Inject constructor(
     }
 
     fun startSimulation(context: Context, route: Route, speedKmh: Float): Boolean {
+        // Root 模式：注入前自动授予模拟权限（含全局开发者选项开关），避免弹「请前往开发者选项勾选」
+        ensureMockLocationAppOp(context)
         val issue = com.mockrun.app.util.PermissionHelper.checkPrimaryPermissions(context)
         if (issue != com.mockrun.app.util.PermissionIssueType.NONE) {
             when (issue) {
@@ -193,6 +198,21 @@ class SimulationViewModel @Inject constructor(
         }
         ContextCompat.startForegroundService(context, intent)
         return true
+    }
+
+    /**
+     * Root 模式下，注入前同步确保 mock_location app-op 已授予（grantMockLocation 同时会开启
+     * 全局开发者选项开关 development_settings_enabled=1）。免 Root 模式不调用，保持仅依赖用户
+     * 在开发者选项中手动勾选。这样无论用户在设置页中途切换 Root 开关、还是服务自愈重启，
+     * 都不会被「请前往开发者选项勾选模拟位置应用」的权限门挡住。
+     */
+    private fun ensureMockLocationAppOp(context: Context) {
+        if (!InjectionModePrefs.isRootMode(context)) return
+        runBlocking(Dispatchers.IO) {
+            if (rootBridge.isRootAvailable()) {
+                rootBridge.grantMockLocation(context.packageName)
+            }
+        }
     }
 
     fun pauseSimulation(context: Context) {
