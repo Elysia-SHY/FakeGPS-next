@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.4.4",
-  "versionCode": 21,
+  "versionName": "v1.4.5",
+  "versionCode": 22,
   "releaseDate": "2026-09-18",
-  "releaseNotes": "本版只改系统层 Hook，不动界面，解决「坐标是对的但目标应用不动」的三类情况。\n\n1. Provider 状态查询：伪造生效时 isProviderEnabled 与 isProviderEnabledForUser 返回已开启，getBestProvider 与 getProviders 保证 gps 在列。此前这些查询与伪造状态不一致，部分应用查完就判定无可用定位源，根本不发请求，伪造点也就没有投递机会。\n\n2. 注册登记：除分发钩子外，在 requestLocationUpdatesLocked 也记录分发对象。此前只有硬件真的上报过才能拿到这些对象。\n\n3. 主动喂点：GPS 关闭、室内无信号或 ROM 不上报时，守护线程按 1 秒间隔主动向各注册者推送伪造点；硬件正常上报时不重复推送，不改变原有刷新率。\n\n4. 伪造点补齐：海拔、方位角、速度为 0 时填入合理默认值，精度与时间戳同样补齐，并写入 extras 卫星数。真实卫星定位结果不会各项全为 0，全 0 会被部分应用判为无效定位而丢弃。\n\n稳定性：分发对象用弱引用保存，应用注销即停止推送；全部新增路径在 ROM 差异导致签名不匹配时退化为一条日志，不影响系统进程。本版与 v1.4.2 之后使用同一签名密钥，可直接覆盖安装。",
+  "releaseNotes": "本版修一个 root 模式下的残留问题：停止模拟后位置仍然停在伪造点，重启也不恢复。\n\n1. 关闭应用即真正停止。此前从最近任务划掉卡片会被当成进程被杀，服务自愈复活后继续写入伪造坐标，表现为「应用关了位置还是假的」。现在划掉卡片会停掉注入协程、把所有持久通道写成已停止，再结束前台服务。\n\n2. 伪造配置改用单调时钟租约。原先只靠系统时间判断配置是否过期，一旦时间未同步或被改到过去，陈旧配置会被当成有效一直伪造，重启也一样。现在额外记录 elapsedRealtime：跨开机残留或超过 30 秒未续租的配置一律判为无效，真实定位随即恢复。\n\n3. 停止时仍然会清理全部通道：系统属性、/data/system 与 /data/local/tmp 下的配置文件、Settings.Global 与共享偏好，并恢复定位模式与 WiFi、蓝牙、AGPS 扫描开关。\n\n本版与 v1.4.2 之后使用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.4/FakeGPS-next-v1.4.4-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.4.5/FakeGPS-next-v1.4.5-release.apk"
 }

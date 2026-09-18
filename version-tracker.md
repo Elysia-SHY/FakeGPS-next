@@ -6,15 +6,15 @@
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.4.4`（由 `d294304` 上的 Hook 改动触发构建） |
-| **Android 内部版本** | `versionCode = 21` |
-| **Android 显示版本** | `versionName = "v1.4.4"` |
-| **本版产物提交** | `0f52f6b`（= tag `v1.4.4`，CI 提交构建产物） |
-| **相对 v1.4.3 差异** | 只改系统层 Hook：Provider 状态查询、注册登记、硬件静默时主动喂点、伪造点零值补齐 |
-| **上一条已发布版本** | `v1.4.3`（tag `v1.4.3` → `cbb1edd`，versionCode = 20） |
+| **最新已发布版本** | `v1.4.5`（修复 root 模式停止后的定位残留） |
+| **Android 内部版本** | `versionCode = 22` |
+| **Android 显示版本** | `versionName = "v1.4.5"` |
+| **本版产物提交** | 待 CI 提交构建产物后回填 |
+| **相对 v1.4.4 差异** | 划掉卡片不再自愈复活续租；伪造配置改用 elapsedRealtime 单调时钟租约判定是否过期 |
+| **上一条已发布版本** | `v1.4.4`（tag `v1.4.4` → `0f52f6b`，versionCode = 21） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.4-release.apk` |
-| **仓库内 Release 产物** | `FakeGPS-next-v1.4.4-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.4.5-release.apk` |
+| **仓库内 Release 产物** | `FakeGPS-next-v1.4.5-release.apk`（已被 git 跟踪，jsDelivr CDN 依赖此路径） |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
 

@@ -42,6 +42,16 @@ object HookStateBridge {
     var updateTimestamp: Long = 0L
         private set
 
+    /**
+     * 最近一次写入时的 `SystemClock.elapsedRealtime()`。
+     *
+     * 钩子用它判断这份配置是否来自本次开机：进程被杀或重启之后，残留配置里的这个值要么过期，
+     * 要么比当前开机时长还大，两种情况都会判为无效，从而停止伪造、让真实定位回来。
+     */
+    @Volatile
+    var updateElapsed: Long = 0L
+        private set
+
     @Volatile
     var lastSystemHookHeartbeat: Long = 0L
         private set
@@ -97,6 +107,8 @@ object HookStateBridge {
         bearing = bear
         speed = spd
         updateTimestamp = System.currentTimeMillis()
+        updateElapsed = android.os.SystemClock.elapsedRealtime()
+        val elapsed = updateElapsed
 
         context?.let { ctx ->
             // 1. SharedPreferences update (Immediate)
@@ -109,6 +121,7 @@ object HookStateBridge {
                     .putFloat("bearing", bear)
                     .putFloat("speed", spd)
                     .putLong("timestamp", updateTimestamp)
+                    .putLong("elapsed", elapsed)
                     .apply()
 
                 val prefsFile = java.io.File(ctx.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
@@ -117,7 +130,8 @@ object HookStateBridge {
                 }
             }.logFailure(TAG, "channel 1: write hook_config SharedPreferences", Diag.Level.DEBUG)
 
-            val jsonStr = """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp}"""
+            val jsonStr =
+                """{"isActive":$active,"latitude":$lat,"longitude":$lon,"altitude":$alt,"bearing":$bear,"speed":$spd,"time":$updateTimestamp,"elapsed":$elapsed}"""
 
             // 2. Settings.Global update (zero IPC overhead in system_server, readable by all apps)
             runCatching {
@@ -164,6 +178,7 @@ object HookStateBridge {
                             buildString {
                                 append("setprop debug.fakegps.active $activeInt; ")
                                 append("setprop debug.fakegps.time $updateTimestamp; ")
+                                append("setprop debug.fakegps.elapsed $elapsed; ")
                                 append("setprop debug.fakegps.lat $lat; ")
                                 append("setprop debug.fakegps.lon $lon; ")
                                 append("setprop debug.fakegps.alt $alt; ")
@@ -188,6 +203,7 @@ object HookStateBridge {
                             buildString {
                                 append("setprop debug.fakegps.active 0; ")
                                 append("setprop debug.fakegps.time 0; ")
+                                append("setprop debug.fakegps.elapsed 0; ")
                                 append("rm -f /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("rm -f /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings delete global fake_gps_config 2>/dev/null; ")

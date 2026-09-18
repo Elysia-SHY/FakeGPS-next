@@ -26,7 +26,14 @@ data class SpoofLocation(
     val altitude: Double,
     val bearing: Float,
     val speed: Float,
-    val timestamp: Long = 0L
+    val timestamp: Long = 0L,
+    /**
+     * 应用侧写入时的 `SystemClock.elapsedRealtime()`（单调时钟，含睡眠）。
+     *
+     * 只有它才能回答"这份配置是不是本次开机之后写的"：墙钟 `timestamp` 在开机未同步时间、
+     * 或设备时间被改到过去时会算出负数差值，导致过期判断失效，陈旧配置被当成有效一直伪造下去。
+     */
+    val elapsed: Long = 0L
 )
 
 /** Logcat/Xposed tag for this hook. Kept short — it appears in `system_server` logs. */
@@ -1533,7 +1540,23 @@ class XposedLocationHook : IXposedHookLoadPackage {
             .ifEmpty { text.substringAfter("\"speed\":", "").substringBefore("}") }
             .ifEmpty { text.substringAfter("\"spd\":", "").substringBefore("}") }).toFloatOrNull() ?: 0f
 
-        return SpoofLocation(isActive, lat, lon, alt, bear, spd, time)
+        val elapsed = (text.substringAfter("\"elapsed\":", "").substringBefore(",")
+            .ifEmpty { text.substringAfter("\"elapsed\":", "").substringBefore("}") }).toLongOrNull() ?: 0L
+
+        return SpoofLocation(isActive, lat, lon, alt, bear, spd, time, elapsed)
+    }
+
+    /**
+     * 单调时钟租约判定。返回 false 表示这份配置不该再生效（进程早已停止，或干脆是上次开机留下的）。
+     *
+     * `elapsed == 0L` 表示写入方是旧版本、没有这个字段，此时不拦它，继续走各通道原有的墙钟 TTL 判断。
+     */
+    private fun isLeaseValid(elapsed: Long): Boolean {
+        if (elapsed <= 0L) return true
+        val now = SystemClock.elapsedRealtime()
+        // 比当前开机时长还大，只可能来自上一次开机，属于残留
+        if (elapsed > now + 1_000L) return false
+        return (now - elapsed) <= 30_000L
     }
 
     private data class TargetAppRule(
@@ -1810,7 +1833,14 @@ class XposedLocationHook : IXposedHookLoadPackage {
             val spd = getSystemProperty("debug.fakegps.speed").toFloatOrNull() ?: 0f
             val time = getSystemProperty("debug.fakegps.time").toLongOrNull() ?: 0L
 
+            val propElapsed = getSystemProperty("debug.fakegps.elapsed").toLongOrNull() ?: 0L
+
             if (activeStr == "1" || activeStr.equals("true", ignoreCase = true)) {
+                if (!isLeaseValid(propElapsed)) {
+                    val stale = SpoofLocation(false, lat, lon, alt, bear, spd, 0L, propElapsed)
+                    cachedLocation = stale
+                    return stale
+                }
                 if (time > 0L && (nowMs - time > 20_000L)) {
                     val expired = SpoofLocation(false, lat, lon, alt, bear, spd, 0L)
                     cachedLocation = expired
@@ -1835,8 +1865,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 val text = file.readText()
                 val loc = parseJsonLocation(text)
                 if (loc != null) {
-                    if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
-                        val inactive = SpoofLocation(false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L)
+                    if (!loc.isActive || !isLeaseValid(loc.elapsed) ||
+                        (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))
+                    ) {
+                        val inactive = SpoofLocation(
+                            false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L, loc.elapsed
+                        )
                         cachedLocation = inactive
                         return inactive
                     }
@@ -1853,8 +1887,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 val text = file.readText()
                 val loc = parseJsonLocation(text)
                 if (loc != null) {
-                    if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
-                        val inactive = SpoofLocation(false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L)
+                    if (!loc.isActive || !isLeaseValid(loc.elapsed) ||
+                        (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))
+                    ) {
+                        val inactive = SpoofLocation(
+                            false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L, loc.elapsed
+                        )
                         cachedLocation = inactive
                         return inactive
                     }
@@ -1872,8 +1910,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 if (!configStr.isNullOrEmpty()) {
                     val loc = parseJsonLocation(configStr)
                     if (loc != null) {
-                        if (!loc.isActive || (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))) {
-                            val inactive = SpoofLocation(false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L)
+                        if (!loc.isActive || !isLeaseValid(loc.elapsed) ||
+                            (loc.timestamp > 0L && (nowMs - loc.timestamp > 20_000L))
+                        ) {
+                            val inactive = SpoofLocation(
+                                false, loc.latitude, loc.longitude, loc.altitude, loc.bearing, loc.speed, 0L, loc.elapsed
+                            )
                             cachedLocation = inactive
                             return inactive
                         }
@@ -1890,11 +1932,17 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 sp.reload()
                 val isActive = sp.getBoolean("is_active", false)
                 val time = sp.getLong("timestamp", 0L)
+                val elapsed = sp.getLong("elapsed", 0L)
                 val lat = sp.getString("latitude", "0")?.toDoubleOrNull() ?: 0.0
                 val lon = sp.getString("longitude", "0")?.toDoubleOrNull() ?: 0.0
                 val bear = sp.getFloat("bearing", 0f)
                 val spd = sp.getFloat("speed", 0f)
                 if (isActive) {
+                    if (!isLeaseValid(elapsed)) {
+                        val stale = SpoofLocation(false, lat, lon, 50.0, bear, spd, 0L, elapsed)
+                        cachedLocation = stale
+                        return stale
+                    }
                     if (time > 0L && (nowMs - time > 20_000L)) {
                         val inactive = SpoofLocation(false, lat, lon, 50.0, bear, spd, 0L)
                         cachedLocation = inactive

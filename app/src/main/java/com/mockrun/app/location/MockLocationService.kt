@@ -152,13 +152,25 @@ class MockLocationService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
+        // 用户从最近任务里划掉卡片是一个明确的结束意图。
+        //
+        // 此前这里会调度复活闹钟把服务拉回来继续模拟，而恢复出来的状态又会持续刷新 hook 的租约，
+        // 于是表现为「应用已经关掉了，位置却还停在伪造点上，怎么都回不来」。现在改成真正停下来：
+        // 停掉两个注入协程、把停止状态写回所有持久通道，再结束前台服务。
         val sp = getSharedPreferences(PREFS_MOCK_SERVICE, Context.MODE_PRIVATE)
-        val isPointActive = sp.getBoolean(KEY_IS_POINT_MOCK_ACTIVE, false)
-        val isSimActive = sp.getBoolean(KEY_IS_SIMULATION_ACTIVE, false)
-        if (isPointActive || isSimActive || pointMockJob?.isActive == true || simulationJob?.isActive == true) {
-            android.util.Log.d("MockLocationService", "onTaskRemoved detected active mock, scheduling resurrection alarm")
-            KeepAliveHelper.scheduleServiceResurrection(applicationContext, MockLocationService::class.java)
-        }
+        val wasActive = pointMockJob?.isActive == true ||
+            simulationJob?.isActive == true ||
+            sp.getBoolean(KEY_IS_POINT_MOCK_ACTIVE, false) ||
+            sp.getBoolean(KEY_IS_SIMULATION_ACTIVE, false)
+        if (!wasActive) return
+
+        Diag.i(TAG, "task removed by user — stopping mock and clearing hook state")
+        runCatching { stopSimulation() }.logFailure(TAG, "stopSimulation on task removal")
+        runCatching { stopPointMock() }.logFailure(TAG, "stopPointMock on task removal")
+        runCatching { com.mockrun.app.hook.HookStateBridge.update(this, false) }
+            .logFailure(TAG, "clear hook state on task removal")
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }.logFailure(TAG, "stopForeground on task removal")
+        runCatching { stopSelf() }.logFailure(TAG, "stopSelf on task removal")
     }
 
     private fun restorePersistedState() {
