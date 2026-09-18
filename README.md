@@ -1,19 +1,20 @@
 # FakeGPS-next
 
-> 面向 Android 的虚拟定位与道路巡航仿真工具。界面遵循 Apple Human Interface Guidelines，支持系统框架级 Hook 注入与多应用独立分流。
+> 面向 Android 的虚拟定位与道路巡航仿真工具。界面遵循 Apple Human Interface Guidelines，支持系统框架级 Hook 注入、多应用独立分流、离线运动学仿真与多星座 GNSS 星历合成。
 
 [![Latest Release](https://img.shields.io/github/v/release/Elysia-SHY/FakeGPS-next?color=007AFF&label=Latest%20Release&style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
-[![Android](https://img.shields.io/badge/Android-10_--_15_(API_29--35)-34C759.svg?style=flat-square)](https://developer.android.com)
+[![Android](https://img.shields.io/badge/Android-10%2B_(API_29%2B)-34C759.svg?style=flat-square)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
-[![UI](https://img.shields.io/badge/UI-Jetpack_Compose_·_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
+[![UI](https://img.shields.io/badge/UI-Jetpack_Compose_%C2%B7_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
+[![Injection](https://img.shields.io/badge/Injection-Root_%2F_No--Root-30B0C7.svg?style=flat-square)](#注入模式-injection-modes)
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-[核心交互功能](#核心交互功能-features) · [架构亮点](#架构亮点-key-highlights) · [更新日志](#更新日志-changelog) · [下载最新版本](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
-
-> **当前版本**：`v1.4.6`（`versionCode = 23`）
+> **当前版本**：`v1.5.0`（`versionCode = 27`）
 >
-> 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，其余位置（[`version.json`](version.json)、[`package.json`](package.json)、本文档、[CHANGELOG.md](CHANGELOG.md)）与其保持一致。
+> 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，[`version.json`](version.json)、[`package.json`](package.json)、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
+
+**导航**：[架构亮点](#架构亮点-key-highlights) · [注入模式](#注入模式-injection-modes) · [模式对比](#工作模式对比-operation-modes) · [快速上手](#快速上手-quick-start) · [核心功能](#核心交互功能-features) · [源码构建](#源码构建-build-from-source) · [常见问题](#常见问题-faq) · [更新日志](#更新日志-changelog)
 
 ---
 
@@ -21,33 +22,43 @@
 
 ```mermaid
 graph TD
-    subgraph UI["Client Layer (Apple HIG)"]
-        A["MapScreen / RouteSimulation"] -->|StateFlow| B[SimulationViewModel]
-        B -->|Async Coroutines| C[MockLocationService]
-        B -->|Sync Engine| V[VersionSyncManager]
+    subgraph Client["客户端层 feature/* · Jetpack Compose (Apple HIG)"]
+        A["feature/map · feature/mock<br/>feature/route · feature/settings"] -->|StateFlow| B["ui/viewmodel<br/>SimulationViewModel / MapViewModel"]
+        B -->|协程下发| C["core/location/MockLocationService"]
+        B -.->|版本比对| V["core/data/VersionSyncManager"]
     end
 
-    subgraph Core["Engine Layer"]
+    subgraph Engine["引擎层 core/location"]
         C --> D[MockLocationEngine]
         C --> E[SensorMockEngine]
         C --> K[KinematicsEngine]
+        C --> R[RouteSimulator]
         C --> F[HookStateBridge]
+        P[PermissionCoordinator] -.->|注入前统一裁决| B
     end
 
-    subgraph SystemServer["Android OS system_server (LSPosed)"]
-        F -.->|"ContentProvider IPC / Property"| G[XposedLocationHook]
+    subgraph System["系统框架层 hook/* · LSPosed system_server"]
+        F -.->|"ContentProvider IPC / 系统属性"| G[XposedLocationHook]
         G --> M[MultiTargetRouting]
         G --> H[LocationManagerService]
         G --> I[LocationProviderManager]
         G --> S[SyntheticGnssProvider]
     end
 
-    subgraph Recovery["Hardware Auto-Recovery"]
-        C -->|"Stop Mock"| R["CoordinateConverter.flushRealLocation"]
-        R ==>|"Single Request"| L["NETWORK_PROVIDER / GPS_PROVIDER"]
-        L ==>|"200ms Fresh Fix"| I
+    subgraph Recovery["硬件自愈"]
+        C -->|"停止模拟"| T["CoordinateConverter.flushRealLocation"]
+        T ==>|"单次请求"| L["NETWORK_PROVIDER / GPS_PROVIDER"]
+        L ==>|"约 200ms 取得新定位"| I
     end
 ```
+
+### 双注入模式（Root / 免 Root）
+
+- **一条开关切换**：设置页的「Root 注入模式」决定是否使用 Root 通道，两条路径互相独立。
+- **免 Root 模式**：应用不调用任何 `su`，注入完全依赖标准 `LocationManager.addTestProvider`，由用户在【开发者选项】中手动把本应用勾选为「模拟位置信息应用」。
+- **Root 模式**：通过 `su` 自动授予 `android:mock_location` 应用 op（并按需开启全局开发者选项开关），其余注入路径与免 Root 一致。用户无需手动打开开发者选项。
+- **授权命令健壮性**：`appops` 与 `settings put` 分开执行、互不短路，并依次尝试 `appops set` / `cmd appops set` / `appops set --uid` 三种写法。
+- **权限统一裁决**：所有注入入口（地图页、虚拟定位页、路线页、摇杆服务）统一经过 `PermissionCoordinator`，避免各页面重复判定产生行为分歧。
 
 ### 多应用独立分流路由
 
@@ -75,6 +86,11 @@ graph TD
 - **动态信噪比**：按卫星仰角计算 24 至 42 dB-Hz 的载噪比，室内或遮挡场景叠加多径衰减。
 - **应对搜星异常**：避免开启模拟后出现搜星数为 0、信噪比空缺这类容易被风控标记的状态。
 
+### 框架分层与工程结构
+
+- **分层清晰**：`feature/*`（界面与交互）、`ui/*`（组件、导航、ViewModel）、`core/location`（定位与仿真）、`core/data`（持久化与版本）、`core/designsystem`（主题与控件）、`hook/*`（系统框架层）、`util/*`（通用工具）。
+- **依赖注入**：基于 Hilt 统一装配单例，`PermissionCoordinator`、`RootSuBridge`、`MockLocationEngine` 等跨页面共享。
+
 ### 云端版本与更新同步
 
 - **三级容灾链路**：依次尝试 jsDelivr CDN、`raw.githubusercontent` 与 GitHub Releases API，国内网络下可直接访问，且不受 API 每小时 60 次的限流约束。
@@ -82,15 +98,30 @@ graph TD
 
 ---
 
+## 注入模式 (Injection Modes)
+
+| 项目 | 免 Root 模式 | Root 模式 |
+| :--- | :--- | :--- |
+| **设备门槛** | 无 | 需 Magisk / KernelSU / APatch |
+| **权限获取** | 手动在【开发者选项】勾选本应用为「模拟位置信息应用」 | `su` 自动授予 `android:mock_location` 应用 op |
+| **是否调用 su** | 从不调用 | 仅用于授权与系统扫描恢复 |
+| **注入通道** | 标准 `addTestProvider` | 标准 `addTestProvider`（与免 Root 相同） |
+| **用户手动操作** | 需要（勾选模拟位置应用） | 不需要 |
+
+> **LSPosed 与上面的模式正交**：它是**可选**的系统框架层增强（抗检测、per-app 分流、去除 mock 标记），并非注入的必要条件。Root 模式不开 LSPosed 也能正常注入；开启 LSPosed 后在上述基础上叠加框架层能力。
+
+> **为什么 Root 模式仍要「设置模拟位置应用」？** 因为注入走的是 Android 公开的 `LocationManager.addTestProvider` 通道，系统把该通道锁在 `android:mock_location` 应用 op（即开发者选项里的「模拟位置信息应用」）上。Root 的职责是用 `appops` 自动把这个标记点好，因此你不会看到需要手动打开开发者选项。若要在完全不设置该标记的前提下注入，需要自研 `system_server` 层注入引擎，属另一量级工程。
+
+---
+
 ## 工作模式对比 (Operation Modes)
 
-| 核心特性 | 免 Root 模式 | Root 模式 | LSPosed 模块模式 |
+| 核心特性 | 免 Root 模式 | Root 模式 | 叠加 LSPosed 模块 |
 | :--- | :--- | :--- | :--- |
-| **设备门槛** | 无门槛 | 需 Magisk / KernelSU / APatch | 需已激活 LSPosed |
-| **生效机制** | 开发者选项中的「模拟位置信息应用」 | AppOps 提权 + 传感器注入 | system_server 层改写分发结果 |
+| **生效机制** | 应用进程 `addTestProvider` | 应用进程 `addTestProvider` | system_server 层改写分发结果 |
 | **多应用独立分流** | 仅支持全局单点 | 仅支持全局单点 | 支持每应用绑定独立坐标与路线 |
-| **Mock 标记** | 保留（`isMock = true`） | 依赖应用层规避 | 在系统框架层去除 |
-| **目标应用内注入** | 无 | 存在提权痕迹 | 无，仅系统框架生效 |
+| **Mock 标记** | 保留（`isMock = true`） | 保留（依赖应用层规避） | 在系统框架层去除 |
+| **目标应用内注入** | 无 | 无 | 无，仅系统框架生效 |
 | **停止后恢复真机定位** | 依赖系统重新搜星（约 15 至 60 秒） | 通常在 2 秒内 | 通常快于 300 毫秒 |
 | **步频与计步仿真** | 不开放 | 开放传感器注入 | 开放传感器注入 |
 
@@ -98,18 +129,26 @@ graph TD
 
 ## 快速上手 (Quick Start)
 
-### 方式一：LSPosed 系统框架模式
+### 方式一：免 Root 模式
+
+1. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装最新 APK；
+2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
+3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启虚拟定位」**。
+4. 在设置页确认「Root 注入模式」处于 **关闭** 状态（此为默认以外的选项，默认开启 Root 模式）。
+
+### 方式二：Root 模式
+
+1. 安装最新 APK，确保设备已获取 Root（Magisk / KernelSU / APatch）；
+2. 在设置页把「Root 注入模式」切到 **开启**。首次切换时应用会请求 Root 授权，允许即可；
+3. 应用会自动完成 `android:mock_location` 授权，无需手动进入开发者选项；
+4. 在设置页「Root 权限状态」一行确认显示 **已授权**。
+
+### 方式三：叠加 LSPosed 系统框架（可选增强）
 
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装 **FakeGPS-next-v1.4.6-release.apk**；
-3. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
-4. 重启设备，或软重启 `system_server` 后生效。
-
-### 方式二：免 Root 模式
-
-1. 安装 FakeGPS-next-v1.4.6-release.apk；
-2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
-3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启单点定位」**。
+2. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
+3. 重启设备，或软重启 `system_server` 后生效；
+4. 回到应用设置页，「LSPosed 系统框架」一行应显示 **已接管系统框架**。
 
 ---
 
@@ -119,6 +158,7 @@ graph TD
 - **多应用分流管理**：首页以抽屉式卡片列表展示分流规则，可自由添加应用并配置专属坐标；未配置的应用保持真实定位。
 - **全路网道路巡航**：支持驾车、骑行、步行三种路网模型，沿真实道路平滑移动，可导入 GPX 路线文件。
 - **桌面悬浮摇杆**：具备阻尼回弹与航向锁定，可实时调整配速（步行 5 km/h、跑步 12 km/h、骑行 25 km/h、驾车 60 km/h，以及瞬移）。
+- **收藏与路线库**：地点收藏与航线收藏分列呈现，点按即可把地图与十字准星移到该点或载入该航线。
 - **运行诊断**：关于页可一键查看设备型号、Android API 级别、CPU 架构与模块运行状态。
 
 ---
@@ -129,7 +169,8 @@ graph TD
 
 - **JDK**：OpenJDK 17
 - **Android SDK**：API Level 34 (Android 14)
-- **Gradle**：8.4 及以上
+- **Gradle**：8.4（仓库内 `gradle/wrapper` 已固定）
+- **Kotlin**：1.9.22 · **AGP**：8.2.2 · **Compose BOM**：2024.02.00
 
 ```bash
 # 1. 克隆代码仓库
@@ -145,7 +186,27 @@ cd FakeGPS-next
 
 编译产物位于 `app/build/outputs/apk/release/app-release.apk`。
 
-> 本地构建未设置 `FAKEGPS_KEYSTORE` 环境变量，release 使用 AGP 的 debug 签名，与仓库内已发布的 APK **签名身份不同**。
+> 本地构建未设置 `FAKEGPS_KEYSTORE` 环境变量时，release 使用 AGP 的 debug 签名，与仓库内已发布的 APK **签名身份不同**。
+
+### 源码结构
+
+```
+app/src/main/java/com/mockrun/app/
+├── MainActivity.kt / MockRunApplication.kt
+├── core/
+│   ├── data/          持久化、GPX 解析、分流规则、版本同步
+│   ├── designsystem/  主题、颜色、字体、iOS 风格控件、动效
+│   └── location/      服务、注入引擎、仿真引擎、权限协调、坐标转换
+├── domain/model/      领域模型（Route / WayPoint / MultiTargetRule 等）
+├── feature/
+│   ├── map/           地图选点与巡航控制
+│   ├── mock/          虚拟定位控制台
+│   ├── route/         路线模拟与路线库
+│   └── settings/      设置与关于
+├── hook/              系统框架层（LSPosed）
+├── ui/                通用组件、导航、ViewModel
+└── util/              诊断、注入模式、权限工具
+```
 
 ### 自动构建与发布 (GitHub Actions)
 
@@ -164,30 +225,49 @@ APK 之所以必须提交进仓库，而不是只作为 Release 资产：应用�
 
 ---
 
+## 常见问题 (FAQ)
+
+**Q：Root 模式为什么还要「模拟位置信息应用」这个设置？**
+A：注入使用 Android 公开的 `LocationManager.addTestProvider`，该 API 被系统锁在 `android:mock_location` 应用 op（即开发者选项的「模拟位置信息应用」）上。Root 的作用是自动授予该权限，所以用户不需要手动操作，但这个标记客观上会被设置。
+
+**Q：停用模拟后位置没有立刻恢复？**
+A：停止路径会清理全部测试 Provider 并主动向 `GPS_PROVIDER` / `NETWORK_PROVIDER` 发起单次请求，通常数秒内恢复；室内无卫星信号时可能需要数十秒重新搜星。若长时间不恢复，请在设置页执行「恢复系统高精度定位」并确认 Wi-Fi 与蓝牙扫描未被关闭。
+
+**Q：升级安装失败怎么办？**
+A：确认新旧包签名一致。v1.4.2 起 CI 使用固定密钥，可从 v1.4.2 直接覆盖升级；v1.4.1 及更早为 debug 签名，需先卸载再安装（会清除收藏与分流配置）。
+
+**Q：不开 LSPosed 能用吗？**
+A：可以。Root 模式与免 Root 模式都不依赖 LSPosed，LSPosed 只提供系统框架层的额外能力（per-app 分流、去除 mock 标记、硬件静默时主动喂点）。
+
+---
+
 ## 更新日志 (Changelog)
 
 完整的历史演进记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-- **[v1.4.6]** (2026-09-18)：重做微信/打卡软件仍显示真实位置的排查板块。板块只保留 Root 功能「一键关闭蓝牙 / Wi-Fi 与背景扫描」（关闭 WLAN 始终扫描、蓝牙始终扫描、Wi-Fi 唤醒并关闭 Wi-Fi 与蓝牙射频），移除「微信强停/权限」入口；未 Root 时按钮改为跳转系统定位设置引导手动关闭扫描开关。
-- **[v1.4.5]** (2026-09-18)：修复 root 模式下停止模拟后位置仍有残留的问题：划掉卡片不再自愈复活续租，伪造配置改用单调时钟租约判定是否过期（重启后残留与系统时间倒退都不再被当成有效）。停止时仍清理全部持久通道并恢复定位与扫描开关。
-- **[v1.4.4]** (2026-09-18)：只改系统层 Hook，解决「坐标是对的但目标应用不动」的三类情况。Provider 状态查询（isProviderEnabled / getBestProvider / getProviders）在伪造生效时返回一致结果，避免应用查完就放弃请求；注册登记补到 requestLocationUpdatesLocked，硬件静默时仍有可推送目标；新增守护线程在 GPS 关闭或室内无信号时按 1 秒间隔主动喂点，硬件正常上报时不重复推送；伪造点的海拔、方位角、速度、精度与卫星数不再留 0，避免被应用判为无效定位丢弃。
-- **[v1.4.3]** (2026-09-16)：新增右上角收藏夹入口，把地点收藏与航线收藏分开呈现。定位标签与路线标签的右上角工具胶囊里新增收藏夹按钮（紧邻底图切换），点按即打开本类收藏清单，不必再展开底部面板。「定位」列出以单点入库的收藏地点并显示 WGS-84 坐标，点按即把地图与十字准星移到该点并设为当前目标，不写入绘制航点与已选路线；「路线」列出手绘、GPX 导入与沿路规划的航线，显示折点数与总里程，点按即载入为当前路线并标注当前已载入的那条。两类收藏同源，按航点数区分（收藏地点恒为 1 个航点、航线至少 2 个），因此无需给 `RouteEntity` 增加类型列与数据库迁移，升级不丢既有数据；弹层内可直接删除，带二次确认。
-- **[v1.4.2]** (2026-09-15)：修复两处收藏缺陷，并把发布流程改为 GitHub Actions 自动构建。其一，首页（定位标签）「收藏此点」失效：该按钮此前复用 `saveCurrentRoute()`，而后者读取手绘航点并要求至少 2 个点，定位标签下航点恒为空，函数在 `size < 2` 守卫处直接返回，收藏既不落库也不报错，界面却仍提示成功；现新增 `MapViewModel.saveLocationPoint()` 以单点构造 `Route` 入库并回传真实结果。其二，release 构建下「收藏路线」必闪退：`RouteRepository.toDomain()` 的 `object : TypeToken<List<WayPoint>>() {}` 在 R8 处理后丢失泛型签名，Gson 抛 `IllegalStateException: TypeToken must be created with a type argument`，且该句位于 `runCatching` 之外，异常直接终止进程；现改用 `TypeToken.getParameterized()` 运行时组装类型，`MultiTargetRepository` 的同类写法一并修正，并在 `proguard-rules.pro` 补入 Gson 保留规则。此外，地址未解析完成时收藏命名回退为「纬度, 经度」，坐标非法时拒绝入库并记入 `Diag`。本版同时包含 v1.4.1 之后 main 上已合入的「稳定晶体玻璃」UI 回滚。
-- **[v1.4.1]** (2026-09-12)：安全加固，不新增功能。跨进程接口 `HookConfigProvider` 改为按调用方 uid 校验，只放行应用自身、system、root 与 shell；hook 配置文件权限由 `0666` 收紧为 `0644`，保留跨进程只读，去掉任意应用改写坐标的通道；`AdbCommandReceiver` 增加 `WRITE_SECURE_SETTINGS` 权限保护。另修复一处导入冲突导致的编译问题。
-- **[v1.4.0]** (2026-09-12)：可观测性专项，不改业务逻辑。新增统一诊断出口 `Diag`（App 进程走 `Log`，被注入进程额外镜像到 `XposedBridge`，按标签限流 10 秒 5 条）与 `Result.logFailure()`，为 94 处 `runCatching` 中的 63 处补上失败记录；修复在线更新把 `v1.3.9` 解析成 `139` 导致每次启动都提示更新的问题；下载 APK 增加签名证书比对，与已安装应用不一致时拒绝安装。
-- **[v1.3.9]** (2026-09-12)：修复滑动时卡片毛玻璃画面偏移，精简自定义壁纸逻辑，上移右侧浮动按钮避让底栏，去掉地图上的模糊残影。
-- **[v1.3.8]** (2026-09-12)：卡片毛玻璃改为全局通用（双 `HazeState`），关于页支持自定义背景，底栏拖动时页面跟随联动。
-- **[v1.3.7]** (2026-09-12)：毛玻璃材质改为静态晶体微光方案：多层渐变半透明底衬、细高光描边、内侧倒角高光，高光绘制下沉到 `drawBehind` 以保持前景文字与图标的对比度；更新弹窗背景同步适配。
-- **[v1.3.6]** (2026-09-12)：新增 GitHub Release 与 jsDelivr CDN 在线更新（官方 API 检查、CDN 分发、启动弹窗与下载安装、Android 8 至 15 适配）；引入 Chris Banes Haze 毛玻璃渲染库；关于页新增开源致谢与依赖清单。
-- **[v1.3.5]** (2026-09-12)：版本同步改为多源并发竞速，解决挂加速器或 VPN 时拉取不到最新版的问题；应用内支持直接下载并安装 APK（含进度与速度显示、断点轮询）；修复路线模拟与定位搜索框文字被上下裁切。
-- **[v1.3.4]** (2026-09-12)：路线模拟支持 POI 与地名搜索（选点阶段新增搜索栏与联想下拉卡片）；路线模式 UI 精简，移除顶部横幅与冗余按钮；分流控制面板纵向结构优化。
-- **[v1.3.3]** (2026-09-12)：独立应用分流选点交互重构（准心指示、底部面板保存确认、按需落盘）；路线巡航与分流模式解耦，两者可同时使用。
-- **[v1.3.2]** (2026-09-12)：介绍页 UI 重构，解决标签挤压并扩充底部安全边距；新增云端版本与更新日志自动同步；新增设备环境与运行诊断面板。
-- **[v1.3.1]** (2026-09-12)：补全 `HookConfigProvider` 导出，解决派发监听器的 CallerIdentity 解析问题；定点驻留模式增加 AOSP 丢包抑制。
+- **[v1.5.0]** (2026-09-19)：新增 `PermissionCoordinator` 统一注入前的权限裁决；Root 模式改为以授权命令结果放行，规避 `AppOpsManager` 进程内读取外部 `su` 写入时的缓存延迟导致误弹；授权命令拆分执行，避免 `&&` 短路。
+- **[v1.4.7]** (2026-09-18)：新增「Root 注入模式」开关，把 Root 与免 Root 两条注入路径分离；LSPosed 明确为可选增强层。
+- **[v1.4.8 / v1.4.9]**：已撤回。两版均未解决 Root 模式的权限弹窗问题，Release 与 tag 已一并移除。
+- **[v1.4.6]** (2026-09-18)：重做「微信 / 打卡软件仍显示真实位置」排查板块，只保留 Root 一键关闭蓝牙 / Wi-Fi 与背景扫描；未 Root 时改为跳转系统设置引导。
+- **[v1.4.5]** (2026-09-18)：修复 Root 模式停止模拟后位置残留：划掉卡片不再自愈复活续租，伪造配置改用单调时钟租约判定过期。
+- **[v1.4.4]** (2026-09-18)：系统层 Hook 补齐 provider 状态查询、`requestLocationUpdatesLocked` 注册登记与硬件静默时的主动喂点；伪造点补齐海拔、方位角、速度、精度与卫星数。
+- **[v1.4.3]** (2026-09-16)：新增右上角收藏夹入口，地点收藏与航线收藏分列呈现，按航点数区分、无需数据库迁移。
+- **[v1.4.2]** (2026-09-15)：修复「收藏此点」失效与 release 下「收藏路线」闪退；发布流程迁移到 GitHub Actions。
+- **[v1.4.1]** (2026-09-12)：安全加固：`HookConfigProvider` 按调用方 uid 收闸、配置文件权限收紧为 `0644`、`AdbCommandReceiver` 增加权限保护。
+- **[v1.4.0]** (2026-09-12)：可观测性专项：新增统一诊断出口 `Diag` 与 `Result.logFailure()`，为多处 `runCatching` 补上失败记录；修复版本解析误报；下载包增加签名比对。
+- **[v1.3.9]** (2026-09-12)：修复滑动时卡片毛玻璃偏移，精简壁纸逻辑，调整浮动按钮避让。
+- **[v1.3.8]** (2026-09-12)：卡片毛玻璃改为全局通用，关于页支持自定义背景，底栏拖动联动。
+- **[v1.3.7]** (2026-09-12)：毛玻璃材质改为静态晶体微光方案。
+- **[v1.3.6]** (2026-09-12)：新增 GitHub Release 与 jsDelivr CDN 在线更新；引入 Haze 毛玻璃渲染库；关于页新增开源致谢与依赖清单。
+- **[v1.3.5]** (2026-09-12)：版本同步改为多源并发竞速；应用内支持直接下载并安装 APK。
+- **[v1.3.4]** (2026-09-12)：路线模拟支持 POI 与地名搜索；路线模式 UI 精简。
+- **[v1.3.3]** (2026-09-12)：独立应用分流选点交互重构；路线巡航与分流模式解耦。
+- **[v1.3.2]** (2026-09-12)：介绍页 UI 重构；新增云端版本同步与设备环境诊断面板。
+- **[v1.3.1]** (2026-09-12)：补全 `HookConfigProvider` 导出；定点驻留模式增加 AOSP 丢包抑制。
 - **[v1.3.0]** (2026-09-11)：多应用独立分流路由首发；离线物理动力学仿真引擎；动态多星座 GNSS 星历合成。
 - **[v1.2.2]** (2026-09-11)：启用 R8 混淆与资源压缩，安装包由 56.2 MB 降至 3.53 MB；修复 MapView 内存泄漏与长航点跨进程传输异常。
-- **[v1.2.1]** (2026-09-10)：解决退出后定位残留；不再改动系统扫描设置；实现室内 Wi-Fi 自愈刷新；适配 Android 12 至 15 的 LocationResult。
-- **[v1.2.0]** (2026-09-10)：修复开启模拟时的界面卡顿与 ANR 风险；引入 20 秒心跳超时；注销测试 Provider 以复位系统状态。
+- **[v1.2.1]** (2026-09-10)：解决退出后定位残留；不再改动系统扫描设置；实现室内 Wi-Fi 自愈刷新。
+- **[v1.2.0]** (2026-09-10)：修复开启模拟时的界面卡顿与 ANR 风险；引入 20 秒心跳超时。
 - **[v1.1.0]** (2026-09-09)：适配 Apple HIG 暗黑模式；新增高德夜间色阶矩阵滤镜；支持平板分屏布局。
 - **[v1.0.0]** (2026-09-09)：正式版首发，包含权限引导向导与三模自适应架构。
 
