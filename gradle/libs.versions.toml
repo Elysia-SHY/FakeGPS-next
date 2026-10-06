@@ -1,13 +1,14 @@
 [versions]
 agp = "8.2.2"
-kotlin = "1.9.22"
-ksp = "1.9.22-1.0.17"
+kotlin = "2.0.21"
+ksp = "2.0.21-1.0.28"
 coreKtx = "1.12.0"
-composeBom = "2024.02.00"
+composeBom = "2024.10.01"
 activityCompose = "1.8.2"
 lifecycleRuntimeKtx = "2.7.0"
 navigationCompose = "2.7.7"
-hilt = "2.50"
+hilt = "2.52"
+haze = "1.0.0"
 hiltNavigationCompose = "1.1.0"
 room = "2.6.1"
 osmdroid = "6.1.17"
@@ -36,9 +37,11 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

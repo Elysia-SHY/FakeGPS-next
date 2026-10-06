@@ -6,6 +6,7 @@ import java.util.Locale
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -75,7 +76,6 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.8" }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
     lint {
         abortOnError = false
@@ -118,7 +118,7 @@ dependencies {
     implementation(libs.gson)
 
     // Chris Banes Haze (Glassmorphism / Frosted Glass)
-    implementation("dev.chrisbanes.haze:haze:0.7.3")
+    implementation(libs.haze)
 
     // LSPosed / Xposed API (compileOnly, never pack into dex)
     compileOnly("de.robv.android.xposed:api:82")
