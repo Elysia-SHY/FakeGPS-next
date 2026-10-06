@@ -17,7 +17,27 @@
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
 
-### v1.6.1 构建信息（待 CI 构建）
+### v1.6.1 构建信息
+
+- **构建时间**：2026-10-07（CI run [`37522394539`](https://github.com/Elysia-SHY/FakeGPS-next/actions/runs/37522394539)，conclusion `success`，耗时约 5 分 45 秒）
+- **构建环境**：GitHub Actions `ubuntu-latest`，JDK 17（temurin），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`sh ./gradlew :app:assembleRelease --no-daemon --stacktrace`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **APK 大小**：4,244,503 bytes
+- **APK SHA-256**：`a678ff7915a24a99deacc8bef4fe223c68fce0bce9f9b94c981f696d2411d0a7`
+- **tag → commit**：`v1.6.1` → `850eababb17d3fe1423f676449c7c669b034b2ce`（tag 已由 CI 强移至携带 APK 的提交）
+- **产物提交信息**：`release: v1.6.1 (versionCode 30) — CI 构建产物`
+- **源码提交**：`d60b951`（UI 重构）← `0918625`（工具链升级）← `7d4d3f4`（v1.6.0 产物）
+- **交付安装包路径**：`D:\Desktop\fake gps\FakeGPS-next-v1.6.1-release.apk`
+- **Release**：https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v1.6.1
+- **本次改动要点**：
+  1. **设计系统重标定至 v1.7.0。** 品牌色 `#007AFF` → `#2F7BFF`；新增背景层级、描边与玻璃三件套 token；新增 `AppShapes`（66 / 36 / 32 / 24 / 22 / 16 / 13 / 9 圆角阶梯）与 `AppSpacing`（8pt 网格 + 三档底部预留）；全工程 146 处零散圆角归一。
+  2. **接入 Haze 1.0.0 真毛玻璃。** 底部 Tab 栏、地图浮层与滚动页卡片具备真实 GPU 高斯模糊（blur 30 / saturate 180%）与背景折射。
+  3. **消除地图浮层穿模。** 地图由 `AndroidView` 承载原生 `MapView`，不在 Compose 绘制树内，Haze 源图层捕获为空；现将无源兜底由半透明改为**不透明磨砂板**，并移除无效的模糊源接线。
+  4. **修复浅色主题不跟随。** 底部 Tab 栏与地图图钉提示条原为硬编码深色常量，绕过语义调色板；改为主题化 token（新增 `glassBgBar` / `pinTipBg`），并修正浅色下未选中/选中项对比度。
+  5. **工具链升级。** Kotlin 1.9.22 → 2.0.21，Compose BOM 2024.02.00 → 2024.10.01，Hilt 2.50 → 2.52，新增 Haze 1.0.0；AGP 8.2.2 / Gradle 8.4 / compileSdk 34 / minSdk 29 不变。
+- **编译/构建验证**：本机 `assembleDebug` BUILD SUCCESSFUL；CI `assembleRelease` conclusion `success`；dex 内已确认含 `v1.6.1` 版本串；Release 资产 SHA-256 与下载件实测一致。
+- **真机验证状态**：v1.6.0 之后由用户真机反馈并已修复的两轮问题为——「地图抽屉右侧穿模 + 卡片无模糊」、「浅色主题下底栏与图钉提示条仍为深色」。**本 v1.6.1 release 包下发前未再经真机复验**（本机无 Android 设备/模拟器）。
 
 ### v1.6.0 构建信息
 
