@@ -80,12 +80,12 @@ fun RouteConfigDialog(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .clickable {
                                     speedVal = p.speed
                                     onSpeedChange(p.speed)
                                 },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(13.dp),
                             color = if (isSelected) IosColors.SystemBlue else IosColors.SystemGray6
                         ) {
                             Column(
@@ -178,12 +178,12 @@ fun RouteConfigDialog(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Text("确定", fontWeight = FontWeight.Bold)
             }
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         containerColor = MaterialTheme.colorScheme.surface
     )
 }

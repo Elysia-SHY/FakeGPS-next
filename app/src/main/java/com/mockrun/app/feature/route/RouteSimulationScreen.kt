@@ -110,43 +110,38 @@ fun RouteSimulationScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // =====================================================================
-        // 1. Apple Large Title Navigation Header
+        // 1. Page Head —— 与「虚拟定位 / 关于」页共用同一排版基准
+        //    设计稿 .page-head：kicker 13 次色 + 30-800 大标题 + 徽标 + 版本芯片
+        //    此处手写而非复用 IosPageHead，是为了保留 SimulationStatus 的
+        //    五态配色（待机/运行/暂停/完成/异常），IosPageHead 的 badge 只有两态。
         // =====================================================================
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Column {
-                Text(
-                    text = "拟真配速与多点巡航漫游",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel,
-                    fontWeight = FontWeight.Medium
+                .padding(
+                    start = AppSpacing.pageH + 4.dp,
+                    end = AppSpacing.pageH,
+                    top = 10.dp,
+                    bottom = 22.dp
                 )
+        ) {
+            Text(
+                text = "拟真配速与多点巡航漫游",
+                style = IosTypography.Footnote,
+                color = IosColors.SecondaryLabel
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "路线模拟",
-                    style = IosTypography.LargeTitle,
-                    color = IosColors.Label
+                    style = IosTypography.Display,
+                    color = IosColors.Label,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Spacer(Modifier.weight(1f))
                 StatusBadge(simState.status)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = IosColors.SystemGreen.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = BuildConfig.VERSION_NAME,
-                        color = IosColors.SystemGreen,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                    )
-                }
+                Spacer(Modifier.width(10.dp))
+                IosVerChip(text = BuildConfig.VERSION_NAME)
             }
         }
 
@@ -155,7 +150,7 @@ fun RouteSimulationScreen(
         // =====================================================================
         IosSectionHeader("当前规划路线")
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(isLiquidGlass = false) {
             if (selectedRoute != null && (selectedRoute?.waypoints?.size ?: 0) >= 2) {
                 val r = selectedRoute!!
                 val totalDistanceKm = r.totalDistanceKm
@@ -180,9 +175,9 @@ fun RouteSimulationScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(13.dp))
                             .bouncyClickable { onNavigateToMap() },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue.copy(alpha = 0.12f)
                     ) {
                         Row(
@@ -200,9 +195,9 @@ fun RouteSimulationScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(13.dp))
                             .bouncyClickable { showRoutePickerDialog = true },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue.copy(alpha = 0.12f)
                     ) {
                         Row(
@@ -246,9 +241,9 @@ fun RouteSimulationScreen(
                         modifier = Modifier
                             .weight(1.2f)
                             .height(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(13.dp))
                             .bouncyClickable { showRoutePickerDialog = true },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue
                     ) {
                         Row(
@@ -266,9 +261,9 @@ fun RouteSimulationScreen(
                         modifier = Modifier
                             .weight(0.9f)
                             .height(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(13.dp))
                             .bouncyClickable { gpxPickerLauncher.launch(arrayOf("*/*")) },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue.copy(alpha = 0.12f)
                     ) {
                         Row(
@@ -290,7 +285,7 @@ fun RouteSimulationScreen(
         // =====================================================================
         IosSectionHeader("巡航控制与看板")
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Metric stats
                 Row(
@@ -407,7 +402,7 @@ fun RouteSimulationScreen(
         // =====================================================================
         IosSectionHeader("巡航配速控制")
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -416,7 +411,7 @@ fun RouteSimulationScreen(
                 ) {
                     Text("当前配速", style = IosTypography.Headline, color = IosColors.Label)
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue.copy(alpha = 0.12f)
                     ) {
                         Text(
@@ -461,7 +456,7 @@ fun RouteSimulationScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(38.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(chipBg)
                                 .bouncyClickable { applySpeed(speedVal) },
                             contentAlignment = Alignment.Center
@@ -512,7 +507,7 @@ fun RouteSimulationScreen(
                 // Custom Numerical Speed Input in clean seamless pill style (无多余外包边)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = IosColors.TertiarySystemFill.copy(alpha = 0.45f)
                 ) {
                     Row(
@@ -552,7 +547,7 @@ fun RouteSimulationScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(9.dp),
                             color = IosColors.SystemBlue.copy(alpha = 0.12f)
                         ) {
                             Text(
@@ -574,7 +569,7 @@ fun RouteSimulationScreen(
         if (isRootActive == true) {
             IosSectionHeader("运动步频与计步仿真 (Root 专享)")
 
-            IosInsetGroupCard {
+            IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Switch Row
                 Row(
@@ -677,7 +672,7 @@ fun RouteSimulationScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(13.dp))
                                     .background(chipBg)
                                     .bouncyClickable {
                                         val targetCadence = when (mode) {
@@ -728,7 +723,7 @@ fun RouteSimulationScreen(
                                 singleLine = true,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .background(IosColors.TertiarySystemFill.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+                                    .background(IosColors.TertiarySystemFill.copy(alpha = 0.45f), RoundedCornerShape(13.dp))
                                     .padding(horizontal = 10.dp)
                             )
                             Spacer(Modifier.width(8.dp))
@@ -760,7 +755,7 @@ fun RouteSimulationScreen(
         if (isRootActive == true) {
             IosSectionHeader("GPS 底层拟真与抗检测 (Root 专享)")
 
-            IosInsetGroupCard {
+            IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 // Realism Engine Status Banner
                 Row(
@@ -888,13 +883,13 @@ fun RouteSimulationScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .bouncyClickable {
                                         mapViewModel.selectRoute(route)
                                         showRoutePickerDialog = false
                                         Toast.makeText(context, "已载入路线: ${route.name}", Toast.LENGTH_SHORT).show()
                                     },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color = if (selectedRoute?.id == route.id) IosColors.SystemBlue.copy(alpha = 0.12f) else IosColors.TertiarySystemFill,
                                 border = BorderStroke(0.5.dp, if (selectedRoute?.id == route.id) IosColors.SystemBlue else IosColors.Separator.copy(alpha = 0.3f))
                             ) {
@@ -929,7 +924,7 @@ fun RouteSimulationScreen(
                     }
                 }
             },
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             containerColor = IosColors.SecondaryGroupedBackground
         )
     }
@@ -950,14 +945,14 @@ private fun StatusBadge(status: SimulationStatus) {
 
     Surface(
         color = color.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(12.dp)
+        shape = AppShapes.pill
     ) {
         Text(
             text = text,
             color = color,
-            style = IosTypography.Caption1,
+            style = IosTypography.Chip,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
 }
@@ -982,7 +977,7 @@ private fun GpsFeatureCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         color = IosColors.TertiarySystemFill.copy(alpha = 0.4f)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {

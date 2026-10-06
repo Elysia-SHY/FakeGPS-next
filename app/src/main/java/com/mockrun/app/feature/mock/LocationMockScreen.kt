@@ -165,11 +165,15 @@ fun LocationMockScreen(
 
     val isLiquidGlass = LocalLiquidGlassEnabled.current
 
+    // 本页专属模糊源：AppBackground 铺底当源层，卡片玻璃采样它 ——
+    // 两者是同一个 Box 下的兄弟节点，不会自引用。
+    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        AppBackground()
+        AppBackground(hazeState = pageHaze)
 
         Column(
             modifier = Modifier
@@ -181,114 +185,34 @@ fun LocationMockScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
         // =====================================================================
-        // 1. Apple Large Title Navigation Header
+        // 1. 页面头（设计稿 .page-head：kicker + 30/800 大标题 + 状态徽标 + 版本芯片）
         // =====================================================================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Column {
-                Text(
-                    text = "系统底层虚拟定位与全向漫游",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "虚拟定位",
-                    style = IosTypography.LargeTitle,
-                    color = IosColors.Label
-                )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isMockOn) IosColors.SystemGreen.copy(alpha = 0.15f) else IosColors.SystemGray.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = if (isMockOn) "🟢 模拟生效中" else "⚪ 待机中",
-                        color = if (isMockOn) IosColors.SystemGreen else IosColors.SecondaryLabel,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = BuildConfig.VERSION_NAME,
-                        color = IosColors.SystemBlue,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                    )
-                }
-            }
-        }
+        IosPageHead(
+            kicker = "系统底层虚拟定位与全向漫游",
+            title = "虚拟定位",
+            badgeText = if (isMockOn) "模拟生效中" else "待机中",
+            badgeRunning = isMockOn,
+            chipText = BuildConfig.VERSION_NAME
+        )
 
         // =====================================================================
-        // WeChat / Anti-Detection Troubleshooter Banner
+        // 反检测排查警告条（设计稿 .alert —— 橙渐变 + 36dp 图标 + 行动链接）
         // =====================================================================
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .bouncyClickable { showWeChatGuideSheet = true }
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = 6.dp,
-                    containerColor = IosColors.SystemOrange.copy(alpha = 0.16f)
-                ),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.Transparent
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = IosColors.SystemOrange,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "微信/打卡软件仍显示真实位置？",
-                        style = IosTypography.Subheadline,
-                        fontWeight = FontWeight.Bold,
-                        color = IosColors.SystemOrange
-                    )
-                    Text(
-                        text = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
-                    )
-                }
-                Text(
-                    text = "排查解决 ▾",
-                    style = IosTypography.Caption1,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IosColors.SystemOrange
-                )
-            }
-        }
+        IosAlertBanner(
+            title = "微信/打卡软件仍显示真实位置？",
+            subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
+            actionText = "排查解决",
+            onAction = { showWeChatGuideSheet = true },
+            icon = Icons.Default.Info,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         // =====================================================================
         // 2. Target Location & Primary Master Controller (iOS Inset Group Card)
         // =====================================================================
         IosSectionHeader("目标位置与主控")
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             // Address & Coordinate Detail Row
             Row(
                 modifier = Modifier
@@ -437,7 +361,7 @@ fun LocationMockScreen(
             )
         }
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             if (multiTargetRules.isEmpty()) {
                 Column(
                     modifier = Modifier
@@ -461,7 +385,7 @@ fun LocationMockScreen(
                     Button(
                         onClick = { showAppPickerSheet = true },
                         colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(13.dp)
                     ) {
                         Text("+ 添加分流应用", style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
                     }
@@ -497,7 +421,7 @@ fun LocationMockScreen(
         // =====================================================================
         IosSectionHeader("悬浮摇杆漫游")
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             IosListRow(
                 title = "桌面万向悬浮摇杆",
                 subtitle = "常驻桌面浮窗，八方向实时移动",
@@ -586,7 +510,7 @@ fun LocationMockScreen(
             )
         }
 
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             // Item 0: Developer Options Mock Location App Check
             IosListRow(
                 title = "开发者选项模拟位置",
@@ -765,7 +689,7 @@ fun LocationMockScreen(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
         )
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             IosListRow(
                 title = "应用自启动管理",
                 subtitle = "跳转当前系统启动管理，允许 Fake GPS 自启动与关联启动",
@@ -811,7 +735,7 @@ fun LocationMockScreen(
         }
 
         // Root One-Click Anti-Flashback Optimization
-        IosInsetGroupCard {
+        IosInsetGroupCard(hazeState = pageHaze) {
             IosListRow(
                 title = "恢复系统高精度定位",
                 subtitle = if (isRootMode && isRootAvailable) "配置模拟权限与 Wi-Fi/蓝牙辅助定位" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",

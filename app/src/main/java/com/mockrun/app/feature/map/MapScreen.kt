@@ -246,10 +246,21 @@ fun MapScreen(
         }
     }
 
+    // ⚠️ 地图页**不接** Haze 模糊源。
+    //
+    // OSMDroid 的 MapView 由 AndroidView 承载，是原生 View —— 它在独立的 View 层级里
+    // 由系统绘制，不进入 Compose 的绘制指令流。而 Haze 只捕获 Compose 自己绘制的内容
+    // （它把源内容 record 进一个 GraphicsLayer），所以给它挂 hazeSource 录出来的图层
+    // 是空的 —— 真机实测结果：地图页浮层全部没有模糊，只剩 72% 半透明底板，
+    // 背后的真实地图与右侧 FAB 列直接透出来，也就是看到的那处「穿模」。
+    //
+    // 因此这里不再提供源。去掉后，MapScreen 内所有 liquidGlass 会自动走到
+    // 「不透明磨砂板」兜底分支（见 LiquidGlassModifier），穿模随之消失，
+    // 也不会为一个永远捕获不到的空图层白烧 GPU。
+    // 底栏不受影响：它用的是 AppNavigation 的全局源（纯 Compose 内容，可正常捕获）。
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        // ① 地图层（原生 View，不参与 Haze 捕获）
+        Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -530,9 +541,12 @@ fun MapScreen(
                     Surface(
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .heightIn(max = 46.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(20.dp))
+                            .clip(AppShapes.panel)
+                            .liquidGlass(
+                                isLiquidGlass = isLiquidGlass,
+                                shape = AppShapes.panel,
+                                elevation = 14.dp
+                            )
                             .bouncyClickable {
                                 val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                                 val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(activeCoord.first, activeCoord.second) else activeCoord
@@ -541,34 +555,44 @@ fun MapScreen(
                                     animateTo(GeoPoint(tLat, tLon))
                                 }
                             },
-                        color = IosFrostedCapsule,
-                        shadowElevation = 6.dp
+                        color = Color.Transparent,
+                        shape = AppShapes.panel
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(11.dp)
                         ) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = activeRuleColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
+                            // 设计稿 .topbar__pin —— 34dp / r12 着色图标块
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(activeRuleColor.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = activeRuleColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
-                                    text = if (activeMapTab == MapTab.ROUTE) "全局路线巡航 · ${BuildConfig.VERSION_NAME}" else if (activeRule != null) "${activeRule.appName} 独立分流 · ${BuildConfig.VERSION_NAME}" else "全局模拟 · ${BuildConfig.VERSION_NAME}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = activeRuleColor,
-                                    fontWeight = FontWeight.SemiBold,
+                                    text = if (activeMapTab == MapTab.ROUTE) "路线巡航"
+                                    else if (activeRule != null) "${activeRule.appName} 独立分流"
+                                    else "全局模拟",
+                                    style = IosTypography.BarTitle,
+                                    color = IosColors.Label,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
+                                Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = currentAddressText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = IosColors.Label,
+                                    style = IosTypography.BarSub,
+                                    color = IosColors.SecondaryLabel,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
@@ -576,17 +600,20 @@ fun MapScreen(
                         }
                     }
 
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
 
                     // Right: Floating Map Tools Pill (Map layer, GPX, Undo, Clear, Save)
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = IosFrostedCapsule,
-                        border = BorderStroke(0.5.dp, IosHairlineBorder),
-                        shadowElevation = 6.dp
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color.Transparent,
+                        modifier = Modifier.liquidGlass(
+                            isLiquidGlass = isLiquidGlass,
+                            shape = RoundedCornerShape(22.dp),
+                            elevation = 14.dp
+                        )
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Road Route Planner Button (Only in ROUTE mode)
@@ -673,37 +700,46 @@ fun MapScreen(
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Item 0: Global Default
                         item {
                             val isSelected = activeTargetKey == null
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isSelected) IosColors.SystemBlue else IosFrostedCapsule,
-                                border = BorderStroke(0.5.dp, if (isSelected) IosColors.SystemBlue else IosHairlineBorder),
-                                shadowElevation = if (isSelected) 4.dp else 2.dp,
-                                modifier = Modifier.bouncyClickable {
-                                    simulationViewModel.setActiveTargetKey(null)
-                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                    val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
-                                        ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
-                                        ?: centerAimingCoord
-                                    centerAimingCoord = targetCoord
-                                    val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
-                                    mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
-                                }
+                                shape = AppShapes.pill,
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .height(44.dp)
+                                    .liquidGlass(
+                                        isLiquidGlass = isLiquidGlass,
+                                        shape = AppShapes.pill,
+                                        elevation = if (isSelected) 14.dp else 8.dp,
+                                        containerColor = if (isSelected) IosColors.SystemBlue else null
+                                    )
+                                    .bouncyClickable {
+                                        simulationViewModel.setActiveTargetKey(null)
+                                        val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                        val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
+                                            ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
+                                            ?: centerAimingCoord
+                                        centerAimingCoord = targetCoord
+                                        val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
+                                        mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                                    }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 20.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
                                     Text(
-                                        text = "🌐 全局通用",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        text = "全局通用",
+                                        style = IosTypography.Subheadline,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = if (isSelected) Color.White else IosColors.Label
                                     )
                                 }
@@ -722,12 +758,18 @@ fun MapScreen(
                                     .getOrDefault(IosColors.SystemBlue)
                             }
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isSelected) ruleColor else IosFrostedCapsule,
-                                border = BorderStroke(0.5.dp, if (isSelected) ruleColor else IosHairlineBorder),
-                                shadowElevation = if (isSelected) 4.dp else 2.dp,
-                                modifier = Modifier.bouncyClickable {
-                                    simulationViewModel.setActiveTargetKey(rule.key)
+                                shape = AppShapes.pill,
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .height(44.dp)
+                                    .liquidGlass(
+                                        isLiquidGlass = isLiquidGlass,
+                                        shape = AppShapes.pill,
+                                        elevation = if (isSelected) 14.dp else 8.dp,
+                                        containerColor = if (isSelected) ruleColor else null
+                                    )
+                                    .bouncyClickable {
+                                        simulationViewModel.setActiveTargetKey(rule.key)
                                     centerAimingCoord = rule.latitude to rule.longitude
                                     val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                                     val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
@@ -735,7 +777,9 @@ fun MapScreen(
                                 }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
@@ -760,14 +804,21 @@ fun MapScreen(
                         // Item N+1: Add App Capsule
                         item {
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = IosFrostedCapsule,
-                                border = BorderStroke(0.5.dp, IosHairlineBorder),
-                                shadowElevation = 2.dp,
-                                modifier = Modifier.bouncyClickable { showMapAppPickerSheet = true }
+                                shape = AppShapes.pill,
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .height(44.dp)
+                                    .liquidGlass(
+                                        isLiquidGlass = isLiquidGlass,
+                                        shape = AppShapes.pill,
+                                        elevation = 8.dp
+                                    )
+                                    .bouncyClickable { showMapAppPickerSheet = true }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
@@ -790,30 +841,54 @@ fun MapScreen(
                 }
             }
 
-            // 2. iOS Style Vertical Zoom Slider (右上角竖向缩放条，位于工具栏下方)
-            IosVerticalZoomControl(
-                currentZoom = currentZoom,
-                minZoom = 3.0,
-                maxZoom = 19.0,
-                onZoomChange = { newZoom ->
-                    currentZoom = newZoom
-                    mapViewRef?.controller?.setZoom(newZoom)
-                },
-                onZoomIn = {
-                    val newZoom = (currentZoom + 1.0).coerceAtMost(19.0)
-                    currentZoom = newZoom
-                    mapViewRef?.controller?.setZoom(newZoom)
-                },
-                onZoomOut = {
-                    val newZoom = (currentZoom - 1.0).coerceAtLeast(3.0)
-                    currentZoom = newZoom
-                    mapViewRef?.controller?.setZoom(newZoom)
-                },
+            // 2 + 5. 右侧悬浮控件列（设计稿 .map-fabs —— 缩放与定位同列，去除 bottom 魔法数字）
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(top = 80.dp, end = 12.dp)
-            )
+                    .padding(top = 156.dp, end = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IosVerticalZoomControl(
+                    currentZoom = currentZoom,
+                    minZoom = 3.0,
+                    maxZoom = 19.0,
+                    onZoomChange = { newZoom ->
+                        currentZoom = newZoom
+                        mapViewRef?.controller?.setZoom(newZoom)
+                    },
+                    onZoomIn = {
+                        val newZoom = (currentZoom + 1.0).coerceAtMost(19.0)
+                        currentZoom = newZoom
+                        mapViewRef?.controller?.setZoom(newZoom)
+                    },
+                    onZoomOut = {
+                        val newZoom = (currentZoom - 1.0).coerceAtLeast(3.0)
+                        currentZoom = newZoom
+                        mapViewRef?.controller?.setZoom(newZoom)
+                    }
+                )
+
+                MapFloatingActions(
+                    context = context,
+                    activeMapTab = activeMapTab,
+                    drawnWaypoints = drawnWaypoints,
+                    currentMapType = currentMapType,
+                    mapViewRef = mapViewRef,
+                    isLiquidGlass = isLiquidGlass,
+                    isPointMockActive = isPointMockActive,
+                    simState = simState,
+                    simulationViewModel = simulationViewModel,
+                    bottomBarPadding = bottomBarPadding,
+                    onResetToRealLocation = { real ->
+                        userRealLocation = real
+                        simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
+                        simulationViewModel.updateSelectedTarget(real.first, real.second)
+                        centerAimingCoord = real
+                    }
+                )
+            }
 
             // 3. Dynamic Status Capsule (iOS Dynamic Island style)
             if (isPointMockActive && pointMockLocation != null) {
@@ -845,10 +920,10 @@ fun MapScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(13.dp),
                             color = IosRed,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .bouncyClickable {
                                     simulationViewModel.stopPointMock(context)
                                     Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
@@ -880,69 +955,20 @@ fun MapScreen(
                         .getOrNull()
                 } ?: IosBlue
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = 32.dp)
-                ) {
-                    // Floating Aiming Label
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (currentActiveRule != null) currentAimingColor else Color(0xEB000000),
-                        shadowElevation = 6.dp,
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (currentActiveRule != null) Icons.Default.AltRoute else Icons.Default.Place,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = if (currentActiveRule != null) "【${currentActiveRule.appName}】分流选点" else (if (activeMapTab == MapTab.ROUTE) "路线航点选点" else "全局目标定位点"),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.Rounded.AddLocationAlt,
-                        contentDescription = "定位十字准心",
-                        tint = currentAimingColor,
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
+                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 46×56 水滴 Pin（偏上 34%）
+                IosCenterPin(
+                    label = if (currentActiveRule != null) "【${currentActiveRule.appName}】分流选点"
+                            else if (activeMapTab == MapTab.ROUTE) "路线航点选点"
+                            else "目标定位点",
+                    pinColor = currentAimingColor,
+                    icon = if (currentActiveRule != null) Icons.Default.AltRoute else Icons.Default.Place,
+                    modifier = Modifier.padding(bottom = 130.dp)
+                )
             }
 
             // =================================================================
-            // 5. Right Floating Action Buttons (Fit Bounds / GPS Relocate / Layers)
+            // 5. 右侧悬浮按钮已并入上方 .map-fabs 控件列（见 2 + 5）
             // =================================================================
-            MapFloatingActions(
-                context = context,
-                activeMapTab = activeMapTab,
-                drawnWaypoints = drawnWaypoints,
-                currentMapType = currentMapType,
-                mapViewRef = mapViewRef,
-                isLiquidGlass = isLiquidGlass,
-                isPointMockActive = isPointMockActive,
-                simState = simState,
-                simulationViewModel = simulationViewModel,
-                bottomBarPadding = bottomBarPadding,
-                modifier = Modifier.align(Alignment.BottomEnd),
-                onResetToRealLocation = { real ->
-                    userRealLocation = real
-                    simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
-                    simulationViewModel.updateSelectedTarget(real.first, real.second)
-                    centerAimingCoord = real
-                }
-            )
 
             // =================================================================
             // 6. Bottom Panels (LocationControlPanel or RouteBottomPanel)
@@ -1161,7 +1187,7 @@ fun MapScreen(
                     onValueChange = { routeNameInput = it },
                     label = { Text("路线名称") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(16.dp)
                 )
             },
             confirmButton = {
@@ -1178,7 +1204,7 @@ fun MapScreen(
                     Text("取消", color = IosGray)
                 }
             },
-            shape = RoundedCornerShape(20.dp)
+            shape = RoundedCornerShape(22.dp)
         )
     }
 

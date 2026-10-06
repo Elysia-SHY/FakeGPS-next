@@ -2,20 +2,22 @@
 
 > **版本真源**：`app/build.gradle.kts` 的 `versionCode` / `versionName`。`version.json`、`package.json`、README 与 CHANGELOG 均以其为准同步。
 
-## 当前状态 (Current State)，更新于 2026-09-21
+## 当前状态 (Current State)，更新于 2026-10-07
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.6.0`（P0 架构重构：UI 线程无阻塞、1Hz 状态极轻量持久化、会话隔离、Provider 生命周期解耦、区分用户停止与系统回收） |
-| **Android 内部版本** | `versionCode = 29` |
-| **Android 显示版本** | `versionName = "v1.6.0"` |
+| **最新已发布版本** | `v1.6.1`（基于设计规范 v1.7.0 的全量 UI 重构与真毛玻璃落地，含浅色主题跟随修复） |
+| **Android 内部版本** | `versionCode = 30` |
+| **Android 显示版本** | `versionName = "v1.6.1"` |
 | **本版产物提交** | 待构建回填 |
-| **相对 v1.5.1 差异** | `SimulationViewModel` 消除 `runBlocking`；`MockLocationService` 消除 1Hz 全量 `Route` 序列化风暴；新增 `currentSessionId` 与 `userStopped` 机制；Provider 注册与变速/Seek 完全解耦 |
-| **上一条已发布版本** | `v1.5.1`（versionCode = 28） |
+| **相对 v1.6.0 差异** | 设计系统重标定（品牌色 `#2F7BFF`、9 级圆角阶梯、新增 `AppShapes` / `AppSpacing`）；接入 Haze 1.0.0 真毛玻璃；地图浮层改不透明磨砂板消除穿模；修复浅色主题下底栏与图钉提示条不跟随主题；工具链升级 Kotlin 2.0.21 / Compose BOM 2024.10.01 |
+| **上一条已发布版本** | `v1.6.0`（versionCode = 29） |
 | **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.6.0-release.apk` |
+| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.6.1-release.apk` |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v1.6.1 构建信息（待 CI 构建）
 
 ### v1.6.0 构建信息
 

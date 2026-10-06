@@ -42,7 +42,10 @@ import androidx.compose.ui.unit.sp
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.core.location.SearchResultItem
+import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosGlassDock
+import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -110,20 +113,29 @@ fun LocationControlPanel(
         )
     }
 
-    Column(
+    // 设计稿 .dock —— 浮空玻璃卡片式抽屉（r32 / blur 30 / 1px 8% 白描边 / 内高光）
+    IosGlassDock(
         modifier = modifier
             .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .padding(horizontal = 14.dp)
-            .padding(bottom = (bottomBarPadding + 8.dp).coerceAtLeast(0.dp))
+            .padding(horizontal = 12.dp)
+            .padding(bottom = bottomBarPadding.coerceAtLeast(0.dp))
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessMediumLow
                 )
             ),
+        shape = AppShapes.sheet,
+        isLiquidGlass = isLiquidGlass,
+        elevation = 18.dp
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 1. Drag Handle Pill (支持点击快速在 COLLAPSED / DEFAULT / EXPANDED 间循环切换)
         Box(
@@ -160,18 +172,15 @@ val activeRuleColor = remember(activeRule.colorHex) {
                }
 
             // A. Search Box (Full Width)
+            // 设计稿 .search —— 52dp / r18 / 白 6% 底 + 6% 描边（Dock 内部不再叠玻璃）
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-                    .then(dragGestureModifier)
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = 6.dp
-                    ),
-                shape = RoundedCornerShape(24.dp),
-                color = Color.Transparent
+                    .height(52.dp)
+                    .then(dragGestureModifier),
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0x0FFFFFFF),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0FFFFFFF))
             ) {
                 Row(
                     modifier = Modifier
@@ -249,7 +258,7 @@ val activeRuleColor = remember(activeRule.colorHex) {
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(9.dp),
                             color = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemGray,
                             modifier = Modifier.size(28.dp)
                         ) {
@@ -394,14 +403,10 @@ val activeRuleColor = remember(activeRule.colorHex) {
                 Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp)
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(26.dp),
-                            elevation = 6.dp
-                        ),
-                    shape = RoundedCornerShape(26.dp),
-                    color = Color.Transparent
+                        .height(52.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0x0FFFFFFF),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0FFFFFFF))
                 ) {
                     Row(
                         modifier = Modifier
@@ -464,12 +469,12 @@ val activeRuleColor = remember(activeRule.colorHex) {
                                 .height(52.dp)
                                 .liquidGlass(
                                     isLiquidGlass = isLiquidGlass,
-                                    shape = RoundedCornerShape(26.dp),
-                                    elevation = 8.dp,
-                                    containerColor = IosColors.SystemBlue.copy(0.92f)
+                                    shape = RoundedCornerShape(16.dp),
+                                    elevation = 12.dp,
+                                    containerColor = IosColors.SystemBlue
                                 )
                                 .clickable { onStartMock() },
-                            shape = RoundedCornerShape(26.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color.Transparent
                         ) {
                             Row(
@@ -500,12 +505,12 @@ val activeRuleColor = remember(activeRule.colorHex) {
                                 .height(52.dp)
                                 .liquidGlass(
                                     isLiquidGlass = isLiquidGlass,
-                                    shape = RoundedCornerShape(26.dp),
-                                    elevation = 8.dp,
-                                    containerColor = IosColors.SystemRed.copy(0.92f)
+                                    shape = RoundedCornerShape(16.dp),
+                                    elevation = 12.dp,
+                                    containerColor = IosColors.SystemRed
                                 )
                                 .clickable { onStopMock() },
-                            shape = RoundedCornerShape(26.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color.Transparent
                         ) {
                             Row(
@@ -537,12 +542,12 @@ val activeRuleColor = remember(activeRule.colorHex) {
                             .height(52.dp)
                             .liquidGlass(
                                 isLiquidGlass = isLiquidGlass,
-                                shape = RoundedCornerShape(26.dp),
-                                elevation = 8.dp,
-                                containerColor = IosColors.SystemBlue.copy(0.95f)
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = 12.dp,
+                                containerColor = IosColors.SystemBlue
                             )
                             .clickable { onStartMock() },
-                        shape = RoundedCornerShape(26.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = Color.Transparent
                     ) {
                         Row(
@@ -579,10 +584,10 @@ val activeRuleColor = remember(activeRule.colorHex) {
                     .heightIn(max = 240.dp)
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(22.dp),
                         elevation = 10.dp
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 LazyColumn(
@@ -633,16 +638,12 @@ val activeRuleColor = remember(activeRule.colorHex) {
             enter = fadeIn(tween(180)) + expandVertically(tween(180)),
             exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
         ) {
+            // 设计稿 .loccard —— r20 / 白 4.5% 底 / 6% 描边
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(22.dp),
-                        elevation = 8.dp
-                    ),
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
-                color = Color.Transparent
+                color = Color(0x0BFFFFFF),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0FFFFFFF))
             ) {
                 Column(
                     modifier = Modifier
@@ -656,33 +657,34 @@ val activeRuleColor = remember(activeRule.colorHex) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            modifier = Modifier.size(36.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isMockActive) IosColors.SystemGreen.copy(0.2f) else IosColors.SystemBlue.copy(0.15f)
+                            modifier = Modifier.size(44.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isMockActive) IosColors.SystemGreen.copy(0.2f) else IosColors.SystemBlue.copy(0.16f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Default.Place,
                                     contentDescription = null,
-                                    tint = if (isMockActive) IosColors.SystemGreen else IosColors.SystemBlue,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = if (isMockActive) IosColors.SystemGreen else IosColors.BrandSoft,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(13.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = address.ifBlank { "已选定目标坐标" },
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.5.sp,
+                                fontSize = 17.sp,
+                                lineHeight = 23.sp,
                                 color = if (isDark) Color.White else IosColors.Label,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(Modifier.height(2.dp))
+                            Spacer(Modifier.height(5.dp))
                             Text(
-                                text = "WGS-84: ${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}",
-                                fontSize = 12.sp,
+                                text = "WGS-84 · ${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}",
+                                style = IosTypography.Mono,
                                 color = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel
                             )
                         }
@@ -702,13 +704,13 @@ val activeRuleColor = remember(activeRule.colorHex) {
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                .height(46.dp),
+                            shape = RoundedCornerShape(16.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
                             Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("复制坐标", fontSize = 12.sp, maxLines = 1)
+                            Spacer(Modifier.width(5.dp))
+                            Text("复制坐标", fontSize = 12.5.sp, maxLines = 1)
                         }
 
                         // Reset to real device location button
@@ -716,13 +718,13 @@ val activeRuleColor = remember(activeRule.colorHex) {
                             onClick = onResetRealLocation,
                             modifier = Modifier
                                 .weight(1.1f)
-                                .height(38.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                .height(46.dp),
+                            shape = RoundedCornerShape(16.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
                             Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = IosColors.SystemOrange)
-                            Spacer(Modifier.width(4.dp))
-                            Text("真机复位", fontSize = 12.sp, color = IosColors.SystemOrange, maxLines = 1)
+                            Spacer(Modifier.width(5.dp))
+                            Text("真机复位", fontSize = 12.5.sp, color = IosColors.SystemOrange, maxLines = 1)
                         }
 
                         // Bookmark button
@@ -730,14 +732,14 @@ val activeRuleColor = remember(activeRule.colorHex) {
                             onClick = onSaveLocation,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp),
-                            shape = RoundedCornerShape(12.dp),
+                                .height(46.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
                             contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
                             Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("收藏此点", fontSize = 12.sp, maxLines = 1)
+                            Spacer(Modifier.width(5.dp))
+                            Text("收藏此点", fontSize = 12.5.sp, maxLines = 1)
                         }
                     }
                 }
@@ -797,7 +799,7 @@ val activeRuleColor = remember(activeRule.colorHex) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(9.dp))
                                         .clickable { onSelectSavedRoute(route) }
                                         .padding(horizontal = 8.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -831,4 +833,5 @@ val activeRuleColor = remember(activeRule.colorHex) {
             }
         }
     }
+    }  // IosGlassDock
 }

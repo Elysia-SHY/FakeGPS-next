@@ -52,8 +52,13 @@ fun RouteLibraryScreen(
 
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
+    // 本页专属模糊源：本页是「叠加层」，若只继承 AppNavigation 的全局源，
+    // 会采样到身后内容区的地图（而本页自己有铺底背景），观感是错的。
+    // 所以自建一个源，由本页 AppBackground 当源层，卡片玻璃采样它。
+    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        AppBackground()
+        AppBackground(hazeState = pageHaze)
 
         Column(
             modifier = Modifier
@@ -61,57 +66,14 @@ fun RouteLibraryScreen(
                 .statusBarsPadding()
         ) {
         // =====================================================================
-        // 1. Apple Large Title Navigation Header
+        // 1. Page Head —— 与其他页面共用同一排版基准
         // =====================================================================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Column {
-                Text(
-                    text = "FAKE GPS",
-                    style = IosTypography.Caption2,
-                    color = IosColors.SecondaryLabel,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "路线库",
-                    style = IosTypography.LargeTitle,
-                    color = IosColors.Label
-                )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = "${savedRoutes.size} 条路线",
-                        color = IosColors.SystemBlue,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = BuildConfig.VERSION_NAME,
-                        color = IosColors.SystemBlue,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-            }
-        }
+        IosPageHead(
+            kicker = "FAKE GPS",
+            title = "路线库",
+            badgeText = "${savedRoutes.size} 条路线",
+            chipText = BuildConfig.VERSION_NAME
+        )
 
         // =====================================================================
         // 2. iOS HIG Native Search Capsule Bar
@@ -121,7 +83,7 @@ fun RouteLibraryScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
                 .height(36.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(13.dp))
                 .background(IosColors.TertiarySystemFill)
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart
@@ -195,7 +157,7 @@ fun RouteLibraryScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(22.dp),
                         color = IosColors.SecondaryGroupedBackground,
                         modifier = Modifier.size(72.dp),
                         border = BorderStroke(0.5.dp, IosColors.Separator)
@@ -235,11 +197,12 @@ fun RouteLibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .liquidGlass(
-                                isLiquidGlass = true,
-                                shape = RoundedCornerShape(16.dp),
-                                elevation = 6.dp
+                                isLiquidGlass = LocalLiquidGlassEnabled.current,
+                                shape = AppShapes.card,
+                                elevation = 8.dp,
+                                hazeState = pageHaze
                             ),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = AppShapes.card,
                         color = Color.Transparent,
                         border = if (isCurrent) BorderStroke(1.5.dp, IosColors.SystemBlue) else null
                     ) {
@@ -268,7 +231,7 @@ fun RouteLibraryScreen(
                                 if (isCurrent) {
                                     Surface(
                                         color = IosColors.SystemGreen.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(10.dp)
+                                        shape = RoundedCornerShape(13.dp)
                                     ) {
                                         Text(
                                             "当前载入",
@@ -289,7 +252,7 @@ fun RouteLibraryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosColors.TertiarySystemFill
                                 ) {
                                     Row(
@@ -313,7 +276,7 @@ fun RouteLibraryScreen(
                                 }
 
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosColors.TertiarySystemFill
                                 ) {
                                     Row(
@@ -424,12 +387,12 @@ fun RouteLibraryScreen(
                                 // Load Route Primary Action Button
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
+                                        .clip(RoundedCornerShape(13.dp))
                                         .bouncyClickable {
                                             mapViewModel.selectRoute(route)
                                             onRouteSelected()
                                         },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(13.dp),
                                     color = if (isCurrent) IosColors.SystemGreen else IosColors.SystemBlue
                                 ) {
                                     Row(
@@ -479,7 +442,7 @@ fun RouteLibraryScreen(
                     onValueChange = { renameInput = it },
                     label = { Text("路线新名称", style = IosTypography.Caption1) },
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = IosColors.SystemBlue,
                         unfocusedBorderColor = IosColors.Separator

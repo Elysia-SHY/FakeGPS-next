@@ -160,7 +160,7 @@ fun AppUpdateDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 180.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = if (isDark) Color(0x33000000) else Color(0x0A000000),
                     border = androidx.compose.foundation.BorderStroke(
                         0.5.dp,
@@ -193,7 +193,7 @@ fun AppUpdateDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = IosColors.SystemBlue
                             )
@@ -298,7 +298,7 @@ fun AppUpdateDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(42.dp),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(16.dp)
                             ) {
                                 Text("取消下载", fontSize = 13.5.sp, color = IosColors.SecondaryLabel)
                             }
@@ -335,7 +335,7 @@ fun AppUpdateDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(46.dp),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = IosColors.SystemGreen
                                 )
@@ -382,7 +382,7 @@ fun AppUpdateDialog(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(44.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(16.dp)
                                 ) {
                                     Text("关闭", fontSize = 13.5.sp)
                                 }
@@ -392,7 +392,7 @@ fun AppUpdateDialog(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(44.dp),
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = IosColors.SystemBlue
                                     )

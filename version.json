@@ -1,8 +1,8 @@
 {
-  "versionName": "v1.6.0",
-  "versionCode": 29,
-  "releaseDate": "2026-09-21",
-  "releaseNotes": "P0 架构重构与性能深度优化：\n\n1. 消除 UI 阻塞：彻底移除 SimulationViewModel 中的 runBlocking，转为全异步协程与上下文切换，结合 Job 追踪避免快速点击导致的并发重入与 ANR。\n\n2. 消除高频序列化：MockLocationService 在 1 秒 tick 循环中仅写入轻量进度与速度（saveSimulationProgress），全量 Route 仅在启动时序列化一次，彻底消灭 GC 与 I/O 抖动。\n\n3. 会话隔离机制：引入 currentSessionId 管理模拟与单点定位会话，快速启停与变速 Seek 时丢弃陈旧数据包，杜绝竞态与坐标跳变。\n\n4. Provider 生命周期解耦：变速与 Seek 拖动不再重新注册 addTestProvider，仅平滑重启模拟流，消除系统位置提供商反复注册引发的广播冲击与漂移。\n\n5. 区分用户停止与系统回收：引入 userStopped 状态标记，当服务被系统 LMK 回收时完整保留恢复点，支持 START_STICKY 完美无感续跑。\n\n本版与历代发布版本共用同一签名密钥，可直接覆盖安装。",
+  "versionName": "v1.6.1",
+  "versionCode": 30,
+  "releaseDate": "2026-10-07",
+  "releaseNotes": "基于设计规范 v1.7.0 的全量 UI 重构与真毛玻璃落地：\n\n1. 设计系统重标定：品牌色由 #007AFF 调整为 #2F7BFF，新增背景层级（bg1 / surface2 / surface3）、描边（line / lineSoft）与玻璃三件套（glassBg / glassLine / glassHighlight）；圆角收敛为 66 / 36 / 32 / 24 / 22 / 16 / 13 / 9 阶梯，页面统一 IosPageHead 排版基准。\n\n2. 真毛玻璃落地：接入 Haze 1.0.0 GPU 高斯模糊（blur 30 / saturate 180%），底部 Tab 栏、地图浮层与滚动页卡片均具备真实背景折射。因 Haze 只能捕获 Compose 自绘内容，AndroidView 承载的原生地图改由不透明磨砂板兜底，彻底消除浮层穿模。\n\n3. 浅色主题补全：修复底部 Tab 栏与地图图钉提示条硬编码深色、不跟随系统明暗的问题，并同步修正浅色下未选中项与选中项的对比度不足。\n\n4. 工具链升级：Kotlin 1.9.22 → 2.0.21，Compose BOM 2024.02.00 → 2024.10.01，Hilt 2.50 → 2.52，新增 Haze 1.0.0 依赖。\n\n本版与历代发布版本共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.6.0/FakeGPS-next-v1.6.0-release.apk"
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v1.6.1/FakeGPS-next-v1.6.1-release.apk"
 }

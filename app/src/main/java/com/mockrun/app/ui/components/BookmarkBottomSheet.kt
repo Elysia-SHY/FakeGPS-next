@@ -97,7 +97,7 @@ fun BookmarkBottomSheet(
                     )
                 }
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = IosColors.SystemBlue.copy(alpha = 0.12f)
                 ) {
                     Text(
@@ -151,9 +151,9 @@ fun BookmarkBottomSheet(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .bouncyClickable { onSelect(route) },
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = IosColors.TertiarySystemFill,
                             border = if (isCurrent) BorderStroke(1.dp, IosColors.SystemBlue) else null
                         ) {
@@ -165,7 +165,7 @@ fun BookmarkBottomSheet(
                             ) {
                                 Surface(
                                     modifier = Modifier.size(32.dp),
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = if (isLocation) {
                                         IosColors.SystemBlue.copy(alpha = 0.14f)
                                     } else {

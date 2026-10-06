@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-> **当前版本**：`v1.5.0`（`versionCode = 27`）
+> **当前版本**：`v1.6.1`（`versionCode = 30`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，[`version.json`](version.json)、[`package.json`](package.json)、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
 

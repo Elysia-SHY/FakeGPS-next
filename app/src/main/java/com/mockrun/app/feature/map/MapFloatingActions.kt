@@ -40,19 +40,22 @@ fun MapFloatingActions(
     modifier: Modifier = Modifier,
     onResetToRealLocation: (Pair<Double, Double>) -> Unit
 ) {
+    // 定位由父级 Column 统一控制（设计稿：与缩放控件同列，去除 bottom 225dp 魔法数字）
+    @Suppress("UNUSED_PARAMETER")
+    val unusedInset = bottomBarPadding
+
     Column(
-        modifier = modifier
-            .padding(bottom = bottomBarPadding + 225.dp, end = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Route Fit Bounds FAB (only in ROUTE mode when waypoints >= 2)
         if (activeMapTab == MapTab.ROUTE && drawnWaypoints.size >= 2) {
             Surface(
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(54.dp)
                     .clip(CircleShape)
-                    .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
+                    .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
                     .bouncyClickable {
                         val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                         val points = drawnWaypoints.map { wp ->
@@ -69,17 +72,17 @@ fun MapFloatingActions(
                 color = Color.Transparent
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = IosBlue, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = IosBlue, modifier = Modifier.size(24.dp))
                 }
             }
         }
 
-        // Locate to Real Physical Location FAB
+        // Locate to Real Physical Location FAB —— 设计稿 .locate-btn 54dp 圆
         Surface(
             modifier = Modifier
-                .size(46.dp)
+                .size(54.dp)
                 .clip(CircleShape)
-                .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 6.dp)
+                .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
                 .bouncyClickable {
                     if (isPointMockActive) simulationViewModel.stopPointMock(context)
                     if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
@@ -104,7 +107,7 @@ fun MapFloatingActions(
             color = Color.Transparent
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = IosBlue, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = IosBlue, modifier = Modifier.size(24.dp))
             }
         }
     }

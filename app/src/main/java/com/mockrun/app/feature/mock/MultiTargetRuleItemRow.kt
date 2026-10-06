@@ -48,7 +48,7 @@ fun MultiTargetRuleItemRow(
         ) {
             Surface(
                 modifier = Modifier.size(36.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(13.dp),
                 color = ruleColor.copy(alpha = 0.18f),
                 border = BorderStroke(1.dp, ruleColor.copy(alpha = 0.5f))
             ) {
@@ -132,7 +132,7 @@ fun MultiTargetRuleItemRow(
             ) {
                 Box {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(9.dp),
                         color = when (rule.mode) {
                             TargetMockMode.REAL_PASSTHROUGH -> IosColors.SystemGray.copy(alpha = 0.15f)
                             else -> IosColors.SystemBlue.copy(alpha = 0.12f)
@@ -180,7 +180,7 @@ fun MultiTargetRuleItemRow(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(9.dp),
                     color = IosColors.SystemBlue.copy(alpha = 0.12f),
                     modifier = Modifier.bouncyClickable { onSetLocationOnMap() }
                 ) {

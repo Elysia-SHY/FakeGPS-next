@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -23,7 +22,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.LocalIosColors
 import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.liquidGlass
 import kotlinx.coroutines.launch
@@ -51,29 +52,31 @@ fun AndroidFloatingBottomBar(
     onDragEnd: () -> Unit,
     onTabSelected: (Int) -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val palette = LocalIosColors.current
+    val isDark = palette.isDark
     val tabCount = tabs.size.coerceAtLeast(1)
 
-    // Single crystal liquid frosted glass capsule (58dp height, 29dp pill corners)
+    // 设计稿 .tabbar —— 72dp 高 / r36 浮空玻璃药丸 / 左右 14dp / 底距 22dp
     Surface(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
             .widthIn(max = 480.dp)
             .fillMaxWidth()
-            .height(58.dp)
+            .height(72.dp)
             .liquidGlass(
                 isLiquidGlass = isLiquidGlass,
-                shape = RoundedCornerShape(29.dp),
-                elevation = 10.dp
+                shape = AppShapes.bar,
+                elevation = 18.dp,
+                containerColor = IosColors.GlassBgBar
             ),
-        shape = RoundedCornerShape(29.dp),
+        shape = AppShapes.bar,
         color = Color.Transparent
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 4.dp, vertical = 3.dp)
+                .padding(6.dp)
                 // Real-time horizontal drag gesture tracking
                 .pointerInput(tabCount) {
                     detectHorizontalDragGestures(
@@ -93,20 +96,16 @@ fun AndroidFloatingBottomBar(
             val clampedPosition = currentPosition.coerceIn(0f, (tabCount - 1).toFloat())
             val indicatorOffset = tabWidth * clampedPosition
 
-            // 1. Soft seamless micro-glow indicator pill
+            // 1. 选中态指示底（设计稿 .tab.active —— rgba(47,123,255,.14)）
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(tabWidth)
                     .fillMaxHeight()
-                    .padding(horizontal = 4.dp, vertical = 3.dp)
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(26.dp))
                     .background(
-                        if (isLiquidGlass) {
-                            if (isDark) Color.White.copy(alpha = 0.15f) else IosColors.SystemBlue.copy(alpha = 0.15f)
-                        } else {
-                            if (isDark) Color.White.copy(alpha = 0.10f) else IosColors.SystemBlue.copy(alpha = 0.10f)
-                        }
+                        if (isLiquidGlass) IosColors.SystemBlue.copy(alpha = 0.14f)
+                        else IosColors.SystemBlue.copy(alpha = 0.10f)
                     )
             )
 
@@ -120,16 +119,20 @@ fun AndroidFloatingBottomBar(
                     val distance = abs(clampedPosition - index)
                     val selectProgress = (1.0f - distance).coerceIn(0f, 1f)
 
-                    val unselectedColor = if (isDark) Color.White.copy(alpha = 0.52f) else Color.Black.copy(alpha = 0.48f)
-                    val activeColor = IosColors.SystemBlue
+                    // 设计稿：未选 --t3 #646E85，选中 --brand-soft #6BA5FF
+                    // 浅色主题下底栏是白色玻璃：--t3 的半透明灰（#8894A8 @50%）与浅蓝
+                    // --brand-soft（#6BA5FF）在白底上对比度都不足，分别换成 .text2 与 --brand。
+                    // 深色主题两个取值与原来完全一致，观感零变化。
+                    val unselectedColor = if (isDark) IosColors.TertiaryLabel else IosColors.SecondaryLabel
+                    val activeColor = palette.brandSoft
                     val currentColor = lerp(unselectedColor, activeColor, selectProgress)
-                    val currentScale = 1.0f + 0.12f * selectProgress
+                    val currentScale = 1.0f + 0.10f * selectProgress
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(22.dp))
+                            .clip(RoundedCornerShape(26.dp))
                             .bouncyClickable {
                                 onTabSelected(index)
                             },
@@ -144,18 +147,18 @@ fun AndroidFloatingBottomBar(
                                 contentDescription = tab.title,
                                 tint = currentColor,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(23.dp)
                                     .graphicsLayer {
                                         scaleX = currentScale
                                         scaleY = currentScale
                                     }
                             )
-                            Spacer(Modifier.height(2.dp))
+                            Spacer(Modifier.height(3.dp))
                             Text(
                                 text = tab.title,
                                 fontSize = 10.5.sp,
                                 lineHeight = 12.sp,
-                                fontWeight = if (selectProgress > 0.5f) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = currentColor
                             )
                         }

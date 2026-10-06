@@ -121,7 +121,7 @@ fun CreditItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(9.dp))
             .clickable {
                 try {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
@@ -199,7 +199,7 @@ fun FeatureItem(
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(13.dp))
                 .background(iconTint.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {

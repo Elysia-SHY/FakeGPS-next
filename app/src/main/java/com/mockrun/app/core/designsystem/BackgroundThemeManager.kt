@@ -97,7 +97,7 @@ object BackgroundThemeManager {
 @Composable
 fun AppBackground(
     modifier: Modifier = Modifier,
-    hazeState: Any? = null
+    hazeState: dev.chrisbanes.haze.HazeState? = null
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -128,6 +128,7 @@ fun AppBackground(
 
     val baseModifier = modifier
         .fillMaxSize()
+        .hazeSource(hazeState)
         .drawBehind {
             if (customBitmap == null) {
                 val canvasWidth = size.width

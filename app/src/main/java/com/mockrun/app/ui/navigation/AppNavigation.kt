@@ -32,6 +32,7 @@ import com.mockrun.app.core.designsystem.LiquidGlassDefaults
 import com.mockrun.app.core.designsystem.LocalBottomBarHazeState
 import com.mockrun.app.core.designsystem.LocalHazeState
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
+import com.mockrun.app.core.designsystem.hazeSource
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.core.data.repository.VersionSyncManager
@@ -68,7 +69,11 @@ fun AppNavigation(
     }
 
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomBarPadding = navBarBottom + 86.dp
+    // 设计稿：Tab 栏 72dp + 底距 22dp
+    val bottomBarPadding = navBarBottom + 94.dp
+
+    // 全局模糊源：整个内容区会被捕获，供底部玻璃 Tab 栏采样
+    val hazeState = remember { dev.chrisbanes.haze.HazeState() }
 
     val navigationTabs = remember {
         listOf(
@@ -103,12 +108,15 @@ fun AppNavigation(
     }
 
     CompositionLocalProvider(
-        LocalLiquidGlassEnabled provides isLiquidGlassEnabled
+        LocalLiquidGlassEnabled provides isLiquidGlassEnabled,
+        LocalHazeState provides hazeState
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Main Sliding Multi-Screen View (Driven by tabPosition in real-time)
             BoxWithConstraints(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(hazeState)
             ) {
                 // Page 0: MapScreen (Handles Tab 0: 定位 and Tab 1: 路线 on ONE single Tencent MapView instance)
                 val mapTab = if (tabPosition.value < 0.5f) MapTab.LOCATION else MapTab.ROUTE

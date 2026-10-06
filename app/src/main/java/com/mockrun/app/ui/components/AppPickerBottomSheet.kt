@@ -174,7 +174,7 @@ fun AppPickerBottomSheet(
 
             // User Profile / Dual App Selector
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = IosColors.TertiaryGroupedBackground,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -240,7 +240,7 @@ fun AppPickerBottomSheet(
 
             // Category Filter: 用户应用 / 全部应用 / 系统应用
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(13.dp),
                 color = IosColors.TertiaryGroupedBackground,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -262,7 +262,7 @@ fun AppPickerBottomSheet(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(7.dp))
+                                .clip(RoundedCornerShape(9.dp))
                                 .bouncyClickable { selectedCategory = cat },
                             color = if (isSelected) IosColors.SecondaryGroupedBackground else Color.Transparent,
                             shadowElevation = if (isSelected) 2.dp else 0.dp
@@ -285,7 +285,7 @@ fun AppPickerBottomSheet(
 
             // Search Bar
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(13.dp),
                 color = IosColors.TertiaryGroupedBackground,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -416,14 +416,14 @@ fun AppPickerBottomSheet(
                                     containerColor = IosColors.SystemBlue.copy(alpha = 0.15f),
                                     contentColor = IosColors.SystemBlue
                                 ),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(9.dp)
                             ) {
                                 Text("直接以包名添加 \"${searchQuery.take(20)}\"")
                             }
                         } else {
                             OutlinedButton(
                                 onClick = { showManualInputDialog = true },
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(9.dp)
                             ) {
                                 Text("手动输入包名添加")
                             }
@@ -566,7 +566,7 @@ val bitmap = remember(item.icon) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = !isAlreadyAdded, onClick = onSelect),
         color = if (isAlreadyAdded) IosColors.SystemGray.copy(alpha = 0.08f) else Color.Transparent
     ) {
@@ -658,7 +658,7 @@ val bitmap = remember(item.icon) {
             // Status Badge
             if (isAlreadyAdded) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = IosColors.SystemGreen.copy(alpha = 0.12f)
                 ) {
                     Row(
@@ -682,7 +682,7 @@ val bitmap = remember(item.icon) {
                 }
             } else {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = IosColors.SystemBlue.copy(alpha = 0.1f)
                 ) {
                     Text(

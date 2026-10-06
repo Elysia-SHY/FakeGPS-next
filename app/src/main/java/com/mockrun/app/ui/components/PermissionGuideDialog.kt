@@ -73,7 +73,7 @@ fun PermissionGuideDialog(
                         )
 
                         Surface(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -142,7 +142,7 @@ fun PermissionGuideDialog(
                         else -> {}
                     }
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
             ) {
                 Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -161,7 +161,7 @@ fun PermissionGuideDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Text("暂不设置", color = IosGray, fontSize = 13.sp)
             }

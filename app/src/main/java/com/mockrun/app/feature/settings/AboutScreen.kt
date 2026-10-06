@@ -109,11 +109,15 @@ fun AboutScreen(
         )
     }
 
+    // 本页专属模糊源：AppBackground 铺底当源层，卡片玻璃采样它 ——
+    // 两者是同一个 Box 下的兄弟节点，不会自引用。
+    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        AppBackground()
+        AppBackground(hazeState = pageHaze)
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)
@@ -133,7 +137,8 @@ fun AboutScreen(
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
                         shape = RoundedCornerShape(24.dp),
-                        elevation = 10.dp
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
                 shape = RoundedCornerShape(24.dp),
                 color = Color.Transparent
@@ -147,14 +152,14 @@ fun AboutScreen(
                     // Luminous App Logo Badge
                     Box(
                         modifier = Modifier
-                            .size(76.dp)
-                            .clip(RoundedCornerShape(22.dp))
+                            .size(92.dp)
+                            .clip(RoundedCornerShape(28.dp))
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
-                                        Color(0xFF007AFF),
-                                        Color(0xFF5856D6),
-                                        Color(0xFF00C7BE)
+                                        Color(0xFF2F7BFF),
+                                        Color(0xFF5A6BFF),
+                                        Color(0xFF7C4DFF)
                                     )
                                 )
                             )
@@ -166,7 +171,7 @@ fun AboutScreen(
                                         Color.White.copy(alpha = 0.15f)
                                     )
                                 ),
-                                RoundedCornerShape(22.dp)
+                                RoundedCornerShape(28.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -174,17 +179,16 @@ fun AboutScreen(
                             imageVector = Icons.Default.Place,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier.size(46.dp)
                         )
                     }
 
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(18.dp))
 
                     Text(
                         text = "FakeGPS-next",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.Black
+                        style = IosTypography.HeroTitle,
+                        color = IosColors.Label
                     )
 
                     Spacer(Modifier.height(6.dp))
@@ -194,15 +198,14 @@ fun AboutScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = IosColors.SystemBlue.copy(alpha = 0.15f)
+                            shape = AppShapes.pill,
+                            color = IosColors.SystemBlue.copy(alpha = 0.12f)
                         ) {
                             Text(
                                 text = BuildConfig.VERSION_NAME,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = IosColors.SystemBlue,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                style = IosTypography.Mono13,
+                                color = IosColors.BrandSoft,
+                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp)
                             )
                         }
 
@@ -228,23 +231,18 @@ fun AboutScreen(
             // =====================================================================
             // 2. Cloud Version Sync & Update Center (自动同步与更新中心)
             // =====================================================================
-            Text(
-                text = "版本与云端同步",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("版本与云端同步")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
@@ -273,7 +271,7 @@ fun AboutScreen(
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(
                                         when (syncState) {
                                             is VersionSyncStatus.HasUpdate -> Color(0xFFFF9500).copy(0.18f)
@@ -497,7 +495,7 @@ fun AboutScreen(
                                             OutlinedButton(
                                                 onClick = { VersionSyncManager.cancelDownload() },
                                                 modifier = Modifier.fillMaxWidth().height(36.dp),
-                                                shape = RoundedCornerShape(10.dp)
+                                                shape = RoundedCornerShape(13.dp)
                                             ) {
                                                 Text("取消下载", fontSize = 12.sp, color = IosColors.SystemRed)
                                             }
@@ -531,7 +529,7 @@ fun AboutScreen(
                                                         VersionSyncManager.startDownload(context, info)
                                                     },
                                                     modifier = Modifier.weight(1f).height(38.dp),
-                                                    shape = RoundedCornerShape(10.dp)
+                                                    shape = RoundedCornerShape(13.dp)
                                                 ) {
                                                     Text("重新下载", fontSize = 12.sp)
                                                 }
@@ -540,7 +538,7 @@ fun AboutScreen(
                                                         VersionSyncManager.installApk(context, file)
                                                     },
                                                     modifier = Modifier.weight(1.3f).height(38.dp),
-                                                    shape = RoundedCornerShape(10.dp),
+                                                    shape = RoundedCornerShape(13.dp),
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34C759))
                                                 ) {
                                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
@@ -569,7 +567,7 @@ fun AboutScreen(
                                                 Button(
                                                     onClick = { VersionSyncManager.startDownload(context, info) },
                                                     modifier = Modifier.weight(1f).height(38.dp),
-                                                    shape = RoundedCornerShape(10.dp),
+                                                    shape = RoundedCornerShape(13.dp),
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
                                                 ) {
                                                     Text("重试在线下载", fontSize = 12.sp, color = Color.White)
@@ -584,7 +582,7 @@ fun AboutScreen(
                                                         }
                                                     },
                                                     modifier = Modifier.weight(1f).height(38.dp),
-                                                    shape = RoundedCornerShape(10.dp)
+                                                    shape = RoundedCornerShape(13.dp)
                                                 ) {
                                                     Text("浏览器下载", fontSize = 12.sp)
                                                 }
@@ -602,7 +600,7 @@ fun AboutScreen(
                                                     showChangelogDialog = Pair("${info.versionName} 更新说明", info.releaseNotes)
                                                 },
                                                 modifier = Modifier.weight(1f).height(40.dp),
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = RoundedCornerShape(16.dp),
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isDark) Color.White else Color.Black)
                                             ) {
                                                 Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
@@ -613,7 +611,7 @@ fun AboutScreen(
                                                     VersionSyncManager.startDownload(context, info)
                                                 },
                                                 modifier = Modifier.weight(1.3f).height(40.dp),
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = RoundedCornerShape(16.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9500))
                                             ) {
                                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
@@ -661,7 +659,7 @@ fun AboutScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(Color(0xFF34C759).copy(alpha = 0.1f))
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -694,7 +692,7 @@ fun AboutScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(Color(0xFFFF3B30).copy(alpha = 0.1f))
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -726,23 +724,18 @@ fun AboutScreen(
             // =====================================================================
             // 3. Core Features & Architectural Capabilities (核心功能与架构特性)
             // =====================================================================
-            Text(
-                text = "核心功能与架构特性",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("核心功能与架构特性")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(
@@ -786,23 +779,18 @@ fun AboutScreen(
             // =====================================================================
             // 4. Device Environment & Diagnostic Card (设备环境与运行诊断)
             // =====================================================================
-            Text(
-                text = "设备环境与运行诊断",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("设备环境与运行诊断")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(
@@ -824,7 +812,7 @@ fun AboutScreen(
                     Spacer(Modifier.height(4.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         color = IosColors.SystemBlue.copy(alpha = 0.08f)
                     ) {
                         Row(
@@ -847,23 +835,18 @@ fun AboutScreen(
             // =====================================================================
             // 5. Visual Appearance & Glass Rendering (视觉渲染风格)
             // =====================================================================
-            Text(
-                text = "视觉渲染风格",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("视觉渲染风格")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
@@ -880,7 +863,7 @@ fun AboutScreen(
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(
                                         if (isLiquidGlass) IosColors.SystemBlue.copy(0.18f) else (if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
                                     ),
@@ -947,23 +930,18 @@ fun AboutScreen(
             // =====================================================================
             // 5.2. Personalization & Background Themes (个性化背景壁纸)
             // =====================================================================
-            Text(
-                text = "个性化背景壁纸",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("个性化背景壁纸")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 4.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(
@@ -982,7 +960,7 @@ fun AboutScreen(
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(if (hasCustomWallpaper) Color(0xFF10B981).copy(alpha = 0.18f) else Color(0xFF6366F1).copy(alpha = 0.18f)),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -1035,7 +1013,7 @@ fun AboutScreen(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (hasCustomWallpaper) Color(0xFF10B981) else IosColors.SystemBlue
                                 ),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(13.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                             ) {
                                 Text(
@@ -1053,23 +1031,18 @@ fun AboutScreen(
             // =====================================================================
             // 6. GitHub Open Source Address & Actions (开源代码仓库)
             // =====================================================================
-            Text(
-                text = "项目开源与代码仓库",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("项目开源与代码仓库")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
@@ -1080,7 +1053,7 @@ fun AboutScreen(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.06f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1125,7 +1098,7 @@ fun AboutScreen(
                                 Toast.makeText(context, "已复制 GitHub 仓库地址至剪贴板！", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f),
                                 contentColor = if (isDark) Color.White else Color.Black
@@ -1147,7 +1120,7 @@ fun AboutScreen(
                                 }
                             },
                             modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = IosColors.SystemBlue,
                                 contentColor = Color.White
@@ -1164,24 +1137,19 @@ fun AboutScreen(
             // =====================================================================
             // 7. Quick Access: Route Library (数据管理与路线库)
             // =====================================================================
-            Text(
-                text = "数据管理与路线库",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosColors.SecondaryLabel,
-                modifier = Modifier.padding(start = 6.dp)
-            )
+            IosSectionHeader("数据管理与路线库")
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     )
                     .clickable { onNavigateToLibrary() },
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Row(
@@ -1198,7 +1166,7 @@ fun AboutScreen(
                         Box(
                             modifier = Modifier
                                 .size(38.dp)
-                                .clip(RoundedCornerShape(11.dp))
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(IosColors.SystemPurple.copy(0.18f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1237,17 +1205,21 @@ fun AboutScreen(
             // =====================================================================
             // 8. Open Source Credits & Acknowledgements (开源致谢与许可协议)
             // =====================================================================
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(start = 6.dp)
-            ) {
-                Icon(Icons.Default.Favorite, contentDescription = null, tint = IosColors.SystemRed, modifier = Modifier.size(15.dp))
-                Text(
+            // IosSectionHeader 内部自带 start = pageH + 4 的内缩，这里把它左移
+            // (pageH + 15dp 图标位) 以便与前面的心形图标对齐到同一条分组标题基准线。
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = IosColors.SystemRed,
+                    modifier = Modifier
+                        .padding(start = AppSpacing.pageH)
+                        .size(15.dp)
+                        .offset(y = 2.dp)
+                )
+                IosSectionHeader(
                     text = "开源致谢与依赖项目 (Acknowledgements)",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = IosColors.SecondaryLabel
+                    modifier = Modifier.offset(x = -(AppSpacing.pageH + 19.dp))
                 )
             }
 
@@ -1256,10 +1228,11 @@ fun AboutScreen(
                     .fillMaxWidth()
                     .liquidGlass(
                         isLiquidGlass = isLiquidGlass,
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = 8.dp
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = 8.dp,
+                        hazeState = pageHaze
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = Color.Transparent
             ) {
                 Column(

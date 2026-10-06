@@ -117,7 +117,7 @@ fun SearchLocationDialog(
                     )
                     items(quickPois) { (name, coords) ->
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = IosBlue.copy(alpha = 0.08f),
                             border = BorderStroke(0.5.dp, IosBlue.copy(alpha = 0.2f)),
                             modifier = Modifier.bouncyClickable {
@@ -157,7 +157,7 @@ fun SearchLocationDialog(
                     ) {
                         items(searchResults) { item ->
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color = if (LocalIosColors.current.isDark) Color(0xFF2C2C2E) else Color.White,
                                 border = BorderStroke(0.5.dp, IosHairlineBorder),
                                 shadowElevation = 1.dp,
@@ -185,7 +185,7 @@ fun SearchLocationDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(13.dp),
                                             color = IosBlue,
                                             modifier = Modifier.bouncyClickable {
                                                 onSelectLocation(item.latitude, item.longitude, item.name)
@@ -200,7 +200,7 @@ fun SearchLocationDialog(
                                             )
                                         }
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(13.dp),
                                             color = IosGreen.copy(alpha = 0.15f),
                                             modifier = Modifier.bouncyClickable {
                                                 onSetAsOrigin(item.latitude, item.longitude)
@@ -215,7 +215,7 @@ fun SearchLocationDialog(
                                             )
                                         }
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(13.dp),
                                             color = IosOrange.copy(alpha = 0.15f),
                                             modifier = Modifier.bouncyClickable {
                                                 onSetAsDestination(item.latitude, item.longitude)
@@ -230,7 +230,7 @@ fun SearchLocationDialog(
                                             )
                                         }
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(13.dp),
                                             color = IosRed.copy(alpha = 0.15f),
                                             modifier = Modifier.bouncyClickable {
                                                 onDirectMock(item.latitude, item.longitude)
@@ -375,7 +375,7 @@ fun RoadRouteDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (selectedTapPoint != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosGreen.copy(alpha = 0.12f),
                                     modifier = Modifier.bouncyClickable {
                                         mapViewModel.setRoadOrigin(WayPoint(selectedTapPoint.first, selectedTapPoint.second))
@@ -386,7 +386,7 @@ fun RoadRouteDialog(
                             }
                             if (pointMockLocation != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosOrange.copy(alpha = 0.12f),
                                     modifier = Modifier.bouncyClickable {
                                         mapViewModel.setRoadOrigin(pointMockLocation)
@@ -397,7 +397,7 @@ fun RoadRouteDialog(
                             }
                             if (realLocation != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosBlue.copy(alpha = 0.12f),
                                     modifier = Modifier.bouncyClickable {
                                         mapViewModel.setRoadOrigin(WayPoint(realLocation.first, realLocation.second))
@@ -450,7 +450,7 @@ fun RoadRouteDialog(
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (selectedTapPoint != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosOrange.copy(alpha = 0.12f),
                                     modifier = Modifier.bouncyClickable {
                                         mapViewModel.setRoadDestination(WayPoint(selectedTapPoint.first, selectedTapPoint.second))
@@ -461,7 +461,7 @@ fun RoadRouteDialog(
                             }
                             if (roadOrigin != null && roadDestination != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(9.dp),
                                     color = IosGray.copy(alpha = 0.12f),
                                     modifier = Modifier.bouncyClickable {
                                         val temp = roadOrigin
@@ -481,7 +481,7 @@ fun RoadRouteDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(IosColors.TertiarySystemFill)
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -590,7 +590,7 @@ fun RoadRouteDialog(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .bouncyClickable {
                                         val route = Route(
                                             name = "沿路规划 (${result.mode.label} ${"%.1f".format(result.distanceKm)}km)",
@@ -600,7 +600,7 @@ fun RoadRouteDialog(
                                         onDismissRequest()
                                         Toast.makeText(context, "已开启沿真实道路模拟运动！", Toast.LENGTH_SHORT).show()
                                     },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color = IosGreen
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 10.dp)) {

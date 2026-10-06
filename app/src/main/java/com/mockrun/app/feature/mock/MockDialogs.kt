@@ -92,7 +92,7 @@ fun UsageGuideDialog(
                 Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
             }
         },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         containerColor = IosColors.SecondaryGroupedBackground
     )
 }
@@ -127,7 +127,7 @@ fun WeChatTroubleshootDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = IosColors.SystemOrange.copy(alpha = 0.12f)
                 ) {
                     Text(
@@ -168,7 +168,7 @@ fun WeChatTroubleshootDialog(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(13.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -185,7 +185,7 @@ fun WeChatTroubleshootDialog(
                 Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
             }
         },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         containerColor = IosColors.SecondaryGroupedBackground
     )
 }
@@ -229,7 +229,7 @@ fun KeepAliveGuideDialog(
                         onClick = {
                             com.mockrun.app.core.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
                         },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(13.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isIgnoringBattery) IosColors.SystemGreen else IosColors.SystemBlue
                         ),
@@ -271,7 +271,7 @@ fun KeepAliveGuideDialog(
                 Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
             }
         },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         containerColor = IosColors.SecondaryGroupedBackground
     )
 }

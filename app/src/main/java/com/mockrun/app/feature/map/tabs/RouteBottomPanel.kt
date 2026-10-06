@@ -181,10 +181,10 @@ fun RouteBottomPanel(
                         .heightIn(max = 200.dp)
                         .liquidGlass(
                             isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(20.dp),
+                            shape = RoundedCornerShape(22.dp),
                             elevation = 10.dp
                         ),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = Color.Transparent
                 ) {
                     LazyColumn(
@@ -268,7 +268,7 @@ fun RouteBottomPanel(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(9.dp),
                                         color = if (waypoints.isEmpty()) IosColors.SystemBlue.copy(0.12f) else IosColors.SystemGreen.copy(0.15f)
                                     ) {
                                         Text(
@@ -287,7 +287,7 @@ fun RouteBottomPanel(
                                             onClick = onUndoWaypoint,
                                             modifier = Modifier.height(32.dp),
                                             contentPadding = PaddingValues(horizontal = 8.dp),
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(13.dp)
                                         ) {
                                             Icon(Icons.Default.Undo, null, modifier = Modifier.size(14.dp))
                                             Spacer(Modifier.width(3.dp))
@@ -297,7 +297,7 @@ fun RouteBottomPanel(
                                             onClick = onClearWaypoints,
                                             modifier = Modifier.height(32.dp),
                                             contentPadding = PaddingValues(horizontal = 8.dp),
-                                            shape = RoundedCornerShape(10.dp)
+                                            shape = RoundedCornerShape(13.dp)
                                         ) {
                                             Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(14.dp), tint = IosColors.SystemRed)
                                             Spacer(Modifier.width(3.dp))
@@ -376,11 +376,11 @@ fun RouteBottomPanel(
 
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(9.dp))
                                         .clickable { onOpenConfig() }
                                         .padding(horizontal = 8.dp, vertical = 4.dp),
                                     color = IosColors.SystemBlue.copy(0.12f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(9.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Tune, null, tint = IosColors.SystemBlue, modifier = Modifier.size(14.dp))
@@ -400,7 +400,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
                                     Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
@@ -413,7 +413,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
                                     Icon(Icons.Default.BookmarkAdd, null, modifier = Modifier.size(16.dp))
@@ -426,7 +426,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.4f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
@@ -486,7 +486,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(46.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     contentPadding = PaddingValues(horizontal = 4.dp)
                                 ) {
                                     Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
@@ -501,7 +501,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.1f)
                                         .height(46.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isPaused) IosColors.SystemGreen else IosColors.SystemOrange
                                     )
@@ -520,7 +520,7 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.2f)
                                         .height(46.dp),
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemRed)
                                 ) {
                                     Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))

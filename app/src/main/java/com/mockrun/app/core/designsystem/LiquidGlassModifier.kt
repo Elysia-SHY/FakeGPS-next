@@ -3,7 +3,6 @@
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,21 +16,47 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 
 /**
  * CompositionLocal providing global Liquid Glass effect toggle state.
  */
 val LocalLiquidGlassEnabled = compositionLocalOf { true }
 
-val LocalHazeState = compositionLocalOf<Any?> { null }
-val LocalBottomBarHazeState = compositionLocalOf<Any?> { null }
+/**
+ * 全局毛玻璃「模糊源」。
+ *
+ * 使用方式（源层与玻璃层必须是**兄弟节点**，否则会自引用递归）：
+ * ```
+ * val hazeState = remember { HazeState() }
+ * Box {
+ *     // ① 源层：会被捕获并模糊的内容（地图 / 页面背景）
+ *     Box(Modifier.fillMaxSize().haze(hazeState)) { MapContent() }
+ *
+ *     // ② 玻璃层：在源层之上，引用同一 state
+ *     CompositionLocalProvider(LocalHazeState provides hazeState) {
+ *         GlassPanel(Modifier.liquidGlass(isLiquidGlass = true))
+ *     }
+ * }
+ * ```
+ */
+val LocalHazeState = compositionLocalOf<HazeState?> { null }
+
+/** 底部 Tab 栏专用的独立模糊源（避免与内容区互相污染） */
+val LocalBottomBarHazeState = compositionLocalOf<HazeState?> { null }
 
 object LiquidGlassDefaults {
     const val PREFS_NAME = "fake_gps_ui_prefs"
     const val KEY_LIQUID_GLASS_ENABLED = "is_liquid_glass_enabled"
+
+    /** 设计稿唯一规范：blur 30 · saturate 180% */
+    val BlurRadius = 30.dp
 
     fun isEnabled(context: Context): Boolean {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -42,19 +67,65 @@ object LiquidGlassDefaults {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sp.edit().putBoolean(KEY_LIQUID_GLASS_ENABLED, enabled).apply()
     }
+
+    /**
+     * 构造设计稿规范的 HazeStyle。
+     * @param tint 玻璃着色（默认 rgba(20,26,42,.72)）
+     */
+    fun glassStyle(
+        tint: Color,
+        blurRadius: Dp = BlurRadius,
+        noiseFactor: Float = 0f
+    ): HazeStyle {
+        val hazeTint = HazeTint(tint)
+        return HazeStyle(
+            Color.Transparent,
+            hazeTint,
+            blurRadius,
+            noiseFactor,
+            hazeTint
+        )
+    }
 }
 
 /**
- * High-performance Liquid Glass (液态毛玻璃) styling modifier.
- * When [isLiquidGlass] is true:
- *   - Ultra-translucent crystal prismatic gradient background (通透晶莹微棱镜折射底衬)
- *   - 135° Fresnel total reflection rim-light border (菲涅尔微棱镜双光边框)
- *   - Physical 3D inner bevel specular highlight (微倒角立体高光内沿)
- *   - Top-down glancing specular surface sheen & bottom ambient reflection (表面掠射弧光)
- *   - Soft diffuse floating ambient shadow (空间悬浮光晕)
- *   - Fully safe: rendered via drawBehind to protect foreground text/icon sharpness
- * When [isLiquidGlass] is false:
- *   - Crisp solid surface (pure material, zero blur/shader overhead, battery-saving)
+ * 把当前节点标记为 Haze 的**模糊源**。
+ * 传入 null 时退化为无操作（例如设备不支持或未开启玻璃时）。
+ */
+fun Modifier.hazeSource(state: HazeState?): Modifier =
+    if (state != null) this.haze(state) else this
+
+/**
+ * 实心卡片面（设计稿 .card）。
+ *
+ * 滚动页（功能页 / 关于页）的卡片按设计稿为**不透明面**，而非玻璃：
+ * 一来 `--surface:#151B2B` 本身是实色，二来大量可滚动卡片若都做实时模糊会显著吃 GPU。
+ * 真毛玻璃只用于地图浮层、底部抽屉与 Tab 栏。
+ */
+fun Modifier.iosCardSurface(
+    shape: Shape = RoundedCornerShape(24.dp)
+): Modifier = composed {
+    this
+        .clip(shape)
+        .background(LocalIosColors.current.secondaryGroupedBackground, shape)
+        .border(1.dp, LocalIosColors.current.line, shape)
+}
+
+/**
+ * Liquid Glass（液态毛玻璃）· v1.7.0
+ *
+ * 开启时（[isLiquidGlass] = true）：
+ *   - 由 Haze 对 [hazeState] 指向的源层做真实 GPU 高斯模糊（blur 30 / saturate 180%）
+ *   - Android 12（API 31）以下由 Haze 内部自动降级为磨砂 tint 板，不会崩
+ *   - 叠加 1px 8% 白描边 + 顶部内高光 + 空间悬浮投影
+ *
+ * 关闭时（[isLiquidGlass] = false）：
+ *   - 输出纯色面板，零模糊开销（省电）
+ *
+ * [hazeState] 默认取 [LocalHazeState]。若解析结果为 null（上层未提供模糊源），
+ * 或源层是 AndroidView 承载的原生 View（Haze 捕获不到），自动退化为
+ * **不透明磨砂板**（描边 + 内高光仍在），保证浮层读起来是一整块实心玻璃，
+ * 而不是让背后内容透出来。
  */
 fun Modifier.liquidGlass(
     isLiquidGlass: Boolean,
@@ -62,228 +133,190 @@ fun Modifier.liquidGlass(
     elevation: Dp = 12.dp,
     containerColor: Color? = null,
     borderWidth: Dp = 1.0.dp,
-    hazeState: Any? = null
+    hazeState: HazeState? = null,
+    blurRadius: Dp = LiquidGlassDefaults.BlurRadius,
+    noiseFactor: Float = 0f
 ): Modifier = composed {
-    val isDark = isSystemInDarkTheme()
+    val palette = LocalIosColors.current
+    val isDark = palette.isDark
+    // 未显式指定时，自动取上层提供的模糊源
+    val resolvedHaze = hazeState ?: LocalHazeState.current
 
-    if (isLiquidGlass) {
-        // 1. Crystal Base Gradient (通透晶莹微棱镜底衬 - 高透光率，让底层地图道路地标清晰穿透)
-        val crystalBaseBrush = if (containerColor != null) {
-            Brush.linearGradient(
-                colors = listOf(
-                    containerColor.copy(alpha = 0.88f),
-                    containerColor.copy(alpha = 0.68f),
-                    containerColor.copy(alpha = 0.82f)
-                ),
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-        } else if (isDark) {
-            // Obsidian Smoked Crystal (黑曜水晶通透深邃微光)
-            Brush.linearGradient(
-                0.0f to Color(0x94262B38), // 58% top-left specular highlight
-                0.40f to Color(0x5212141A), // 32% high-transparency cosmic dark
-                0.75f to Color(0x66181B22), // 40% obsidian crystal body
-                1.0f to Color(0x801F232D),  // 50% deep obsidian depth
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-        } else {
-            // Ultra-Clear Prismatic Crystal (超白玻微偏光极度通透 - 拒绝乳白扁平塑料感)
-            Brush.linearGradient(
-                0.0f to Color(0xB8FFFFFF), // 72% 入射光掠影
-                0.38f to Color(0x52E8F2FC), // 32% 冰晶微偏光通透带 - 地图道路与图钉清晰穿透！
-                0.78f to Color(0x66FFFFFF), // 40% 晶体本体高透光
-                1.0f to Color(0x78D8E8F8),  // 47% 边缘微棱镜折射散色
-                start = Offset.Zero,
-                end = Offset.Infinite
-            )
-        }
-
-        // 1. Subtle, clean glass border (VisionOS single hairline rim)
-        val borderBrush = Brush.linearGradient(
-            colors = if (containerColor != null) {
-                listOf(
-                    containerColor.copy(alpha = 0.60f),
-                    containerColor.copy(alpha = 0.25f)
-                )
-            } else if (isDark) {
-                listOf(
-                    Color.White.copy(alpha = 0.22f),
-                    Color.White.copy(alpha = 0.06f)
-                )
-            } else {
-                listOf(
-                    Color.White.copy(alpha = 0.65f),
-                    Color.White.copy(alpha = 0.20f)
-                )
-            },
-            start = Offset.Zero,
-            end = Offset.Infinite
-        )
-
-        // 2. Base Modifier with soft clipping and subtle elevation
-        val baseModifier = if (elevation > 0.dp) {
-            this.shadow(
-                elevation = elevation.coerceAtMost(3.dp),
-                shape = shape,
-                spotColor = if (isDark) Color(0x22000000) else Color(0x10001020),
-                ambientColor = Color.Transparent
-            ).clip(shape)
-        } else {
-            this.clip(shape)
-        }
-
-        // 3. Clean Translucent Crystal Base with Single Crisp Hairline Border
-        baseModifier
-            .background(crystalBaseBrush, shape)
-            .border(borderWidth.coerceAtMost(0.8.dp).coerceAtLeast(0.5.dp), borderBrush, shape)
-    } else {
-        val solidFill = containerColor ?: if (isDark) {
-            Color(0xFF1E1E20)
-        } else {
-            Color(0xFFFFFFFF)
-        }
-        val solidBorder = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
-
-        this
+    // ---- 关闭玻璃：纯色面板 ----
+    if (!isLiquidGlass) {
+        val solidFill = containerColor ?: if (isDark) palette.surface2 else palette.secondaryGroupedBackground
+        val solidBorder = if (isDark) DesignTokens.Line else DesignTokens.LLine
+        return@composed this
             .shadow(
-                elevation = (elevation * 0.75f).coerceAtLeast(4.dp),
+                elevation = (elevation * 0.5f).coerceIn(0.dp, 10.dp),
                 shape = shape,
-                spotColor = Color.Black.copy(alpha = if (isDark) 0.4f else 0.12f)
+                spotColor = Color.Black.copy(alpha = if (isDark) 0.45f else 0.12f),
+                ambientColor = Color.Transparent
             )
             .clip(shape)
             .background(solidFill, shape)
             .border(borderWidth, solidBorder, shape)
     }
+
+    // ---- 玻璃层着色 ----
+    // containerColor 给定且足够不透明时，视为「实心 CTA」，不做模糊（省 GPU 且符合设计稿）
+    val solidThreshold = 0.90f
+    val isSolidCta = containerColor != null && containerColor.alpha >= solidThreshold
+    val tintColor = containerColor ?: palette.glassBg
+
+    val borderColor = if (isDark) palette.glassLine else palette.glassLine
+
+    // 投影：设计稿 0 18px 44px -20px rgba(0,0,0,.85)
+    val shadowElevation = elevation.coerceIn(0.dp, 26.dp)
+    val spotAlpha = if (isDark) 0.55f else 0.16f
+
+    var modifier = this
+        .shadow(
+            elevation = shadowElevation,
+            shape = shape,
+            spotColor = Color.Black.copy(alpha = spotAlpha),
+            ambientColor = Color.Transparent
+        )
+
+    modifier = if (isSolidCta) {
+        // 实心 CTA：直接铺色，不做模糊
+        modifier.clip(shape).background(tintColor, shape)
+    } else if (resolvedHaze != null) {
+        // 真毛玻璃：Haze 捕获源层 → 高斯模糊 → tint 着色
+        modifier
+            .hazeChild(
+                resolvedHaze,
+                shape,
+                LiquidGlassDefaults.glassStyle(tintColor, blurRadius, noiseFactor)
+            )
+            .clip(shape)
+    } else {
+        // ---- 无可用模糊源兜底：输出**不透明**磨砂板 ----
+        //
+        // 触发场景有两条：
+        //   ① 上层根本没提供源（LocalHazeState 为 null 且未显式传 hazeState）；
+        //   ② 提供了源，但源层是 AndroidView 承载的**原生 View**（如 OSMDroid MapView）。
+        //      Haze 仅捕获 Compose 自己绘制的内容，此时录到的图层是空的，模糊结果为空。
+        //
+        // 这两种情况下若仍用 72% 半透明底板，背后的真实内容会硬生生透出来 ——
+        // 观感就是「穿模」（例如右侧 FAB 列从底部抽屉里透出来）。
+        // 因此这里改用不透明磨砂底板 + 描边 + 内高光，读起来仍是一整块实心玻璃。
+        val opaqueFallback = when {
+            containerColor != null && containerColor.alpha >= 0.5f -> containerColor.copy(alpha = 1f)
+            isDark -> DesignTokens.GlassBgOpaque
+            else -> DesignTokens.LGlassBgOpaque
+        }
+        modifier.clip(shape).background(opaqueFallback, shape)
+    }
+
+    modifier
+        .border(borderWidth, borderColor, shape)
+        .drawBehind {
+            // inset 0 1px 0 rgba(255,255,255,.07) —— 顶部内高光，模拟 Apple 连续曲率
+            val stroke = 1.dp.toPx()
+            drawLine(
+                color = palette.glassHighlight,
+                start = Offset(stroke * 4f, stroke / 2f),
+                end = Offset(size.width - stroke * 4f, stroke / 2f),
+                strokeWidth = stroke
+            )
+        }
 }
 
 /**
- * Ambient chromatic luminous backdrop for non-map screens (e.g. LocationMockScreen, AboutScreen).
- * Renders Apple HIG / VisionOS style ethereal radiant lighting orbs onto an obsidian or pearlescent canvas,
- * and captures them via dev.chrisbanes.haze.haze(hazeState).
- * When cards float and scroll above this backdrop with .liquidGlass(hazeState), Haze's GPU Gaussian blur
- * disperses these luminous gradients, creating genuine, refraction-rich liquid frosted glass!
+ * 滚动页（功能页 / 关于页）的环境光背景，同时作为 Haze 的模糊源。
+ *
+ * 返回的 [Box] 已经挂了 [Modifier.hazeSource]，直接把它当作视觉底衬，
+ * 上层卡片用 [Modifier.liquidGlass] 即可获得真实的折射毛玻璃。
  */
 @Composable
 fun FrostedAmbientBackground(
-    hazeState: Any? = null,
+    hazeState: HazeState? = null,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalIosColors.current.isDark
 
     val baseModifier = modifier
         .fillMaxSize()
-            .background(if (isDark) Color(0xFF090C12) else Color(0xFFF2F4F7))
-            .drawBehind {
-                val canvasWidth = size.width
-                val canvasHeight = size.height
+        .hazeSource(hazeState)
+        .background(if (isDark) DesignTokens.Bg1 else DesignTokens.LBg0)
+        .drawBehind {
+            val w = size.width
+            val h = size.height
 
-                if (isDark) {
-                    // 1. Top-Right Radiant Sapphire Orb (深邃皇家蓝宝石光晕)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF2563EB).copy(alpha = 0.40f),
-                                Color(0xFF1D4ED8).copy(alpha = 0.20f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.88f, canvasHeight * 0.10f),
-                            radius = canvasWidth * 0.85f
-                        )
+            if (isDark) {
+                // 1. 右上蓝宝石光晕
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            DesignTokens.Brand.copy(alpha = 0.28f),
+                            DesignTokens.Brand.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.88f, h * 0.08f),
+                        radius = w * 0.85f
                     )
-
-                    // 2. Mid-Left Luminous Violet / Amethyst Orb (紫罗兰晶体偏光)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF7C3AED).copy(alpha = 0.35f),
-                                Color(0xFF4C1D95).copy(alpha = 0.16f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.12f, canvasHeight * 0.42f),
-                            radius = canvasWidth * 0.85f
-                        )
+                )
+                // 2. 左中紫罗兰
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            DesignTokens.Violet.copy(alpha = 0.26f),
+                            DesignTokens.Violet.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.10f, h * 0.40f),
+                        radius = w * 0.85f
                     )
-
-                    // 3. Bottom-Right Cyan / Emerald Atmospheric Glow (青翠薄荷微光)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF0D9488).copy(alpha = 0.30f),
-                                Color(0xFF065F46).copy(alpha = 0.12f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.90f, canvasHeight * 0.80f),
-                            radius = canvasWidth * 0.75f
-                        )
+                )
+                // 3. 右下薄荷青
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF0D9488).copy(alpha = 0.20f),
+                            Color(0xFF065F46).copy(alpha = 0.08f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.90f, h * 0.80f),
+                        radius = w * 0.72f
                     )
-
-                    // 4. Subtle Center Indigo Fill
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF3B82F6).copy(alpha = 0.18f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.50f, canvasHeight * 0.62f),
-                            radius = canvasWidth * 0.65f
-                        )
+                )
+            } else {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF38BDF8).copy(alpha = 0.30f),
+                            Color(0xFF93C5FD).copy(alpha = 0.14f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.88f, h * 0.08f),
+                        radius = w * 0.85f
                     )
-                } else {
-                    // Light Mode - Luminous Apple VisionOS Pastel Gradient Fields
-                    // 1. Top-Right Cerulean Sky Glow (天蓝晶莹漫射光)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF38BDF8).copy(alpha = 0.36f),
-                                Color(0xFF93C5FD).copy(alpha = 0.18f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.88f, canvasHeight * 0.10f),
-                            radius = canvasWidth * 0.85f
-                        )
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFC084FC).copy(alpha = 0.26f),
+                            Color(0xFFE9D5FF).copy(alpha = 0.12f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.10f, h * 0.40f),
+                        radius = w * 0.85f
                     )
-
-                    // 2. Mid-Left Lavender / Quartz Aura (淡紫幻彩光晕)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFC084FC).copy(alpha = 0.32f),
-                                Color(0xFFE9D5FF).copy(alpha = 0.16f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.12f, canvasHeight * 0.42f),
-                            radius = canvasWidth * 0.85f
-                        )
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF34D399).copy(alpha = 0.22f),
+                            Color(0xFFA7F3D0).copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.90f, h * 0.80f),
+                        radius = w * 0.72f
                     )
-
-                    // 3. Bottom-Right Emerald / Mint Glow (薄荷青绿柔光)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF34D399).copy(alpha = 0.28f),
-                                Color(0xFFA7F3D0).copy(alpha = 0.12f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.90f, canvasHeight * 0.80f),
-                            radius = canvasWidth * 0.75f
-                        )
-                    )
-
-                    // 4. Center Radiant Reflection
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF60A5FA).copy(alpha = 0.18f),
-                                Color.Transparent
-                            ),
-                            center = Offset(canvasWidth * 0.45f, canvasHeight * 0.28f),
-                            radius = canvasWidth * 0.60f
-                        )
-                    )
-                }
+                )
             }
+        }
 
     Box(modifier = baseModifier)
 }
