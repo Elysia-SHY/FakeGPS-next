@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.hook
+package com.mockrun.app.hook
 
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -72,6 +72,38 @@ object HookStateBridge {
 
     fun recordSystemHookHeartbeat() {
         lastSystemHookHeartbeat = System.currentTimeMillis()
+    }
+
+    /**
+     * 执行 su 命令并**捕获 stdout**。
+     *
+     * RootSuBridge.executeCommand 只返回成败布尔值，无法拿到输出；
+     * 环境指纹导出需要确认文件真的写成功（对比 `ls -l` 的输出）。
+     *
+     * 同步阻塞调用 —— 调用方必须在后台线程上执行。
+     *
+     * @return stdout 文本；su 不可用或执行失败返回 null
+     */
+    fun runSu(cmd: String): String? {
+        var process: Process? = null
+        return runCatching {
+            // 不依赖 PATH：KernelSU 的 su 挂载在 /system/bin/su，
+            // 但部分机型只在动态路径暴露，这里显式优先绝对路径。
+            val suBin = listOf("/system/bin/su", "/system/xbin/su", "su")
+                .firstOrNull { it == "su" || java.io.File(it).exists() } ?: "su"
+            process = Runtime.getRuntime().exec(arrayOf(suBin, "-c", cmd))
+            process.outputStream.close()
+            val out = process.inputStream.bufferedReader().use { it.readText() }
+            val err = process.errorStream.bufferedReader().use { it.readText() }
+            val code = process.waitFor()
+            if (code != 0) {
+                Diag.w(TAG, "runSu exit=$code :: ${cmd.take(120)} :: $err")
+                null
+            } else {
+                out
+            }
+        }.logFailure(TAG, "runSu :: ${cmd.take(120)}").getOrNull()
+            .also { runCatching { process?.destroy() } }
     }
 
     fun isSystemHookAlive(): Boolean {
@@ -166,7 +198,10 @@ object HookStateBridge {
             // 4. Multi-Channel System Sync via Root (Asynchronous, NEVER blocks UI thread)
             val now = System.currentTimeMillis()
             val stateChanged = (lastSyncedActive != active)
-            if (stateChanged || (now - lastSuSyncTime > 1200L)) {
+            // 节流窗口从 1200ms 收紧到 250ms：摇杆/路线模拟下位置每秒变多次，
+            // 1.2s 的窗口会让 system_server 读到明显滞后的点。
+            // su 有进程创建开销，250ms 已是实用下限。
+            if (stateChanged || (now - lastSuSyncTime > 250L)) {
                 lastSuSyncTime = now
                 lastSyncedActive = active
 
@@ -191,6 +226,10 @@ object HookStateBridge {
                                 // coordinates this hook serves.
                                 append("chmod 644 /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("echo '$jsonStr' > /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
+                                // /data/local/tmp 是 shell_data_file，system_server 可读 —— 这是
+                                // Android 11+ 上唯一对 system_server 可靠的通道。
+                                // XSharedPreferences 读 /data/data/<pkg>/shared_prefs 会被
+                                // SELinux 拒绝（u:r:system_server:s0 读 app_data_file）。
                                 append("chmod 644 /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings put global fake_gps_config '$jsonStr' 2>/dev/null; ")
                                 append("chmod 755 $pkgDir 2>/dev/null; ")

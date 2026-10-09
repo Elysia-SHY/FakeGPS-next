@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.feature.map
+package com.mockrun.app.feature.map
 
 import android.content.Context
 import android.widget.Toast
@@ -345,14 +345,19 @@ fun RoadRouteDialog(
                                 Spacer(Modifier.width(8.dp))
                                 Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = IosColors.Label)
                             }
-                            if (roadOrigin != null) {
+                            // 组合期取快照：roadOrigin 是 collectAsState() 委托，
+                            // 「清除」按钮会在点击时把它置为 null，
+                            // 而本行的 bouncyClickable lambda 稍后才重新读取 ——
+                            // 用 roadOrigin!! 会在这种情况下抛 KotlinNullPointerException。
+                            val origin = roadOrigin
+                            if (origin != null) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(
                                         text = "定位",
                                         color = IosBlue,
                                         style = MaterialTheme.typography.labelSmall,
                                         modifier = Modifier.bouncyClickable {
-                                            onNavigateToOrigin(roadOrigin!!.latitude, roadOrigin!!.longitude)
+                                            onNavigateToOrigin(origin.latitude, origin.longitude)
                                         }
                                     )
                                     Text(

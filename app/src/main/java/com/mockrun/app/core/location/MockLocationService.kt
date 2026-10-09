@@ -411,13 +411,22 @@ class MockLocationService : Service() {
 
         pointMockJob = serviceScope.launch {
             var tick = 0
+            // 真实 GNSS 静止时的水平误差典型值 3-8 m，而且是连续游走（有惯性），
+            // 不是每 tick 独立重摇的白噪声。原实现用 ±0.000002°（约 ±0.22 m）
+            // 的独立随机 —— 散点是一个半径 0.22 m 的圆，比真实 GPS 稳定得多。
+            //
+            // 改用 Ornstein-Uhlenbeck 过程近似：每 tick 保留大部分上一次偏移，
+            // 只注入少量新扰动。稳态半径约 ±4 m，且是连续游走。
+            var ouLat = 0.0
+            var ouLon = 0.0
             while (isActive && sessionId == currentSessionId) {
                 runCatching {
-                    // Natural micro-jitter (±0.2m) to mimic authentic GPS drift and bypass anti-cheat
-                    val jitterLat = (kotlin.random.Random.nextDouble(-1.0, 1.0) * 0.000002)
-                    val jitterLon = (kotlin.random.Random.nextDouble(-1.0, 1.0) * 0.000002)
-                    val currentLat = lat + jitterLat
-                    val currentLon = lon + jitterLon
+                    val ouStep = 0.000005
+                    val ouRetain = 0.92
+                    ouLat = ouLat * ouRetain + kotlin.random.Random.nextDouble(-0.6, 0.6) * ouStep
+                    ouLon = ouLon * ouRetain + kotlin.random.Random.nextDouble(-0.6, 0.6) * ouStep
+                    val currentLat = lat + ouLat
+                    val currentLon = lon + ouLon
                     mockEngine.inject(
                         latitude = currentLat,
                         longitude = currentLon,

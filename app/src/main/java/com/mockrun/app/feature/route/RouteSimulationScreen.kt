@@ -72,9 +72,10 @@ fun RouteSimulationScreen(
     ) { uri: Uri? ->
         uri?.let {
             try {
-                val inputStream = context.contentResolver.openInputStream(it)
-                if (inputStream != null) {
-                    mapViewModel.importGpx(inputStream, "导入GPX路线")
+                // use{} 保证流被关闭。原实现只在成功路径上拿到流、从不关闭，
+                // 每次导入泄漏一个 fd，累积后 EMFILE，连路线库和地图瓦片都打不开。
+                context.contentResolver.openInputStream(it)?.use { stream ->
+                    mapViewModel.importGpx(stream, "导入GPX路线")
                     Toast.makeText(context, "GPX 路线导入成功并已载入", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
@@ -327,7 +328,12 @@ fun RouteSimulationScreen(
                 Spacer(Modifier.height(12.dp))
 
                 // Primary Simulation Master Buttons
-                val hasValidRoute = selectedRoute != null && (selectedRoute?.waypoints?.size ?: 0) >= 2
+                // 先在组合期取局部量：selectedRoute 是 collectAsState() 委托，
+                // onClick lambda 会在稍后重新读取它，而 MapViewModel.clearWaypoints() /
+                // deleteRoute() 可能在这两次读取之间把状态置空 ——
+                // 那样 selectedRoute!! 就会在点击时抛 KotlinNullPointerException。
+                val route = selectedRoute
+                val hasValidRoute = route != null && route.waypoints.size >= 2
                 when (simState.status) {
                     is SimulationStatus.Idle, is SimulationStatus.Completed -> {
                         IosPrimaryButton(
@@ -335,8 +341,8 @@ fun RouteSimulationScreen(
                             containerColor = if (hasValidRoute) IosColors.SystemGreen else IosColors.SystemGray,
                             icon = Icons.Default.PlayArrow,
                             onClick = {
-                                if (hasValidRoute) {
-                                    simulationViewModel.startSimulation(context, selectedRoute!!, selectedSpeed)
+                                if (route != null && route.waypoints.size >= 2) {
+                                    simulationViewModel.startSimulation(context, route, selectedSpeed)
                                     Toast.makeText(context, "路线模拟已开启", Toast.LENGTH_SHORT).show()
                                 } else {
                                     showRoutePickerDialog = true

@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.util
+package com.mockrun.app.util
 
 import android.Manifest
 import android.app.AppOpsManager
@@ -46,31 +46,41 @@ object PermissionHelper {
             if (mode == AppOpsManager.MODE_ALLOWED) {
                 true
             } else {
-                val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                val probe = "mock_probe_test"
-                try {
-                    lm.addTestProvider(probe, false, false, false, false, false, false, false, 1, 1)
-                    lm.removeTestProvider(probe)
-                    true
-                } catch (se: SecurityException) {
-                    false
-                } catch (e: Exception) {
-                    true
-                }
+                probeMockLocationApp(context)
             }
         } catch (e: Exception) {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val probe = "mock_probe_test"
-            try {
-                lm.addTestProvider(probe, false, false, false, false, false, false, false, 1, 1)
-                lm.removeTestProvider(probe)
-                true
-            } catch (se: SecurityException) {
-                false
-            } catch (e: Exception) {
-                true
-            }
+            probeMockLocationApp(context)
         }
+    }
+
+    /**
+     * 通过 add/remove test provider 探测本应用是否已被设为「模拟位置信息应用」。
+     *
+     * 注意三点，缺一即会误报：
+     *  1. 必须先 remove 一次 —— 上次探测若在 add 与 remove 之间进程被杀，provider
+     *     会残留在系统里，此时 addTestProvider 抛的是
+     *     IllegalArgumentException("Provider ... already exists")，而不是 SecurityException。
+     *  2. 清理必须放在 finally —— 否则成功路径之外都会留下残留。
+     *  3. 只有「add 成功」才算通过；把任意 Exception 当作 true 会让
+     *     checkPrimaryPermissions 返回 NONE，跳过引导，之后注入失败时报的是不相干的错。
+     */
+    private fun probeMockLocationApp(context: Context): Boolean {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return false
+        val probe = "mock_probe_test"
+        var ok = false
+        try {
+            runCatching { lm.removeTestProvider(probe) }
+            lm.addTestProvider(probe, false, false, false, false, false, false, false, 1, 1)
+            ok = true
+        } catch (se: SecurityException) {
+            ok = false
+        } catch (e: Exception) {
+            ok = false
+        } finally {
+            runCatching { lm.removeTestProvider(probe) }
+        }
+        return ok
     }
 
     fun checkPrimaryPermissions(context: Context): PermissionIssueType {

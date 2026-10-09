@@ -66,7 +66,14 @@ class RouteSimulator @Inject constructor(
 
             // Dynamic realistic speed combining macro pacing wave (±12%) and micro stride jitter (±3%)
             val currentSpeedMs = kinematicsEngine.nextDynamicSpeed(safeSpeedMs)
-            val distThisTick = currentSpeedMs * (UPDATE_INTERVAL_MS / 1000.0)
+            // 每 tick 距离必须有下限。
+            // nextDynamicSpeed 对 baseSpeedMs <= 0.1 直接返回 0.0（即速度 ≤ 0.36 km/h），
+            // 那样 distThisTick = 0，covered 永不推进，外层 while 永不退出：
+            // 每秒发射一个完全相同的点，isCompleted 永不触发，前台服务永不结束，
+            // 24 小时 PARTIAL_WAKE_LOCK 一直持有。
+            // 触发路径是 AdbCommandReceiver 文档里写明的
+            // `am broadcast -a com.mockrun.app.ACTION_SET_SPEED --ef extra_speed 0`。
+            val distThisTick = (currentSpeedMs * (UPDATE_INTERVAL_MS / 1000.0)).coerceAtLeast(0.3)
 
             val dynAlt = kinematicsEngine.nextElevation(baseAltitude = pt.alt, deltaDistanceMeters = distThisTick)
 

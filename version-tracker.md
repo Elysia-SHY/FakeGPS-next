@@ -2,20 +2,32 @@
 
 > **版本真源**：`app/build.gradle.kts` 的 `versionCode` / `versionName`。`version.json`、`package.json`、README 与 CHANGELOG 均以其为准同步。
 
-## 当前状态 (Current State)，更新于 2026-10-07
+## 当前状态 (Current State)，更新于 2026-10-09
 
 | 项目 | 值 |
 | :--- | :--- |
-| **最新已发布版本** | `v1.6.1`（基于设计规范 v1.7.0 的全量 UI 重构与真毛玻璃落地，含浅色主题跟随修复） |
-| **Android 内部版本** | `versionCode = 30` |
-| **Android 显示版本** | `versionName = "v1.6.1"` |
+| **最新已发布版本** | `v2.0.0`（系统层 Hook 全链路修复 + 环境指纹采集与回放） |
+| **Android 内部版本** | `versionCode = 40` |
+| **Android 显示版本** | `versionName = "v2.0.0"` |
 | **本版产物提交** | 待构建回填 |
-| **相对 v1.6.0 差异** | 设计系统重标定（品牌色 `#2F7BFF`、9 级圆角阶梯、新增 `AppShapes` / `AppSpacing`）；接入 Haze 1.0.0 真毛玻璃；地图浮层改不透明磨砂板消除穿模；修复浅色主题下底栏与图钉提示条不跟随主题；工具链升级 Kotlin 2.0.21 / Compose BOM 2024.10.01 |
-| **上一条已发布版本** | `v1.6.0`（versionCode = 29） |
-| **交付存放目录** | `D:\Desktop\fake gps\` |
-| **最新安装包路径** | `D:\Desktop\fake gps\FakeGPS-next-v1.6.1-release.apk` |
+| **相对 v1.6.1 差异** | 修正 AMap/Baidu/Tencent 三套坐标系契约（此前一律注入 WGS-84，实测偏移 1.37 km）；按 API 分级清除 mock 标记（原字段反射在 API 29+ 全部失效）；补齐 Android 11 的 `LocationManagerService$LocationProviderManager` 与 GNSS 实际方法名；新增 `/data/local/tmp` 配置通道绕开 SELinux 拒绝；新增环境指纹采集与回放；移除 Wi-Fi/基站清空与 AOSP 哨兵值；静止抖动改 OU 过程；新增 33 个单元测试 |
+| **上一条已发布版本** | `v1.6.1`（versionCode = 30） |
+| **交付存放目录** | `D:\Desktop\dsh\fg\` |
+| **最新安装包路径** | `app/build/outputs/apk/release/app-release.apk` |
 | **发布方式** | GitHub Actions [`.github/workflows/release.yml`](.github/workflows/release.yml)（`workflow_dispatch` 或 push tag `v*`） |
+| **官网** | [https://aqvtc.icu/](https://aqvtc.icu/) |
+| **官方 APK 下载地址** | [https://aqvtc.icu/downloads/latest.apk](https://aqvtc.icu/downloads/latest.apk) |
 | **签名证书 SHA-256** | `0f8d4bea2db592a239dbc2eab8de441ff26dd6f1e244bfe4dbff099c1072761e`（`CN=FakeGPS-next`，CI 固定密钥，v1.4.2 起未变） |
+
+### v2.0.0 构建信息
+
+- **构建时间**：2026-10-09（本地构建）
+- **构建环境**：Windows，JDK 17（Microsoft OpenJDK 17.0.20.101），Android SDK `platforms;android-34` + `build-tools;34.0.0`
+- **构建命令**：`.\gradlew.bat :app:assembleRelease --offline`
+- **产物绝对路径**：`app/build/outputs/apk/release/app-release.apk`
+- **签名**：与历代版本共用 `keystore/fakegps-signing.jks`，SHA-256 指纹未变，可直接覆盖安装
+- **单元测试**：`.\gradlew.bat :app:testDebugUnitTest` —— 3 个测试类 / 33 个用例 / 0 失败
+- **源码提交**：见本版 Git 提交记录
 
 ### v1.6.1 构建信息
 

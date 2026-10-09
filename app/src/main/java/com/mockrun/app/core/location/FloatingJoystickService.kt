@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.core.location
+package com.mockrun.app.core.location
 
 import android.app.*
 import android.content.Context
@@ -203,19 +203,19 @@ class FloatingJoystickService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        if (stateRepo.isJoystickActive.value || rootView != null) {
-            android.util.Log.d("FloatingJoystickService", "onTaskRemoved: scheduling rapid resurrection alarm")
-            val extras = Bundle().apply {
-                putDouble(EXTRA_LATITUDE, currentLat)
-                putDouble(EXTRA_LONGITUDE, currentLon)
-            }
-            KeepAliveHelper.scheduleServiceResurrection(
-                applicationContext,
-                FloatingJoystickService::class.java,
-                ACTION_SET_LOCATION,
-                extras
-            )
-        }
+        // 用户从最近任务里划掉卡片是明确的结束意图 —— 不要再调度复活闹钟。
+        //
+        // 原实现在这里调 KeepAliveHelper.scheduleServiceResurrection()，500 ms 后由闹钟
+        // 把本服务拉回来：悬浮窗重新出现、伪造定位继续跑，表现为「应用已关闭但位置还停在
+        // 伪造点」。MockLocationService.onTaskRemoved 已针对同一问题改成真正停止，
+        // 这里与之对齐。
+        //
+        // 另一个必须去掉的理由：API 31+ 上由闹钟在后台启动 location 型前台服务会抛
+        // ForegroundServiceStartNotAllowedException，而它发生在 onCreate 里，无法被调用方捕获。
+        //
+        // 用户主动点「停止」时走的是 stopSelf 路径，不受此处影响。
+        android.util.Log.d("FloatingJoystickService", "onTaskRemoved: user dismissed task, stopping for real")
+        stopSelf()
     }
 
     private fun buildFloatingWindow() {

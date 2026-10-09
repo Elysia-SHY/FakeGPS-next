@@ -32,8 +32,8 @@ android {
         applicationId = "com.mockrun.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 30
-        versionName = "v1.6.1"
+        versionCode = 40
+        versionName = "v2.0.0"
         buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -81,6 +81,14 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric 需要 android 资源与 manifest，否则测试里 Context/Resources 为空
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -122,4 +130,11 @@ dependencies {
 
     // LSPosed / Xposed API (compileOnly, never pack into dex)
     compileOnly("de.robv.android.xposed:api:82")
+
+    // ---- 单元测试 ----
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

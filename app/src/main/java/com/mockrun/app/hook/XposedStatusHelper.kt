@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.hook
+package com.mockrun.app.hook
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -53,7 +53,11 @@ object XposedStatusHelper {
         if (HookStateBridge.isSystemHookAlive()) return true
         return try {
             val bundle = context.contentResolver.call(
-                Uri.parse("content://com.mockrun.app.provider"),
+                // 必须是 manifest 里声明的 authority：com.mockrun.app.hook.provider。
+                // 原值 com.mockrun.app.provider 从未注册，每次调用都抛
+                // IllegalArgumentException 并被下面 catch 吞掉，该回退分支永远返回 false ——
+                // 结果是模块其实已激活、只是心跳还没写入时，UI 误报「LSPosed 未激活」。
+                Uri.parse("content://com.mockrun.app.hook.provider"),
                 "isHookActive",
                 null,
                 null

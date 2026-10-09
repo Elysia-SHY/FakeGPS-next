@@ -2,6 +2,7 @@
 <resources>
     <string-array name="xposed_scope">
         <item>android</item>
+        <item>com.chaoxing.mobile</item>
         <item>com.autonavi.minimap</item>
         <item>com.baidu.BaiduMap</item>
         <item>com.tencent.map</item>

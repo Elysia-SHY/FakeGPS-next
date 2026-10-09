@@ -55,6 +55,8 @@ import com.mockrun.app.util.logFailure
 import androidx.compose.ui.text.style.TextAlign
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
+import com.mockrun.app.core.location.fingerprint.FingerprintCoordinator
+import com.mockrun.app.core.location.fingerprint.FingerprintStore
 import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
@@ -77,6 +79,19 @@ fun LocationMockScreen(
     val selectedTargetLocation by simulationViewModel.selectedTargetLocation.collectAsState()
     val multiTargetRules by simulationViewModel.multiTargetRules.collectAsState()
     var showAppPickerSheet by remember { mutableStateOf(false) }
+
+    // 环境指纹状态
+    var fingerprintIds by remember { mutableStateOf(FingerprintStore.list(context)) }
+    var fingerprintSummaries by remember { mutableStateOf(emptyMap<String, String>()) }
+    var activeFingerprintId by remember { mutableStateOf<String?>(null) }
+    var isCapturingFingerprint by remember { mutableStateOf(false) }
+    var showFingerprintCaptureDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(fingerprintIds) {
+        fingerprintSummaries = fingerprintIds.associateWith { fid ->
+            FingerprintStore.load(context, fid)?.let { FingerprintStore.summary(it) } ?: ""
+        }
+    }
 
     var joystickSizeDp by remember { mutableFloatStateOf(140f) }
     var realLocationCoord by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -336,7 +351,145 @@ fun LocationMockScreen(
         }
 
         // =====================================================================
-        // 2.5 Multi-Target Per-App Virtualization Routing (iOS Inset Group Card)
+        // 2.5 环境指纹（实地采集 Wi-Fi / 基站 / 蓝牙，之后在虚拟点回放）
+        // =====================================================================
+        IosSectionHeader("环境指纹（实地采集）")
+
+        IosInsetGroupCard(hazeState = pageHaze) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "在目标地点实地采集周边的 Wi-Fi、基站、蓝牙快照，" +
+                        "之后在这些地点启用虚拟定位时按距离回放，" +
+                        "让周边环境与虚拟坐标自洽。",
+                    style = IosTypography.Footnote,
+                    color = IosColors.SecondaryLabel
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(
+                    text = "采集时请先关闭虚拟定位，并站在目标地点。",
+                    style = IosTypography.Caption1,
+                    color = IosColors.SystemOrange
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { showFingerprintCaptureDialog = true },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isCapturingFingerprint,
+                        colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
+                    ) {
+                        if (isCapturingFingerprint) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("采集中…", style = IosTypography.Footnote)
+                        } else {
+                            Icon(Icons.Filled.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("采集当前地点", style = IosTypography.Footnote)
+                        }
+                    }
+                }
+
+                if (fingerprintIds.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "已保存 (${fingerprintIds.size})".uppercase(),
+                        style = IosTypography.Caption1,
+                        color = IosColors.SecondaryLabel,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(6.dp))
+
+                    fingerprintIds.forEach { fid ->
+                        val isActiveFp = fid == activeFingerprintId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isActiveFp) IosColors.SystemBlue.copy(alpha = 0.12f)
+                                    else Color.Transparent
+                                )
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = fid,
+                                    style = IosTypography.Footnote,
+                                    color = IosColors.Label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                fingerprintSummaries[fid]?.let {
+                                    Text(
+                                        text = it,
+                                        style = IosTypography.Caption2,
+                                        color = IosColors.SecondaryLabel
+                                    )
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = if (isActiveFp) "已启用" else "启用",
+                                    style = IosTypography.Caption1,
+                                    color = if (isActiveFp) IosColors.SystemGreen else IosColors.SystemBlue,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.bouncyClickable {
+                                        if (isActiveFp) {
+                                            FingerprintCoordinator.deactivate(context)
+                                            activeFingerprintId = null
+                                            Toast.makeText(context, "已停用环境指纹", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            val ok = FingerprintCoordinator.activate(context, fid)
+                                            activeFingerprintId = if (ok) fid else null
+                                            Toast.makeText(
+                                                context,
+                                                if (ok) "已启用 $fid" else "导出失败：需要 root 写入 /data/local/tmp",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                )
+
+                                Text(
+                                    text = "删除",
+                                    style = IosTypography.Caption1,
+                                    color = IosColors.SystemRed,
+                                    modifier = Modifier.bouncyClickable {
+                                        FingerprintStore.delete(context, fid)
+                                        if (activeFingerprintId == fid) {
+                                            FingerprintCoordinator.deactivate(context)
+                                            activeFingerprintId = null
+                                        }
+                                        fingerprintIds = FingerprintStore.list(context)
+                                        fingerprintSummaries = fingerprintSummaries - fid
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // =====================================================================
+        // 3. Multi-Target Per-App Virtualization Routing (iOS Inset Group Card)
         // =====================================================================
         Row(
             modifier = Modifier
@@ -809,6 +962,34 @@ fun LocationMockScreen(
         PermissionGuideDialog(
             issueType = issue,
             onDismissRequest = { permissionIssueDialogType = null }
+        )
+    }
+
+    if (showFingerprintCaptureDialog) {
+        FingerprintCaptureDialog(
+            defaultLat = activeLat,
+            defaultLon = activeLon,
+            onDismissRequest = { showFingerprintCaptureDialog = false },
+            onConfirm = { name, lat, lon ->
+                showFingerprintCaptureDialog = false
+                coroutineScope.launch {
+                    isCapturingFingerprint = true
+                    runCatching {
+                        FingerprintCoordinator.captureAndSave(context, name, lat, lon)
+                    }.onSuccess { fp ->
+                        fingerprintIds = FingerprintStore.list(context)
+                        Toast.makeText(
+                            context,
+                            "已采集：${FingerprintStore.summary(fp)}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }.onFailure { e ->
+                        Diag.w("LocationMockScreen", "fingerprint capture failed", e)
+                        Toast.makeText(context, "采集失败：${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                    isCapturingFingerprint = false
+                }
+            }
         )
     }
 }

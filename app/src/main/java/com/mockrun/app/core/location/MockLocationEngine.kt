@@ -49,7 +49,15 @@ class MockLocationEngine(private val context: Context) {
         LocationManager.GPS_PROVIDER,
         LocationManager.NETWORK_PROVIDER
     )
-    private val activeProviders = Collections.synchronizedSet(mutableSetOf<String>())
+    // 用 ConcurrentHashMap.newKeySet() 而非 Collections.synchronizedSet：
+    // inject() 没有 @Synchronized，在第 198 行对集合做 toList()（即迭代），
+    // 而 register()/unregister() 是 @Synchronized 且会被 inject() 自身递归调用、
+    // 也会被 MockLocationService / FloatingJoystickService 从其它线程调用。
+    // synchronizedSet 的迭代器不受其内部锁保护，会导致
+    // ConcurrentModificationException（被 logFailure 吞掉 → 该 tick 静默不注入）
+    // 或读到不一致的 provider 列表。并发集合可安全迭代。
+    private val activeProviders: MutableSet<String> =
+        java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private var isRegistered = false
 
@@ -218,20 +226,27 @@ class MockLocationEngine(private val context: Context) {
                         this.elapsedRealtimeUncertaintyNanos = 0.0
                     }
                     val bundle = Bundle()
-                    val totalSats = kotlin.random.Random.nextInt(18, 25)
-                    bundle.putInt("satellites", totalSats)
-                    bundle.putInt("beidou_satellites", kotlin.random.Random.nextInt(8, 13))
-                    bundle.putInt("gps_satellites", kotlin.random.Random.nextInt(8, 12))
-                    bundle.remove("mockLocation")
-                    bundle.putBoolean("mockLocation", false)
+                    // 只写 AOSP 真实存在的 extras key。
+                    // GnssLocationProvider.java:279 -> extras.putInt("satellites", mSvCount)
+                    bundle.putInt("satellites", kotlin.random.Random.nextInt(18, 25))
+                    // 删除以下内容，它们都是指纹而非伪装：
+                    //   bundle.putInt("beidou_satellites", ...)  —— AOSP 不认这个 key
+                    //   bundle.putInt("gps_satellites", ...)     —— AOSP 不认这个 key
+                    //   bundle.remove("mockLocation") / putBoolean("mockLocation", false)
+                    //      —— "mockLocation" 这个 key 在 AOSP 全版本里都不存在（已 grep 验证），
+                    //         主动塞进去等于挂了一块「这里有人动过手」的牌子。
                     this.extras = bundle
 
-                    // Strip internal mock field if accessible
-                    runCatching {
-                        val mField = Location::class.java.getDeclaredField("mIsFromMockProvider")
-                        mField.isAccessible = true
-                        mField.setBoolean(this, false)
-                    }.logFailure(TAG, "strip mIsFromMockProvider", Diag.Level.DEBUG)
+                    // 不再尝试清 mIsFromMockProvider 字段。
+                    //
+                    // minSdk = 29，而该字段在 Android 10 (API 29) 已被 mFieldsMask 取代
+                    // （Android 9 及以下才是真实字段），所以这行在全部受支持机型上都会抛
+                    // NoSuchFieldException 并被 runCatching 吞掉 —— 从未执行过。
+                    //
+                    // 真正清 flag 的是系统侧 MockProvider.setProviderLocation 里的
+                    // setIsFromMockProvider(true)（AOSP MockProvider.java:55），
+                    // 由 XposedLocationHook.createSpoofedLocation 覆写。
+                    // App 侧改这个字段没有任何作用。
                 }
                 locationManager.setTestProviderLocation(p, loc)
             }.logFailure(TAG, "inject into $p")

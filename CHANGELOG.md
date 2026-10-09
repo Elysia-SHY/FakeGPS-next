@@ -8,6 +8,87 @@
 
 ---
 
+## [2.0.0] - 2026-10-09
+
+> 系统层 Hook 的全链路修复版：逐一核对 Android 11–14 AOSP 定位框架源码，修掉长期静默失效的 hook 与坐标系错配；新增「环境指纹」实地采集与回放；把 Wi-Fi / 基站伪造从「清空」改为「自洽」。
+
+### 新增 (Added)
+
+- **环境指纹（实地采集 + 回放）。** 在真实地点采集周边 Wi-Fi、基站、蓝牙与已配对设备快照，之后在这些地点启用虚拟定位时按距离重放。回放覆盖 `WifiManager.getScanResults` / `getConnectionInfo`、`TelephonyManager.getAllCellInfo` / `requestCellInfoUpdate`、`BluetoothLeScanner.startScan` 与 `ScanCallback.onScanResult` / `onBatchScanResults`、`BluetoothAdapter.getBondedDevices`。
+  - 采集入口位于「定位」页新增的「环境指纹」区块，可命名、可指定采集点坐标、可启用 / 停用 / 删除。
+  - 指纹落盘于 `filesDir/fingerprints/<id>.json`，经 root 导出至 `/data/local/tmp/fakegps_fp_<id>.json` 供 hook 侧读取；id 通过 `setprop debug.fakegps.fingerprint_id` 发布，并以 `Settings.Global.fake_gps_fingerprint_id` 作为无 root 回退。
+  - RSSI 按自由空间路径损耗重标定（`RSSI_B = RSSI_A − 20·log10(d_B/d_A)`，衰减上限 35 dB），时间戳一律重写为当前时刻（`ScanResult.timestamp` 为微秒、`CellInfo.setTimeStamp` 为纳秒）。
+- **新增 33 个单元测试。** 覆盖坐标系转换（含 5 个城市的独立参考值往返）、运动学引擎（哈弗辛距离、外接圆半径退化、曲率限速、OU 高程）、指纹 RSSI 重标定（边界、上限、已连接 AP 底噪）。
+- **新增 `/data/local/tmp` 配置通道。** 见下方「修复」中对 SELinux 的说明。
+
+### 修复 (Fixed)
+
+- **坐标系错配，导致虚拟位置整体偏移数百米至 1.3 公里。** `AMapLocation` 对外契约是 GCJ-02、`BDLocation` 是 BD-09、`TencentLocation` 是 GCJ-02，而原实现一律注入 WGS-84，被各 SDK 再转换一次后偏差翻倍。实测设置点 `39.9042, 116.4074`（WGS-84）经百度 SDK 上报为 `39.91187, 116.420032`，即「设置点转 BD-09」的结果，与设置点相距约 1.37 km。
+  - 修复方式：在 hook 侧内联 WGS-84 → GCJ-02 / BD-09 转换，按各 SDK 契约注入；`AMapLocation.getCoordType()` 一并返回 `GCJ02`。
+  - 修复后：各 SDK 拿到的坐标与虚拟点一致，不再二次偏移。
+- **mock 标记清除代码在全部受支持机型上从未生效。** 原实现反射写 `Location.mIsFromMockProvider` 字段，而该字段在 Android 10（API 29）已被 `mFieldsMask` 的 `HAS_MOCK_PROVIDER_MASK` 位取代，Android 12 起公开 API 更名 `setMock()`。项目 `minSdk = 29`，因此该反射在所有目标机型上都抛 `NoSuchFieldException` 并被 `runCatching` 吞掉。
+  - 修复方式：按 API 分级调用 —— API 31+ 用 `setMock(false)`，API 29/30 用 `setIsFromMockProvider(false)`，更早版本才回退到字段赋值；失败日志级别由 `DEBUG` 提升为 `WARN`。
+  - 同时删除 App 侧 `MockLocationEngine` 中同样失效的字段反射（死代码）。
+- **Android 11 上定位服务与 GNSS 的 hook 全部未命中。**
+  - `LocationProviderManager` 在 Android 11 是 `LocationManagerService` 的**内部类**（`com.android.server.location.LocationManagerService$LocationProviderManager`），原候选类名 `com.android.server.location.LocationProviderManager` 与 `...provider.LocationProviderManager` 均不匹配。已补齐该内部类名。
+  - GNSS 合成所用的 `onReportGnssStatus` 方法名在 Android 11 / 12 / 13 / 14 的 AOSP 源码中**均不存在**（已逐版本 grep 核对）。已按实际方法名重写：Android 12+ 走 `GnssStatusProvider.onReportSvStatus(GnssStatus)`，Android 11 走 `GnssStatusListenerHelper.onSvStatusChanged(int, int[], float[], float[], float[], float[], float[])`，并按 AOSP 位编码手写 PRN 标志位。
+  - 修复前表现：室内场景读到真实 0 星，或合成逻辑静默不执行。
+- **配置通道在 Android 11+ 被 SELinux 拒绝，导致 hook 读到过期数据。** `XSharedPreferences` 读取 `/data/data/<pkg>/shared_prefs/hook_config.xml` 时，`system_server`（`u:r:system_server:s0`）访问 `app_data_file` 被拒，logcat 可见 `avc: denied { open } ... tclass=file`。
+  - 修复方式：新增 `/data/local/tmp/fake_gps_hook.json` 通道（`shell_data_file`，`system_server` 可读），并在 `HookConfigProvider` 的 root 同步命令中一并写入。
+- **「有 GPS 星数却零 Wi-Fi、零基站」的物理矛盾。** 原实现把 `WifiManager.getScanResults` / `WifiServiceImpl.getScanResults` / `TelephonyManager.getAllCellInfo` / `getNeighboringCellInfo` 一律置空。真实设备在有 GPS 定位的同时不可能扫不到任何 Wi-Fi 与基站，这一矛盾本身就是最强的伪造特征。
+  - 修复方式：移除全部置空逻辑，改为指纹回放；**读不到指纹时不做任何修改**，让真实值透出（返回空列表比返回真实值更可疑）。
+- **BSSID 遮蔽使用了 AOSP 的「权限不足」哨兵值。** 原实现把 BSSID / MAC 统一写成 `02:00:00:00:00:00`，而 AOSP 明确将该值定义为「调用者权限不足」的指示（`WifiInfo.DEFAULT_MAC_ADDRESS`）。调用方看到它即可推断出有 hook 介入。
+  - 修复方式：保留真实 OUI 前三字节、仅随机化后三字节，表现为「切换到同厂商的另一台 AP」；无真实值时生成合法的本地管理地址。
+- **写入了 AOSP 中不存在的 extras 键。** 原实现写入 `mockLocation`、`beidou_satellites`、`gps_satellites`。经 grep 核对，AOSP 全版本只有 `GnssLocationProvider` 写入的 `satellites` 一个键；主动写入未知键等于留下明确标记。
+  - 修复方式：只保留 `satellites`。
+- **`AMapLocationQualityReport.isInstalledHighDangerMockApp()` 未覆盖。** 该方法会扫描本机包名，而本模块的 `AndroidManifest.xml` 中声明了 `ACCESS_MOCK_LOCATION` 与 `xposedmodule` meta-data，属静态可扫特征。已补充 hook 返回 `false`，并一并覆盖 `getGPSSatellites` / `getGPSStatus` / `getAdviseMessage`。
+- **`getSystemProperty` 在目标应用进程中不可用。** 原实现用 `Class.forName("android.os.SystemProperties")` 反射读取，该 API 属 hidden API，在 `targetSdk >= 28` 的目标应用进程中会被拦截（`system_server` 内不受影响），导致最快的配置通道静默失效。
+  - 修复方式：三级回退 —— 引导类加载器 → `XposedHelpers.callStaticMethod`（LSPosed 提供 hidden-API 豁免）→ 放弃并记录日志。
+- **重复的配置通道读取代码。** `/data/local/tmp/fake_gps_hook.json` 的读取块在 `getGlobalActiveLocation` 中出现两次，第二段为不可达的冗余分支。已合并为一段。
+- **`cachedLocation` 的检查与使用之间存在竞态（可致 `system_server` 崩溃）。** 该字段被 binder 线程、`fakeloc-push` 与 `fakegps-ble-push` 两个守护线程并发读写，却没有 `@Volatile`；在 `!= null` 判断与随后的 `!!` 之间，另一线程可把它置空（所有 expired / inactive / stale 分支都会写），从而在 `system_server` 或被 hook 的应用进程内抛 `NullPointerException`。ARM64 上非 volatile 字段的重复读取本身也不保证稳定。现加 `@Volatile` 并改为先取一次快照再判断。
+- **GNSS 星历 hook 未按参数个数做保护。** `hookAllMethods(helperClass, "onSvStatusChanged", …)` 会挂上该名字的**全部重载**；厂商分支常同时提供 1 参 `onSvStatusChanged(GnssStatus)` 与 7 参版本，对 1 参版本写 `args[1..6]` 会抛 `ArrayIndexOutOfBoundsException` 并抛进框架的 GNSS 分发链。现于写参数前判 `param.args.size < 7`。
+- **四个 hook 去重表不是线程安全的。** `hookedBleCallbackClasses` / `hookedListenerClasses` / `hookedGnssCallbackClasses` / `hookedTencentListenerClasses` 原为普通 `mutableSetOf`，而它们的写入来自被 hook 的应用线程（`BluetoothLeScanner.startScan`、`requestLocationUpdates`、`registerGnssStatusCallback`）。`contains` + `add` 非原子且 `HashSet` 非线程安全，可能重复安装 hook（双重伪造、回调重复）或损坏表结构（在被 hook 方法内抛 `ConcurrentModificationException`）。现改用 `ConcurrentHashMap.newKeySet()` 并把 `contains`+`add` 合并为单次原子 `add`。
+- **`activeProviders` 在锁外被迭代。** 该集合为 `Collections.synchronizedSet`，而 `inject()` 未加 `@Synchronized` 却执行 `toList()`（即迭代），`register()` / `unregister()` 则由 `inject()` 自身递归调用、也被前台服务从其它线程调用 → `ConcurrentModificationException`（被 `logFailure` 吞掉，症状是该 tick 静默不注入）。现改用并发集合，可安全迭代。
+- **环境指纹缓存的三个 `@Volatile` 字段构成非原子守卫。** `cachedForId` 在 `cached` 之后写、`lastReadAt` 在解析之前写，分发线程与 BLE 推送线程竞争时可观察到「新 id + 旧指纹」，于是把**上一个坐标**的 Wi-Fi / 基站列表回放给新坐标 —— 正是该模块要消除的物理矛盾。现改为单个不可变快照对象，id / 时间 / 指纹一起原子替换。
+- **Android 13+ 上 9 参 `CellIdentityGsm` / `CellIdentityWcdma` 构造器已不存在。** AOSP T 给这两个隐藏构造器追加了 `Set<ClosedSubscriberGroupInfo>` 参数（9 参 → 10 参），在 API 33/34 上按 9 参调用会抛 `NoSuchMethodError` 并被外层 `runCatching` 吞掉，该基站被静默丢弃 —— 回放出的指纹又变成「有 GPS 星数却没有 GSM / WCDMA 基站」。现按类实际声明的构造器参数个数择优，并保留历史签名的回退。
+- **`XposedStatusHelper` 使用了错误的 ContentProvider authority。** 原值 `com.mockrun.app.provider` 从未在 manifest 注册（实际为 `com.mockrun.app.hook.provider`），每次调用抛 `IllegalArgumentException` 并被 catch 吞掉，导致该回退分支永远返回 false —— 模块其实已生效、只是心跳尚未写入时，UI 会误报「LSPosed 未激活」，把用户引向重复启用一个正常工作的模块。
+- **`PermissionHelper` 把任何异常都当作「已设为模拟位置应用」。** 探针 `addTestProvider` / `removeTestProvider` 未放在 `finally` 中：若上次探测在两步之间进程被杀，provider 会残留，此时 `addTestProvider` 抛的是 `IllegalArgumentException`（"already exists"）而非 `SecurityException`，落入 `catch (e: Exception) { true }` 返回 true。于是 `checkPrimaryPermissions` 返回 `NONE`、跳过配置引导，之后注入失败时报的是不相干错误，而界面一直声称配置就绪。现在先 `remove` 清理、清理放入 `finally`、且只把「add 成功」视为通过。
+- **路线模拟在极低速下永久空转。** `nextDynamicSpeed` 对 `baseSpeedMs <= 0.1`（≤ 0.36 km/h）返回 `0.0`，导致 `distThisTick = 0`、`covered` 永不推进、`while (covered < totalDistance)` 永不退出：每秒发射一个完全相同的点，`isCompleted` 永不触发，前台服务永不结束，24 小时 `PARTIAL_WAKE_LOCK` 持续持有。触发路径为文档中写明的 `am broadcast -a com.mockrun.app.ACTION_SET_SPEED --ef extra_speed 0`。现给每 tick 距离设 0.3 m 下限。
+- **GPX 导入泄漏文件描述符。** `RouteSimulationScreen` 取到 `InputStream` 后从不关闭（同项目的 `MapScreen` 用的是正确的 `?.use{}`）。累积后 `EMFILE`，随后连路线库与地图瓦片都无法打开。现改为 `?.use { … }`。
+- **摇杆服务的复活闹钟永不取消。** 从最近任务划掉应用后，500 ms 后闹钟会把摇杆服务拉回来，悬浮窗与伪造定位一起恢复 —— 与 `MockLocationService.onTaskRemoved` 注释中声明已修复的症状完全一致（后者当时只改了自己，漏了这个服务）。此外 API 31+ 上由闹钟在后台启动 `location` 型前台服务会在 `onCreate` 抛 `ForegroundServiceStartNotAllowedException`。现改为与 `MockLocationService` 对齐：划掉即真正停止，不调度复活。
+- **点击回调中对 `collectAsState()` 委托值使用 `!!`。** `RouteSimulationScreen` 的「开始模拟路线」与 `MapDialogs` 的「定位」按钮在组合期判定非空，却在稍后的点击 lambda 中重新读取该委托；`clearWaypoints()` / `deleteRoute()` / 「清除」按钮可在这两次读取之间把状态置空，导致点击时抛 `KotlinNullPointerException`。现改为组合期取局部快照。
+
+### 优化 (Changed & Performance)
+
+- **静止抖动由白噪声改为 Ornstein-Uhlenbeck 过程。** 原实现每个 tick 独立重摇 ±0.000002°（约 ±0.22 m），散点构成半径 0.22 m 的圆，比真实 GPS 稳定得多。现改为带惯性的均值回归过程（保留系数 0.92），稳态半径约 4 m，符合真实 GNSS 静止误差分布（开阔地典型水平误差 3–8 m）。
+- **root 同步节流窗口由 1200 ms 收紧至 250 ms。** 摇杆与路线模拟下位置每秒变化多次，1.2 s 窗口会让 `system_server` 读到明显滞后的坐标。250 ms 为 `su` 进程创建开销下的实用下限。
+- **默认值不再伪造为「更可信」的固定值。**
+  - 海拔：不再在缺失时补 `200.0` m。上海、广州、天津等平原城市真实海拔均在 10 m 以内，上报 200 m 是明显异常；现改为移除该字段。
+  - 方位角 / 速度：不再在 0 值时补 `1.2f`。静止时 0 是合法值，补成非零恒定值反而意味着「持续移动却无位移」；`bearing` 改为按包名派生稳定但非恒定的值。
+  - 星数：由固定 `20` 改为 18–22 区间随机。
+
+### 安全 (Security)
+
+- **减少可被静态扫描的指纹面。** 移除对 AOSP 哨兵值的使用、移除未知 extras 键、移除空列表伪造；`AMapLocationQualityReport` 的危险应用检测返回值已覆盖。
+
+### 文档 (Documentation)
+
+- 新增官网入口与官方 APK 下载地址说明（见 [README](README.md)）。
+- 修正 README 中过时的工具链版本（Kotlin 1.9.22 → 2.0.21，Compose BOM 2024.02.00 → 2024.10.01）。
+- 版本号统一为 `2.0.0`（`versionCode = 40`）。
+
+### 兼容性说明 (Compatibility)
+
+- **无破坏性变更。** 应用 ID 保持 `com.mockrun.app`，`minSdk = 29`、`targetSdk = 34` 不变，签名密钥与历代版本一致，可直接覆盖安装，用户数据（路线、多应用分流规则、设置）全部保留。
+- 环境指纹为**可选功能**：未采集指纹时，Wi-Fi / 基站 / 蓝牙相关 hook 不介入，行为与 1.x 一致（除不再清空扫描结果）。
+- 指纹需要 root 才能导出到 `/data/local/tmp`；无 root 时启用会提示失败并保持停用状态。
+
+### 已知限制 (Known Limitations)
+
+- **传感器伪造未实现。** `SensorMockEngine` 仍为内存状态机，不写入 `SensorManager`。原因：只读传感器在 Android 上无法 hook 出可信数据 —— `SensorEvent` 由 HAL 直接投递，Java 层只能修改已投递的值，而加速度计的噪声分布本身是硬件特征，人工噪声比真实噪声更规律，反而成为更强的指纹。做对需要写入 HAL，超出模块范围。
+- **`development_settings_enabled` 仍会被写入**（仅 `RootSuBridge` 在需要 appops 授权时）。该值在开过开发者选项的设备上本就为 1，删除会导致部分 ROM 上 appops 授权失败，故保留。
+
+---
 ## [1.6.1] - 2026-10-07
 
 > 基于设计规范 v1.7.0 的全量 UI 重构与真毛玻璃落地，并修复浅色主题下部分组件不跟随系统明暗的问题。

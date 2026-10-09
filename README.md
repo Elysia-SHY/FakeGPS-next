@@ -4,15 +4,21 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/Elysia-SHY/FakeGPS-next?color=007AFF&label=Latest%20Release&style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 [![Android](https://img.shields.io/badge/Android-10%2B_(API_29%2B)-34C759.svg?style=flat-square)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose_%C2%B7_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
 [![Injection](https://img.shields.io/badge/Injection-Root_%2F_No--Root-30B0C7.svg?style=flat-square)](#注入模式-injection-modes)
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-> **当前版本**：`v1.6.1`（`versionCode = 30`）
+> **当前版本**：`v2.0.0`（`versionCode = 40`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，[`version.json`](version.json)、[`package.json`](package.json)、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
+
+**官方网站**：[aqvtc.icu](https://aqvtc.icu/) —— 下载最新安装包、查看更新说明与使用指引。
+
+> 官方 APK 下载入口：[https://aqvtc.icu/downloads/latest.apk](https://aqvtc.icu/downloads/latest.apk)
+>
+> 该地址由项目官网提供，始终指向最新正式版。[GitHub Release](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 附件是另一个独立来源（适用于无法访问官网的场景），两者内容一致但来源不同，请按需选择。
 
 **导航**：[架构亮点](#架构亮点-key-highlights) · [注入模式](#注入模式-injection-modes) · [模式对比](#工作模式对比-operation-modes) · [快速上手](#快速上手-quick-start) · [核心功能](#核心交互功能-features) · [源码构建](#源码构建-build-from-source) · [常见问题](#常见问题-faq) · [更新日志](#更新日志-changelog)
 
@@ -170,7 +176,7 @@ graph TD
 - **JDK**：OpenJDK 17
 - **Android SDK**：API Level 34 (Android 14)
 - **Gradle**：8.4（仓库内 `gradle/wrapper` 已固定）
-- **Kotlin**：1.9.22 · **AGP**：8.2.2 · **Compose BOM**：2024.02.00
+- **Kotlin**：2.0.21 · **AGP**：8.2.2 · **Compose BOM**：2024.10.01
 
 ```bash
 # 1. 克隆代码仓库
