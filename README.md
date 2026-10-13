@@ -14,12 +14,6 @@
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，[`version.json`](version.json)、[`package.json`](package.json)、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
 
-**官方网站**：[aqvtc.icu](https://aqvtc.icu/) —— 下载最新安装包、查看更新说明与使用指引。
-
-> 官方 APK 下载入口：[https://aqvtc.icu/downloads/latest.apk](https://aqvtc.icu/downloads/latest.apk)
->
-> 该地址由项目官网提供，始终指向最新正式版。[GitHub Release](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 附件是另一个独立来源（适用于无法访问官网的场景），两者内容一致但来源不同，请按需选择。
-
 **导航**：[架构亮点](#架构亮点-key-highlights) · [注入模式](#注入模式-injection-modes) · [模式对比](#工作模式对比-operation-modes) · [快速上手](#快速上手-quick-start) · [核心功能](#核心交互功能-features) · [源码构建](#源码构建-build-from-source) · [常见问题](#常见问题-faq) · [更新日志](#更新日志-changelog)
 
 ---
