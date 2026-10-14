@@ -4,5 +4,3 @@
   "releaseDate": "2026-10-09",
   "releaseNotes": "FakeGPS-next 2.0.0：系统层定位 hook 的全链路修复，以及「环境指纹」实地采集与回放。\n\n本版基于对 Android 11–14 AOSP 定位框架源码的逐版本核对，修掉了长期失效的若干 hook 与坐标系错配问题。\n\n主要改动：\n\n1. 坐标系修正：AMap 契约是 GCJ-02、BDLocation 是 BD-09、TencentLocation 是 GCJ-02，此前一律注入 WGS-84，偏差达数百米至 1.3 公里。现按各自契约转换。\n\n2. mock 标记清除：Location.isFromMockProvider 字段在 Android 10 已被 mFieldsMask 位取代，原反射赋值在所有受支持机型上均抛异常且被吞掉。现按 API 分级调用 setMock(false) / setIsFromMockProvider(false)。\n\n3. Android 11 定位服务适配：LocationProviderManager 在 Android 11 是 LocationManagerService 的内部类，原候选类名均不匹配；GNSS 合成所用的 onReportGnssStatus 方法在任何 AOSP 版本都不存在。均已按实际类名与方法名修正。\n\n4. 环境指纹：在真实地点采集 Wi-Fi / 基站 / 蓝牙快照，之后在虚拟点按距离重标定 RSSI 回放，使周边环境与虚拟坐标自洽。\n\n5. 消除物理矛盾：不再清空 Wi-Fi 扫描结果与基站列表（有 GPS 星数却零 Wi-Fi 零基站是明显的伪造特征），不再使用 AOSP 的「权限不足」哨兵值 02:00:00:00:00:00，不再写入不存在的 extras 键。\n\n6. 轨迹拟真：静止抖动由每 tick 独立白噪声改为 Ornstein-Uhlenbeck 过程，稳态半径由约 0.22 m 调整为约 4 m，符合真实 GNSS 静止误差分布。\n\n本版与历代发布版本共用同一签名密钥，可直接覆盖安装。",
   "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/latest",
-  "downloadUrl": "https://aqvtc.icu/downloads/latest.apk"
-}
