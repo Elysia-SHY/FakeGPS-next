@@ -3,7 +3,6 @@
   "version": "2.0.0",
   "description": "FakeGPS-next: Android System-Level Deep Hook Virtual Location & Route Simulation",
   "private": true,
-  "homepage": "https://aqvtc.icu/",
   "author": "Elysia-SHY (https://github.com/Elysia-SHY)",
   "contributors": [
     "Elysia-SHY, 项目发起者与主开发者",
