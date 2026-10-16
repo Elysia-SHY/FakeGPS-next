@@ -1,15 +1,11 @@
 name: Build & Publish Release APK
 
 # 触发方式
-#   1) workflow_dispatch —— 推荐。CI 会完成「构建 → 提交 APK → 打 tag → 发 Release」全链路。
-#   2) push tag v* —— 兼容手动打 tag 的旧习惯；CI 会把 tag 重新指向包含 APK 的提交后再发 Release。
+#   1) workflow_dispatch —— 推荐。CI 会完成「构建 → 打 tag → 发 Release」全链路。
+#   2) push tag v* —— 兼容手动打 tag 的旧习惯。
 #
-# 为什么 APK 必须提交进仓库树：
-#   .gitignore 中已注明，应用内更新的主下载路径是
-#   https://cdn.jsdelivr.net/gh/{owner}/{repo}@{tag}/{file}.apk
-#   而 jsDelivr 的 /gh/ 端点只服务仓库文件、不服务 Release 资产。
-#   因此「提交 APK → 再创建 tag」的顺序是必需的，否则该路径会 404。
-#   故本 workflow 始终：先构建、再把 APK 提交到 main、最后才创建/移动 tag。
+# 产物分发：构建出的 APK 仅作为 GitHub Release 资产上传，
+# 不写入仓库工作树、不进入提交历史。
 
 on:
   workflow_dispatch:
@@ -38,7 +34,6 @@ jobs:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
-          # 始终在 main 上工作：APK 提交与 tag 都落在这里
           ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -132,11 +127,8 @@ jobs:
           SRC="app/build/outputs/apk/release/app-release.apk"
           test -f "$SRC"
           APK="${{ steps.ver.outputs.apk }}"
+          # 仅在工作目录暂存，用于上传 Release 资产；不提交进仓库
           cp "$SRC" "$APK"
-          # 仓库只保留当前版本的产物，历史版本交给 git history
-          for f in $(git ls-files 'FakeGPS-next-*-release.apk'); do
-            if [ "$f" != "$APK" ]; then git rm -q "$f"; fi
-          done
           SHA=$(sha256sum "$APK" | cut -d' ' -f1)
           echo "$SHA  $APK" > SHA256.txt
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
@@ -148,23 +140,10 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
           "$APKSIGNER" verify --print-certs "${{ steps.ver.outputs.apk }}"
 
-      - name: Commit APK into the tree
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f "${{ steps.ver.outputs.apk }}"
-          git add -A -- ':(glob)FakeGPS-next-*-release.apk'
-          git add SHA256.txt
-          git commit -m "release: ${{ steps.ver.outputs.tag }} (versionCode ${{ steps.ver.outputs.version_code }}) — CI 构建产物" \
-            -m "签名指纹: ${{ steps.stage.outputs.sha256 }} (SHA-256 of APK)" || echo "无变更可提交"
-          git push origin HEAD:main
-
-      - name: Move tag onto the commit carrying the APK
+      - name: Tag the release commit
         run: |
           set -euo pipefail
           TAG="${{ steps.ver.outputs.tag }}"
-          # 强制移动：jsDelivr 的 /gh/{repo}@{tag}/{file}.apk 要求 tag 指向的提交里含该 APK
           git tag -f "$TAG"
           git push -f origin "$TAG"
 
@@ -194,5 +173,4 @@ jobs:
             echo ""
             echo "下载路径："
             echo "- Release 资产：https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.ver.outputs.apk }}"
-            echo "- jsDelivr CDN：https://cdn.jsdelivr.net/gh/${{ github.repository }}@${{ steps.ver.outputs.tag }}/${{ steps.ver.outputs.apk }}"
           } >> "$GITHUB_STEP_SUMMARY"
