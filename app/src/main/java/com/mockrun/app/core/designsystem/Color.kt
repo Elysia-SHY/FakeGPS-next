@@ -41,37 +41,32 @@ object DesignTokens {
     val T2 = Color(0xFF98A2B8)
     val T3 = Color(0xFF646E85)
 
-    // 毛玻璃（唯一规范）
-    val GlassBg = Color(0xB8141A2A)        // rgba(20,26,42,.72)  玻璃底板
-    val GlassBgBar = Color(0xB81E2330)     // rgba(30,35,48,.72)  底部 Tab 栏
-    val GlassLine = Color(0x14FFFFFF)      // rgba(255,255,255,.08)
-    val GlassHighlight = Color(0x12FFFFFF) // inset 0 1px 0 rgba(255,255,255,.07)
+    // 毛玻璃（暗色模式：降低遮罩不透明度以增强背景模糊通透感与层次感，提升高光边缘）
+    val GlassBg = Color(0x78121829)        // rgba(18,24,41,.47)  通透深蓝宝石玻璃底板
+    val GlassBgBar = Color(0x88161D2E)     // rgba(22,29,46,.53)  底部 Tab 栏
+    val GlassLine = Color(0x2BFFFFFF)      // rgba(255,255,255,.17) 晶体外边缘
+    val GlassHighlight = Color(0x42FFFFFF) // inset 0 1px 0 rgba(255,255,255,.26) 顶部镜面高光
 
     /**
-     * 无可用模糊源时的**不透明磨砂底板**（= GlassBg 去掉 alpha 后合成到底色上的结果）。
-     *
-     * 为什么需要它：Haze 只能捕获 Compose 自己绘制的内容。当地图这类内容由
-     * `AndroidView` 承载原生 View 时，源图层录出来是空的，模糊结果为空 ——
-     * 此时若仍输出 72% 半透明底板，背后内容会硬生生透出来（观感即「穿模」）。
-     * 用不透明底板兜底，浮层才会读起来像一整块实心磨砂玻璃。
+     * 无可用模糊源时的**不透明磨砂底板**（如 OSMDroid 原生地图层之上的浮层）。
      */
-    val GlassBgOpaque = Color(0xFF141A2A)
-    val GlassBgBarOpaque = Color(0xFF1E2330)
+    val GlassBgOpaque = Color(0xEC141B2D)
+    val GlassBgBarOpaque = Color(0xF01B2234)
 
-    // 明色档（同语义映射，供 isDark=false 使用）
-    val LBg0 = Color(0xFFF5F7FB)
-    val LBg1 = Color(0xFFFFFFFF)
+    // 明色档（亮色模式：解决白色毛玻璃过白、不透明、缺乏模糊层次的问题）
+    val LBg0 = Color(0xFFEEF2F9)
+    val LBg1 = Color(0xFFF8FAFF)
     val LSurface = Color(0xFFFFFFFF)
-    val LSurface2 = Color(0xFFF2F4F8)
-    val LSurface3 = Color(0xFFE8ECF3)
-    val LLine = Color(0x12000000)
-    val LLineSoft = Color(0x0B000000)
-    val LGlassBg = Color(0xB8FFFFFF)
-    val LGlassBgBar = Color(0xB8FFFFFF)  // rgba(255,255,255,.72) 底部 Tab 栏
-    val LGlassLine = Color(0x0F000000)
-    val LGlassHighlight = Color(0x99FFFFFF)
-    val LGlassBgOpaque = Color(0xFFFFFFFF)
-    val LGlassBgBarOpaque = Color(0xFFF7F8FA)
+    val LSurface2 = Color(0xFFF0F4FA)
+    val LSurface3 = Color(0xFFE4EAF3)
+    val LLine = Color(0x140F172A)
+    val LLineSoft = Color(0x0C0F172A)
+    val LGlassBg = Color(0x72FFFFFF)       // rgba(255,255,255,.45) 冰晶通透白玻璃
+    val LGlassBgBar = Color(0x85F8FAFF)    // rgba(248,250,255,.52) 底部 Tab 栏
+    val LGlassLine = Color(0x80FFFFFF)     // 亮色玻璃晶亮白内边（配合外层微阴影轮廓）
+    val LGlassHighlight = Color(0xE6FFFFFF)
+    val LGlassBgOpaque = Color(0xF2FFFFFF)
+    val LGlassBgBarOpaque = Color(0xF5F8FAFF)
 
     // 地图图钉上方提示条底板（压在地图瓦片上，需高不透明以保证可读）
     val LPinTipBg = Color(0xE6FFFFFF)   // rgba(255,255,255,.90)
@@ -428,6 +423,133 @@ val IosBg1Dark = DesignTokens.Bg1
 val IosText1Dark = DesignTokens.T1
 val IosText2Dark = DesignTokens.T2
 val IosText3Dark = DesignTokens.T3
+
+// =============================================================================
+// v1.7.1 语义色补齐 —— 只增不改，现有常量一律保留原值
+// =============================================================================
+//
+// 问题：错误红有两套来源 —— feature/settings/AboutScreen.kt:301/318/345/725/731/736
+// 硬编码 Color(0xFFFF3B30)，而 IosColors.SystemRed / DesignTokens.Danger 是 #FF453A。
+// 两者在同一屏幕上并存时肉眼可见色差（#FF3B30 更偏纯红、#FF453A 略偏珊瑚）。
+// 下面补齐一组带容器色与深/浅档的语义色，页面统一从这里取，不再各自写死十六进制。
+
+/**
+ * 语义色 · 状态。默认取暗色档（与 DesignTokens 现有取值一致）。
+ *
+ * ```
+ * Icon(Icons.Default.Warning, tint = IosSemanticColors.Danger)
+ * Box(Modifier.background(IosSemanticColors.DangerContainer))
+ * ```
+ */
+object IosSemanticColors {
+    /** 危险 / 错误 —— 暗色档 #FF453A（= DesignTokens.Danger） */
+    val Danger = Color(0xFFFF453A)
+
+    /** 危险 / 错误 —— 明色档，在浅底上对比度更高 #D70015 */
+    val DangerLight = Color(0xFFD70015)
+
+    /** 危险底容器 —— 暗色档，红 15% 覆盖在深底上 */
+    val DangerContainer = Color(0x26FF453A)
+
+    /** 危险底容器 —— 明色档 */
+    val DangerContainerLight = Color(0x1FD70015)
+
+    /** 警告 —— 暗色档 #FF9F0A（= DesignTokens.Warn） */
+    val Warning = Color(0xFFFF9F0A)
+
+    /** 警告 —— 明色档 #B25000 */
+    val WarningLight = Color(0xFFB25000)
+
+    /** 警告底容器 —— 暗色档 */
+    val WarningContainer = Color(0x26FF9F0A)
+
+    /** 警告底容器 —— 明色档 */
+    val WarningContainerLight = Color(0x1FB25000)
+
+    /** 成功 —— 暗色档 #30D158（= DesignTokens.Ok） */
+    val Success = Color(0xFF30D158)
+
+    /** 成功 —— 明色档 #248A3D */
+    val SuccessLight = Color(0xFF248A3D)
+
+    /** 成功底容器 —— 暗色档 */
+    val SuccessContainer = Color(0x2630D158)
+
+    /** 成功底容器 —— 明色档 */
+    val SuccessContainerLight = Color(0x1F248A3D)
+
+    /** 提示 / 信息 —— 暗色档 #2F7BFF（= DesignTokens.Brand） */
+    val Info = Color(0xFF2F7BFF)
+
+    /** 提示 / 信息 —— 明色档 #0066CC */
+    val InfoLight = Color(0xFF0066CC)
+
+    /** 提示底容器 —— 暗色档 */
+    val InfoContainer = Color(0x262F7BFF)
+
+    /** 提示底容器 —— 明色档 */
+    val InfoContainerLight = Color(0x1F0066CC)
+}
+
+/**
+ * 按明暗取语义色。
+ *
+ * ```
+ * val danger = IosSemanticColors.forDark(LocalIosColors.current.isDark).danger
+ * ```
+ */
+data class IosSemanticPalette(
+    val danger: Color,
+    val dangerContainer: Color,
+    val warning: Color,
+    val warningContainer: Color,
+    val success: Color,
+    val successContainer: Color,
+    val info: Color,
+    val infoContainer: Color
+)
+
+/** 暗色档语义色组 */
+val DarkSemanticPalette = IosSemanticPalette(
+    danger = IosSemanticColors.Danger,
+    dangerContainer = IosSemanticColors.DangerContainer,
+    warning = IosSemanticColors.Warning,
+    warningContainer = IosSemanticColors.WarningContainer,
+    success = IosSemanticColors.Success,
+    successContainer = IosSemanticColors.SuccessContainer,
+    info = IosSemanticColors.Info,
+    infoContainer = IosSemanticColors.InfoContainer
+)
+
+/** 明色档语义色组 */
+val LightSemanticPalette = IosSemanticPalette(
+    danger = IosSemanticColors.DangerLight,
+    dangerContainer = IosSemanticColors.DangerContainerLight,
+    warning = IosSemanticColors.WarningLight,
+    warningContainer = IosSemanticColors.WarningContainerLight,
+    success = IosSemanticColors.SuccessLight,
+    successContainer = IosSemanticColors.SuccessContainerLight,
+    info = IosSemanticColors.InfoLight,
+    infoContainer = IosSemanticColors.InfoContainerLight
+)
+
+/** 按明暗开关取对应语义色组 */
+fun IosSemanticColors.forDark(isDark: Boolean): IosSemanticPalette =
+    if (isDark) DarkSemanticPalette else LightSemanticPalette
+
+// ---- 顶层语义别名，供 `import ...IosDanger` 后直接使用（默认暗色档）----
+
+/** 危险 / 错误（默认暗色档 #FF453A） */
+val IosDanger = IosSemanticColors.Danger
+
+/** 警告（默认暗色档 #FF9F0A） */
+val IosWarning = IosSemanticColors.Warning
+
+/** 成功（默认暗色档 #30D158） */
+val IosSuccess = IosSemanticColors.Success
+
+/** 提示 / 信息（默认暗色档 #2F7BFF） */
+val IosInfo = IosSemanticColors.Info
 
 // Legacy Fallbacks
 val PrimaryGreen = IosGreen

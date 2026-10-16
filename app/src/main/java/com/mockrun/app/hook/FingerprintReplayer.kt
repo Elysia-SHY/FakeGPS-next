@@ -68,7 +68,15 @@ object FingerprintReplayer {
         val type: String, val mcc: Int, val mnc: Int, val cid: Int,
         val pci: Int, val tac: Int, val earfcn: Int, val rssi: Int,
         val rsrp: Int, val rsrq: Int, val rssnr: Int,
-        val isRegistered: Boolean, val connectionStatus: Int
+        val isRegistered: Boolean, val connectionStatus: Int,
+        /**
+         * NR 专属：36-bit NCI。
+         *
+         * JSON 里缺这个键时必须是 **null**，不能是 0 —— 0 是「没有 NCI」和
+         * 「NCI 恰好是 0」的混淆点，旧指纹包（无 NR 字段）全部落到前者。
+         * 解析时用 `has()` 判断键是否存在，而不是靠 optLong 的默认值。
+         */
+        val nci: Long? = null
     )
 
     class ParsedBle(
@@ -118,7 +126,14 @@ object FingerprintReplayer {
         return parsed
     }
 
-    private fun parse(json: String): ParsedFingerprint {
+    /**
+     * 解析指纹 JSON。
+     *
+     * 可见性为 `internal` 而非 `private`：单元测试需要直接喂各种形状的 JSON
+     * （旧格式、缺 nci、nci 超 32 位）来锁住解析行为，而 `getActive()` 依赖
+     * /data/local/tmp 下的真实文件，测试里没法用。
+     */
+    internal fun parse(json: String): ParsedFingerprint {
         val o = JSONObject(json)
         val originLat = o.optDouble("originLat", 0.0)
         val originLon = o.optDouble("originLon", 0.0)
@@ -162,7 +177,10 @@ object FingerprintReplayer {
                         rsrq = c.optInt("rsrq", -10),
                         rssnr = c.optInt("rssnr", 10),
                         isRegistered = c.optBoolean("isRegistered", false),
-                        connectionStatus = c.optInt("connectionStatus", 0)
+                        connectionStatus = c.optInt("connectionStatus", 0),
+                        // 必须用 has() 判断键存在性：缺键时 optLong 返回 0，
+                        // 而 0 会被当成一个有效的 NCI 回放出去。
+                        nci = if (c.has("nci") && !c.isNull("nci")) c.optLong("nci") else null
                     )
                 )
             }
@@ -352,7 +370,12 @@ object FingerprintReplayer {
         cellSignalLteClass: Class<*>?, cellConfigLteClass: Class<*>?,
         cellInfoGsmClass: Class<*>?, cellIdentityGsmClass: Class<*>?,
         cellSignalGsmClass: Class<*>?,
-        cellInfoWcdmaClass: Class<*>?, cellIdentityWcdmaClass: Class<*>?, cellSignalWcdmaClass: Class<*>?
+        cellInfoWcdmaClass: Class<*>?, cellIdentityWcdmaClass: Class<*>?, cellSignalWcdmaClass: Class<*>?,
+        // NR（5G）参数。带默认值是为了让旧调用点仍然编译得过；
+        // 传 null 时 NR 条目会被跳过，而不是构造出一条残缺的 CellInfo。
+        cellInfoNrClass: Class<*>? = null,
+        cellIdentityNrClass: Class<*>? = null,
+        cellSignalNrClass: Class<*>? = null
     ): List<Any> {
         val out = ArrayList<Any>(fp.cells.size)
 
@@ -437,6 +460,22 @@ object FingerprintReplayer {
                         stampCellInfo(info, t)
                         out.add(info)
                     }
+                    "NR" -> {
+                        if (cellInfoNrClass == null || cellIdentityNrClass == null || cellSignalNrClass == null) {
+                            Diag.w(
+                                TAG,
+                                "NR replay unavailable (classes missing) — dropping NR cell nci=${t.nci}"
+                            )
+                            return@runCatching
+                        }
+                        val id = buildCellIdentityNr(cellIdentityNrClass, t) ?: return@runCatching
+                        val sig = buildCellSignalStrengthNr(
+                            cellSignalNrClass, t, fp.originLat, fp.originLon, targetLat, targetLon
+                        ) ?: return@runCatching
+                        val info = newCellInfoNr(cellInfoNrClass, id, sig, t) ?: return@runCatching
+                        stampCellInfo(info, t)
+                        out.add(info)
+                    }
                 }
             }.logFailure(TAG, "build CellInfo (${t.type})", Diag.Level.DEBUG)
         }
@@ -451,6 +490,168 @@ object FingerprintReplayer {
         runCatching { XposedHelpers.callMethod(info, "setRegistered", t.isRegistered) }
         runCatching { XposedHelpers.callMethod(info, "setTimeStamp", nowNanos()) }
         runCatching { XposedHelpers.callMethod(info, "setCellConnectionStatus", t.connectionStatus) }
+    }
+
+    // ---------------------------------------------------------------- NR 构造
+
+    /**
+     * NR（5G）专用构造。
+     *
+     * 为什么不能照抄 LTE 的写法：`CellInfoNr` **没有** `setCellSignalStrength`，
+     * 且 `mCellSignalStrength` 在 API 29–34 全程是 `final`。
+     * LTE 那条「无参构造 + setCellIdentity + setCellSignalStrength」的路径在 NR 上根本走不通。
+     * 因此这里按各版本**真实存在的构造器参数个数**分派（个数取自 AOSP 源码）：
+     *
+     *  - `CellInfoNr(int, boolean, long, CellIdentityNr, CellSignalStrengthNr)` — 5 参，API 32+（Android 12L/13+），
+     *    identity 与 signal 一次到位，这是首选。
+     *  - `CellInfoNr()` — 无参，API 31+（Android 12）。只有它可用时，
+     *    用 `setCellIdentity` 写 identity，再用反射直写 final 字段 `mCellSignalStrength`。
+     *  - API 29–30 的 `CellInfoNr` **没有任何公开构造器**（只有 private Parcel / copy 构造），
+     *    因此这两版无法构造 NR 条目 —— 返回 null 并由调用方记日志丢弃，
+     *    不伪造一条信号强度为 UNAVAILABLE 的残条目。
+     */
+    internal fun newCellInfoNr(clazz: Class<*>, id: Any, sig: Any, t: ParsedCell): Any? {
+        val arities = runCatching { clazz.declaredConstructors.map { it.parameterTypes.size }.toSet() }
+            .getOrDefault(emptySet())
+
+        // 首选：5 参完整构造（API 32+）
+        if (5 in arities) {
+            val r = runCatching {
+                val ctor = clazz.declaredConstructors.first { it.parameterTypes.size == 5 }
+                ctor.isAccessible = true
+                ctor.newInstance(
+                    Integer.valueOf(t.connectionStatus),
+                    java.lang.Boolean.valueOf(t.isRegistered),
+                    java.lang.Long.valueOf(nowNanos()),
+                    id,
+                    sig
+                )
+            }.logFailure(TAG, "newCellInfoNr via 5-arg ctor", Diag.Level.DEBUG).getOrNull()
+            if (r != null) return r
+        }
+
+        // 回退：无参构造 + setCellIdentity + 反射直写 final 字段（API 31）
+        if (0 in arities) {
+            return runCatching {
+                val info = XposedHelpers.newInstance(clazz)
+                XposedHelpers.callMethod(info, "setCellIdentity", id)
+                runCatching { XposedHelpers.setObjectField(info, "mCellSignalStrength", sig) }
+                    .logFailure(TAG, "set final mCellSignalStrength on CellInfoNr", Diag.Level.DEBUG)
+                info
+            }.logFailure(TAG, "newCellInfoNr via no-arg ctor", Diag.Level.DEBUG).getOrNull()
+        }
+
+        Diag.w(
+            TAG,
+            "CellInfoNr has no usable constructor on this API " +
+                "(declared arities=$arities) — NR cell dropped, nci=${t.nci}"
+        )
+        return null
+    }
+
+    /**
+     * 构造 `CellIdentityNr`。
+     *
+     * NCI 是 36-bit，**必须**用 Long 传：`newInstance` 收到 `Integer` 会去匹配 int 形参，
+     * 而这里要的是 `long`，传错类型会 NoSuchMethod 直接丢掉这条基站。
+     * [ParsedCell.nci] 为 null（旧指纹包）时退回 cid 的无符号值，保持旧包可回放。
+     *
+     * 参数个数按 AOSP 源码分派：
+     *  - 10 参 `(int pci, int tac, int nrArfcn, int[] bands, String mcc, String mnc, long nci, String alphal, String alphas, Collection)` — API 31+
+     *  - 8 参 `(int pci, int tac, int nrArfcn, String mcc, String mnc, long nci, String alphal, String alphas)` — API 29/30
+     */
+    internal fun buildCellIdentityNr(clazz: Class<*>, t: ParsedCell): Any? {
+        val nci = t.nci ?: (t.cid.toLong() and 0xFFFFFFFFL)
+        val arities = runCatching { clazz.declaredConstructors.map { it.parameterTypes.size }.toSet() }
+            .getOrDefault(emptySet())
+
+        if (10 in arities) {
+            val r = runCatching {
+                val ctor = clazz.declaredConstructors.first { it.parameterTypes.size == 10 }
+                ctor.isAccessible = true
+                ctor.newInstance(
+                    Integer.valueOf(t.pci), Integer.valueOf(t.tac), Integer.valueOf(t.earfcn),
+                    IntArray(0),
+                    t.mcc.toString(), t.mnc.toString(),
+                    java.lang.Long.valueOf(nci),
+                    null, null,
+                    java.util.Collections.emptyList<String>()
+                )
+            }.logFailure(TAG, "newCellIdentityNr via 10-arg ctor", Diag.Level.DEBUG).getOrNull()
+            if (r != null) return r
+        }
+
+        if (8 in arities) {
+            return runCatching {
+                val ctor = clazz.declaredConstructors.first { it.parameterTypes.size == 8 }
+                ctor.isAccessible = true
+                ctor.newInstance(
+                    Integer.valueOf(t.pci), Integer.valueOf(t.tac), Integer.valueOf(t.earfcn),
+                    t.mcc.toString(), t.mnc.toString(),
+                    java.lang.Long.valueOf(nci),
+                    null, null
+                )
+            }.logFailure(TAG, "newCellIdentityNr via 8-arg ctor", Diag.Level.DEBUG).getOrNull()
+        }
+
+        Diag.w(TAG, "CellIdentityNr has no usable constructor (declared arities=$arities)")
+        return null
+    }
+
+    /**
+     * 构造 `CellSignalStrengthNr`。
+     *
+     * 6 参构造 `(csiRsrp, csiRsrq, csiSinr, ssRsrp, ssRsrq, ssSinr)` 在 API 29–34 全程存在，首选；
+     * 9 参是 API 31+ 的扩展签名，作为回退。
+     *
+     * 取值域各版本不同（API 29 的 ssRsrp 是 [-140,-44]，API 31+ 放宽到 [-156,-31]），
+     * 这里按**最窄交集**裁剪，避免构造器把越界值静默替换成 `UNAVAILABLE`(Int.MAX_VALUE)——
+     * 那会让一条本该有信号的基站显示成「无信号」。
+     * CSI 三值一律传 `UNAVAILABLE`：NR 采集侧只拿到 SS 系列，CSI 本就没有数据。
+     */
+    internal fun buildCellSignalStrengthNr(
+        clazz: Class<*>,
+        t: ParsedCell,
+        originLat: Double, originLon: Double,
+        targetLat: Double, targetLon: Double
+    ): Any? {
+        val rssi = rescaleRssi(t.rssi, originLat, originLon, targetLat, targetLon, t.isRegistered)
+        val delta = rssi - t.rssi
+        val ssRsrp = (t.rsrp + delta).coerceIn(-140, -44)
+        val ssRsrq = (t.rsrq + delta / 2).coerceIn(-20, -3)
+        val ssSinr = (t.rssnr + delta / 3).coerceIn(-23, 23)
+
+        val arities = runCatching { clazz.declaredConstructors.map { it.parameterTypes.size }.toSet() }
+            .getOrDefault(emptySet())
+
+        if (6 in arities) {
+            val r = runCatching {
+                val ctor = clazz.declaredConstructors.first { it.parameterTypes.size == 6 }
+                ctor.isAccessible = true
+                ctor.newInstance(
+                    Integer.valueOf(Int.MAX_VALUE), Integer.valueOf(Int.MAX_VALUE), Integer.valueOf(Int.MAX_VALUE),
+                    Integer.valueOf(ssRsrp), Integer.valueOf(ssRsrq), Integer.valueOf(ssSinr)
+                )
+            }.logFailure(TAG, "newCellSignalStrengthNr via 6-arg ctor", Diag.Level.DEBUG).getOrNull()
+            if (r != null) return r
+        }
+
+        if (9 in arities) {
+            return runCatching {
+                val ctor = clazz.declaredConstructors.first { it.parameterTypes.size == 9 }
+                ctor.isAccessible = true
+                ctor.newInstance(
+                    Integer.valueOf(Int.MAX_VALUE), Integer.valueOf(Int.MAX_VALUE), Integer.valueOf(Int.MAX_VALUE),
+                    Integer.valueOf(Int.MAX_VALUE),
+                    java.util.Collections.emptyList<Byte>(),
+                    Integer.valueOf(ssRsrp), Integer.valueOf(ssRsrq), Integer.valueOf(ssSinr),
+                    Integer.valueOf(Int.MAX_VALUE)
+                )
+            }.logFailure(TAG, "newCellSignalStrengthNr via 9-arg ctor", Diag.Level.DEBUG).getOrNull()
+        }
+
+        Diag.w(TAG, "CellSignalStrengthNr has no usable constructor (declared arities=$arities)")
+        return null
     }
 
     // ---------------------------------------------------------------- BLE 构造

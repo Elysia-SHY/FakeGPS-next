@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.CoordinateConverter
@@ -34,16 +33,15 @@ fun MapFloatingActions(
     mapViewRef: MapView?,
     isLiquidGlass: Boolean,
     isPointMockActive: Boolean,
+    isJoystickRunning: Boolean,
     simState: com.mockrun.app.domain.model.SimulationState,
     simulationViewModel: SimulationViewModel,
-    bottomBarPadding: Dp,
     modifier: Modifier = Modifier,
     onResetToRealLocation: (Pair<Double, Double>) -> Unit
 ) {
-    // 定位由父级 Column 统一控制（设计稿：与缩放控件同列，去除 bottom 225dp 魔法数字）
-    @Suppress("UNUSED_PARAMETER")
-    val unusedInset = bottomBarPadding
-
+    // 定位由父级 Column 统一控制（设计稿：与缩放控件同列，去除 bottom 225dp 魔法数字）。
+    // 原 bottomBarPadding 参数在此处从未被使用（只是被 @Suppress 吞掉的死参数），
+    // 已删除 —— 底部安全区改由 ScreenInsets 在各面板内部统一推导。
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -54,7 +52,6 @@ fun MapFloatingActions(
             Surface(
                 modifier = Modifier
                     .size(54.dp)
-                    .clip(CircleShape)
                     .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
                     .bouncyClickable {
                         val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
@@ -81,27 +78,41 @@ fun MapFloatingActions(
         Surface(
             modifier = Modifier
                 .size(54.dp)
-                .clip(CircleShape)
                 .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
                 .bouncyClickable {
                     if (isPointMockActive) simulationViewModel.stopPointMock(context)
                     if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
                     CoordinateConverter.clearSavedRealLocation(context)
-                    com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+                    // 必须加摇杆守卫。forceCleanAllTestProviders 会无条件移除
+                    // GPS/NETWORK/PASSIVE/fused 四个 test provider，而悬浮摇杆持有
+                    // 另一个 MockLocationEngine 实例、其 isRegistered 仍为 true，
+                    // 而 inject() 只在 `!isRegistered || activeProviders.isEmpty()`
+                    // 时才重新注册 —— 于是此后每次 setTestProviderLocation 都抛
+                    // IllegalArgumentException 并被内部 runCatching 吞掉：
+                    // 界面显示摇杆开着、浮窗也在动，但不再注入任何位置。
+                    // 项目另外三处调用点都带同样的守卫
+                    // （MockLocationService 的 start/stop 路径）。
+                    if (!isJoystickRunning) {
+                        com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+                    }
+                    // 单路复位：requestFreshLocation 会同步回调一次，并在 provider
+                    // 回调里再回调一次（取消信号挂 15 秒）。原先这里又独立查了一遍
+                    // getRealDeviceLocation 并第二次调用 onResetToRealLocation，
+                    // 于是用户重新瞄准后，迟到的回调会把准星和地图拽回物理位置。
                     CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
                         onResetToRealLocation(freshLat to freshLon)
-                    }
-                    val real = CoordinateConverter.getRealDeviceLocation(context)
-                    if (real != null) {
-                        onResetToRealLocation(real)
                         val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
-                        val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
+                        val (tLat, tLon) = if (isGcj) {
+                            CoordinateConverter.wgs84ToGcj02(freshLat, freshLon)
+                        } else {
+                            freshLat to freshLon
+                        }
                         mapViewRef?.controller?.apply {
                             setZoom(16.5)
                             animateTo(GeoPoint(tLat, tLon))
                         }
-                        Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
                     }
+                    Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
                 },
             shape = CircleShape,
             color = Color.Transparent

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -107,7 +108,15 @@ fun IosGroupHeader(
     modifier: Modifier = Modifier,
     count: Int? = null,
     linkText: String? = null,
-    onLinkClick: (() -> Unit)? = null
+    onLinkClick: (() -> Unit)? = null,
+    /**
+     * 右侧链接的前置图标。
+     *
+     * 默认 [Icons.Default.Add] 保持原有「+ 添加」语义不变；
+     * 传 null 表示纯文字链接（如「使用指南」这类非新增动作），
+     * 避免给非新增操作也挂一个加号造成误读。
+     */
+    linkIcon: ImageVector? = Icons.Default.Add
 ) {
     Row(
         modifier = modifier
@@ -132,18 +141,21 @@ fun IosGroupHeader(
             Spacer(Modifier.weight(1f))
             Row(
                 modifier = Modifier
+                    .minTouchTarget()
                     .clip(AppShapes.chip)
                     .bouncyClickable(onClick = onLinkClick)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    tint = IosColors.BrandSoft,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(4.dp))
+                if (linkIcon != null) {
+                    Icon(
+                        linkIcon,
+                        contentDescription = null,
+                        tint = IosColors.BrandSoft,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
                 Text(
                     text = linkText,
                     style = IosTypography.ButtonSmall,
@@ -195,7 +207,7 @@ fun IosInsetGroupCard(
     hazeState: dev.chrisbanes.haze.HazeState? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = AppSpacing.pageH)
@@ -204,9 +216,7 @@ fun IosInsetGroupCard(
                 shape = shape,
                 elevation = elevation,
                 hazeState = hazeState
-            ),
-        shape = shape,
-        color = Color.Transparent
+            )
     ) {
         Column(content = content)
     }
@@ -506,6 +516,20 @@ fun <T> IosSegmentedControl(
 
 /**
  * 主按钮　设计稿 .btn--primary —— 52dp / r16 / 16-600 / 品牌蓝 + 蓝色光晕
+ *
+ * v1.7.1 扩展：新增 [enabled] 与 [loading]。两者默认值保持旧行为
+ * （enabled = true、loading = false），默认路径的渲染结果与旧实现逐项一致，
+ * 现有 7 个调用点无需改动。
+ *
+ * ```
+ * IosPrimaryButton(text = "开始模拟", onClick = { start() })                 // 旧写法，行为不变
+ * IosPrimaryButton(text = "开始模拟", onClick = { start() }, loading = isBusy)
+ * IosPrimaryButton(text = "开始模拟", onClick = { start() }, enabled = canStart)
+ * ```
+ *
+ * @param enabled false 时降低底板与文字不透明度、去掉投影，并屏蔽点击
+ * @param loading true 时左侧显示环形进度并屏蔽点击；不传 [loadingText] 时文字沿用 [text]
+ * @param loadingText 可选，loading 期间替换显示的文案（如「正在模拟…」）
  */
 @Composable
 fun IosPrimaryButton(
@@ -515,31 +539,48 @@ fun IosPrimaryButton(
     containerColor: Color = IosColors.SystemBlue,
     contentColor: Color = Color.White,
     icon: ImageVector? = null,
-    height: Dp = 52.dp
+    height: Dp = 52.dp,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    loadingText: String? = null
 ) {
+    // loading 期间一律不可点击；enabled=false 同样屏蔽
+    val clickable = enabled && !loading
+    val label = if (loading) (loadingText ?: text) else text
+
+    val resolvedContainer = if (clickable) containerColor else containerColor.copy(alpha = 0.40f)
+    val resolvedContent = if (clickable) contentColor else contentColor.copy(alpha = 0.72f)
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
             .clip(AppShapes.button)
-            .bouncyClickable(onClick = onClick),
+            .bouncyClickable(enabled = clickable, onClick = onClick),
         shape = AppShapes.button,
-        color = containerColor,
-        shadowElevation = 8.dp
+        color = resolvedContainer,
+        shadowElevation = if (clickable) 8.dp else 0.dp
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(17.dp))
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(17.dp),
+                    strokeWidth = 2.dp,
+                    color = resolvedContent
+                )
+                Spacer(Modifier.width(8.dp))
+            } else if (icon != null) {
+                Icon(icon, contentDescription = null, tint = resolvedContent, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(8.dp))
             }
             Text(
-                text = text,
+                text = label,
                 style = IosTypography.ButtonText,
-                color = contentColor
+                color = resolvedContent
             )
         }
     }
@@ -645,16 +686,49 @@ fun IosChip(
     }
 }
 
-/** 状态徽标　设计稿 .badge / .badge.run */
+/**
+ * 状态徽标语义档位。
+ *
+ * [NEUTRAL] 中性（灰）、[RUNNING] 运行中（绿）、[WARNING] 警告（橙）、
+ * [ERROR] 错误（红）、[INFO] 提示（蓝）。
+ */
+enum class IosBadgeTone { NEUTRAL, RUNNING, WARNING, ERROR, INFO }
+
+/**
+ * 状态徽标　设计稿 .badge / .badge.run
+ *
+ * v1.7.1 扩展：新增 [tone] 表达多状态。旧参数 [running] 与旧调用点完全不变，
+ * 两者都省略时的渲染结果与旧实现逐项一致（灰底 + 次色文字 + 三级色圆点）。
+ *
+ * 优先级：[tone] 非空时以 [tone] 为准；[tone] 为 null 时回落到 [running]
+ * （true -> RUNNING，false -> NEUTRAL），因此 `IosStatusBadge(text, running = true)`
+ * 与 `IosStatusBadge(text, tone = IosBadgeTone.RUNNING)` 视觉等价。
+ *
+ * ```
+ * IosStatusBadge(text = "已连接")                                   // 旧写法，中性灰
+ * IosStatusBadge(text = "模拟中", running = true)                    // 旧写法，绿色
+ * IosStatusBadge(text = "需要定位权限", tone = IosBadgeTone.WARNING)  // 橙色
+ * IosStatusBadge(text = "同步失败", tone = IosBadgeTone.ERROR)        // 红色
+ * IosStatusBadge(text = "v1.7.1", tone = IosBadgeTone.INFO)          // 蓝色
+ * ```
+ */
 @Composable
 fun IosStatusBadge(
     text: String,
     modifier: Modifier = Modifier,
-    running: Boolean = false
+    running: Boolean = false,
+    tone: IosBadgeTone? = null
 ) {
-    val bg = if (running) IosColors.SystemGreen.copy(alpha = 0.15f) else Color(0x14FFFFFF)
-    val fg = if (running) IosColors.SystemGreen else IosColors.SecondaryLabel
-    val dot = if (running) IosColors.SystemGreen else IosColors.TertiaryLabel
+    val resolved = tone ?: if (running) IosBadgeTone.RUNNING else IosBadgeTone.NEUTRAL
+    val fg = when (resolved) {
+        IosBadgeTone.NEUTRAL -> IosColors.SecondaryLabel
+        IosBadgeTone.RUNNING -> IosColors.SystemGreen
+        IosBadgeTone.WARNING -> IosColors.SystemOrange
+        IosBadgeTone.ERROR -> IosColors.SystemRed
+        IosBadgeTone.INFO -> IosColors.SystemBlue
+    }
+    val bg = if (resolved == IosBadgeTone.NEUTRAL) Color(0x14FFFFFF) else fg.copy(alpha = 0.15f)
+    val dot = if (resolved == IosBadgeTone.NEUTRAL) IosColors.TertiaryLabel else fg
 
     Row(
         modifier = modifier
@@ -859,34 +933,68 @@ fun IosPageHead(
 }
 
 /**
- * 搜索框　设计稿 .search —— 52dp / r18 / 白 6% 底 + 6% 描边，聚焦时描边转品牌蓝
+ * 搜索框规格档位。
+ *
+ * [STANDARD] 列表页标准规格 —— 52dp 高 / 18dp 圆角 / 16sp（即旧 IosSearchField 的默认外观）
+ * [COMPACT]  地图内嵌紧凑规格 —— 36dp 高 / 13dp 圆角 / 13sp
+ */
+enum class IosSearchFieldStyle(val height: Dp, val cornerRadius: Dp, val iconSize: Dp, val horizontalPadding: Dp, val fontSize: TextUnit) {
+    STANDARD(height = 52.dp, cornerRadius = 18.dp, iconSize = 19.dp, horizontalPadding = 16.dp, fontSize = 16.sp),
+    COMPACT(height = 36.dp, cornerRadius = 13.dp, iconSize = 15.dp, horizontalPadding = 10.dp, fontSize = 13.sp)
+}
+
+/**
+ * 搜索框　设计稿 .search —— 默认 52dp / r18 / 白 6% 底 + 6% 描边，聚焦时描边转品牌蓝
+ *
+ * v1.7.1 扩展：参数化高度与圆角，并提供 [IosSearchFieldStyle.COMPACT] 覆盖地图内嵌场景。
+ * 新增参数全部带默认值，默认走 STANDARD 规格（52dp / r18 / 16sp），
+ * 与旧实现的默认外观完全一致，现有调用点无需改动。
+ *
+ * ```
+ * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索")            // 旧写法
+ * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索地点",
+ *                style = IosSearchFieldStyle.COMPACT)                                    // 地图内嵌
+ * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索",
+ *                height = 44.dp, cornerRadius = 14.dp)                                   // 自定义
+ * ```
+ *
+ * @param height 传 null 时取 [style] 的高度
+ * @param cornerRadius 传 null 时取 [style] 的圆角
+ * @param style 规格档位，默认 [IosSearchFieldStyle.STANDARD]
  */
 @Composable
 fun IosSearchField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    height: Dp? = null,
+    cornerRadius: Dp? = null,
+    style: IosSearchFieldStyle = IosSearchFieldStyle.STANDARD
 ) {
     var focused by remember { mutableStateOf(false) }
     val bg = if (focused) Color(0x17FFFFFF) else Color(0x0FFFFFFF)
     val borderColor = if (focused) IosColors.SystemBlue.copy(alpha = 0.4f) else Color(0x0FFFFFFF)
 
+    val resolvedHeight = height ?: style.height
+    val resolvedCorner = cornerRadius ?: style.cornerRadius
+    val shape = RoundedCornerShape(resolvedCorner)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .height(resolvedHeight)
+            .clip(shape)
             .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
-            .padding(horizontal = 16.dp),
+            .border(1.dp, borderColor, shape)
+            .padding(horizontal = style.horizontalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = Icons.Default.Search,
             contentDescription = null,
             tint = IosColors.SecondaryLabel,
-            modifier = Modifier.size(19.dp)
+            modifier = Modifier.size(style.iconSize)
         )
         Spacer(Modifier.width(10.dp))
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -903,7 +1011,7 @@ fun IosSearchField(
                 singleLine = true,
                 textStyle = TextStyle(
                     color = IosColors.Label,
-                    fontSize = 16.sp
+                    fontSize = style.fontSize
                 ),
                 cursorBrush = SolidColor(IosColors.SystemBlue),
                 modifier = Modifier

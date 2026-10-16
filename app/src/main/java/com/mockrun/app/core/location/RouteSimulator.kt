@@ -3,6 +3,7 @@ package com.mockrun.app.core.location
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.SimulatedPoint
 import com.mockrun.app.domain.model.WayPoint
+import com.mockrun.app.util.Diag
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -26,6 +27,7 @@ class RouteSimulator @Inject constructor(
 ) {
 
     companion object {
+        private const val TAG = "RouteSimulator"
         const val UPDATE_INTERVAL_MS = 1000L   // position update cadence
         const val EARTH_RADIUS_M = 6371000.0
         const val GPS_NOISE_SIGMA_M = 0.3      // ~0.3 m standard deviation
@@ -36,7 +38,15 @@ class RouteSimulator @Inject constructor(
         speedKmh: Float,
         startProgress: Float = 0f
     ): Flow<SimulatedPoint> = flow {
-        require(route.waypoints.size >= 2) { "Route must have at least 2 waypoints" }
+        // 不用 require()：该异常会在 MockLocationService.serviceScope.launch 内抛出，
+        // 而那个作用域没有 CoroutineExceptionHandler，未捕获异常会直接崩掉进程。
+        // 调用方（UI 层）虽然已加了按钮可用性判断，但模拟也可能由
+        // ADB 广播、路线删除竞态等路径触发，这里必须自己兜住 ——
+        // 返回空 flow 让模拟静默结束，比崩溃好。
+        if (route.waypoints.size < 2) {
+            Diag.w(TAG, "simulateRoute 收到 ${route.waypoints.size} 个航点（需 >= 2），已跳过本次模拟")
+            return@flow
+        }
 
         val segments = buildSegments(route.waypoints)
         val totalDistance = segments.last().endCumulative

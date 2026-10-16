@@ -24,18 +24,55 @@ object FingerprintCoordinator {
     const val SETTINGS_KEY = "fake_gps_fingerprint_id"
 
     /**
+     * 采集结果。
+     *
+     * 存在的理由：保存失败时旧实现仍返回 fp 对象，UI 拿不到任何失败信号，
+     * 于是「保存失败」照样弹「已采集成功」，用户以为存下了、实际列表里什么都没有。
+     * 现在保存与否由 [saved] 明确表达，失败原因在 [saveError]。
+     */
+    data class CaptureOutcome(
+        val fingerprint: EnvironmentFingerprint,
+        val saved: Boolean,
+        val saveError: String? = null
+    )
+
+    /**
      * 采集并保存。调用方必须确保虚拟定位已停止。
+     *
+     * 采集本身失败会抛异常（调用方 catch）；采集成功而保存失败时
+     * 返回 `saved = false` 的 [CaptureOutcome]，不抛异常也不假装成功。
+     *
+     * @param originSource 坐标来源标记：MANUAL / DEVICE / MOCK_TARGET
      */
     suspend fun captureAndSave(
         context: Context,
         id: String,
         lat: Double,
-        lon: Double
-    ): EnvironmentFingerprint {
-        val fp = FingerprintCollector(context).collect(lat, lon)
-        FingerprintStore.save(context, id, fp)
-        Diag.i(TAG, "captured fingerprint '$id': ${FingerprintStore.summary(fp)}")
-        return fp
+        lon: Double,
+        originSource: String = "MANUAL"
+    ): CaptureOutcome {
+        val fp = FingerprintCollector(context).collect(lat, lon, originSource)
+        val saved = FingerprintStore.save(context, id, fp)
+
+        val outcome = CaptureOutcome(
+            fingerprint = fp,
+            saved = saved,
+            saveError = if (saved) null else "写入 filesDir/fingerprints/$id.json 失败"
+        )
+
+        if (saved) {
+            Diag.i(TAG, "captured fingerprint '$id': ${FingerprintStore.summary(fp)}")
+        } else {
+            Diag.w(TAG, "captured fingerprint '$id' but SAVE FAILED: ${outcome.saveError}")
+        }
+        if (fp.mockNotStopped == true) {
+            Diag.w(
+                TAG,
+                "fingerprint '$id' captured while simulation was still injecting — " +
+                    "values may be contaminated by our own mock"
+            )
+        }
+        return outcome
     }
 
     /**

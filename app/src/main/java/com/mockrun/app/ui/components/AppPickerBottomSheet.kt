@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.ui.components
+package com.mockrun.app.ui.components
 
 import android.graphics.drawable.Drawable
 import androidx.compose.animation.AnimatedVisibility
@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,15 +104,14 @@ fun AppPickerBottomSheet(
             baseList
         } else {
             val q = searchQuery.trim().lowercase()
-            val matchedInBase = baseList.filter {
+            // 只在当前分类内搜索，不做全量兜底。
+            //
+            // 原实现在本分类无匹配时会回落到全量搜索：用户在「系统应用」下搜到
+            // 一个用户应用，列表显示它、分段控件仍高亮「系统应用」，
+            // 而「已筛选 N 个应用」与各分类计数（上方统计）都与可见列表矛盾。
+            // 空态已提供「以包名添加」入口，不会让用户无路可走。
+            baseList.filter {
                 it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
-            }
-            if (matchedInBase.isNotEmpty()) {
-                matchedInBase
-            } else {
-                allApps.filter {
-                    it.appName.lowercase().contains(q) || it.packageName.lowercase().contains(q)
-                }
             }
         }
     }
@@ -119,7 +119,7 @@ fun AppPickerBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         containerColor = IosColors.SecondaryGroupedBackground,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Surface(
                 modifier = Modifier
@@ -156,12 +156,13 @@ fun AppPickerBottomSheet(
                         color = IosColors.SecondaryLabel
                     )
                 }
-                IconButton(
-                    onClick = onDismissRequest,
+                Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .minTouchTarget()
                         .clip(CircleShape)
                         .background(IosColors.SystemGray.copy(alpha = 0.15f))
+                        .bouncyClickable(onClick = onDismissRequest),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Close,
@@ -283,55 +284,35 @@ fun AppPickerBottomSheet(
                 }
             }
 
-            // Search Bar
-            Surface(
-                shape = RoundedCornerShape(13.dp),
-                color = IosColors.TertiaryGroupedBackground,
+            // Search Bar —— 复用设计系统 IosSearchField(COMPACT)，
+            // 清除按钮移到框外，热区 48dp（原先 24dp IconButton 难以命中）
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp)
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                IosSearchField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = "搜索应用名称或包名...",
+                    modifier = Modifier.weight(1f),
+                    style = IosSearchFieldStyle.COMPACT
+                )
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .minTouchTarget()
+                        .clip(CircleShape)
+                        .bouncyClickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = IosColors.SecondaryLabel,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (searchQuery.isEmpty()) {
-                            Text(
-                                text = "搜索应用名称或包名...",
-                                style = IosTypography.Body,
-                                color = IosColors.SecondaryLabel
-                            )
-                        }
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            singleLine = true,
-                            textStyle = IosTypography.Body.copy(color = IosColors.Label),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(
-                            onClick = { searchQuery = "" },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "清除",
-                                tint = IosColors.SecondaryLabel,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "清除搜索",
+                            tint = IosColors.SecondaryLabel,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -351,12 +332,12 @@ fun AppPickerBottomSheet(
                 )
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .minTouchTarget()
+                        .clip(RoundedCornerShape(13.dp))
                         .bouncyClickable {
                             manualPkgInput = searchQuery.trim()
                             showManualInputDialog = true
-                        }
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                        },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -378,11 +359,16 @@ fun AppPickerBottomSheet(
             Spacer(Modifier.height(4.dp))
 
             // Content List
+            // 列表高度按屏幕高度取 45%，窄屏（如 640dp 高）下也不会把
+            // 空态 CTA 顶出可视区；上限 420dp 保持大屏观感不变。
+            val maxListHeight = (LocalConfiguration.current.screenHeightDp * 0.45f)
+                .coerceIn(200f, 420f).dp
+
             if (isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(220.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
@@ -394,7 +380,7 @@ fun AppPickerBottomSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp),
+                        .height(220.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -412,6 +398,7 @@ fun AppPickerBottomSheet(
                                     manualPkgInput = searchQuery.trim()
                                     showManualInputDialog = true
                                 },
+                                modifier = Modifier.minTouchTarget(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = IosColors.SystemBlue.copy(alpha = 0.15f),
                                     contentColor = IosColors.SystemBlue
@@ -423,6 +410,7 @@ fun AppPickerBottomSheet(
                         } else {
                             OutlinedButton(
                                 onClick = { showManualInputDialog = true },
+                                modifier = Modifier.minTouchTarget(),
                                 shape = RoundedCornerShape(9.dp)
                             ) {
                                 Text("手动输入包名添加")
@@ -434,7 +422,7 @@ fun AppPickerBottomSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 420.dp),
+                        .heightIn(max = maxListHeight),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(filteredApps, key = { "${it.packageName}_${finalUserId}" }) { item ->
@@ -474,11 +462,13 @@ fun AppPickerBottomSheet(
         AlertDialog(
             onDismissRequest = { showManualInputDialog = false },
             containerColor = IosColors.SecondaryGroupedBackground,
+            shape = RoundedCornerShape(24.dp),
             title = {
                 Text(
                     text = "手动指定应用包名",
                     style = IosTypography.Headline,
-                    color = IosColors.Label
+                    color = IosColors.Label,
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -533,13 +523,17 @@ fun AppPickerBottomSheet(
                             onDismissRequest()
                         }
                     },
-                    enabled = manualPkgInput.isNotBlank()
+                    enabled = manualPkgInput.isNotBlank(),
+                    modifier = Modifier.minTouchTarget()
                 ) {
                     Text("确认添加", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showManualInputDialog = false }) {
+                TextButton(
+                    onClick = { showManualInputDialog = false },
+                    modifier = Modifier.minTouchTarget()
+                ) {
                     Text("取消", color = IosColors.SecondaryLabel)
                 }
             }

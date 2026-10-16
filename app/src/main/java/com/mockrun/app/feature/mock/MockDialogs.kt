@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.feature.mock
+package com.mockrun.app.feature.mock
 
 import android.content.Context
 import android.content.Intent
@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -17,8 +18,9 @@ import com.mockrun.app.core.location.RootSuBridge
 import com.mockrun.app.core.designsystem.IosColors
 import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.util.logFailure
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * iOS Style Guide Dialog: 防闪回与使用指南
@@ -103,12 +105,19 @@ fun UsageGuideDialog(
 @Composable
 fun WeChatTroubleshootDialog(
     context: Context,
-    coroutineScope: CoroutineScope,
     rootBridge: RootSuBridge,
     isRootMode: Boolean,
     isRootAvailable: Boolean,
     onDismissRequest: () -> Unit
 ) {
+    // 自持作用域，不使用调用方传入的 CoroutineScope。
+    //
+    // 原实现接收调用方的 scope（LocationMockScreen 的 rememberCoroutineScope），
+    // 于是在这里启动的 root 探测与 disableWifiBluetoothScan 属于调用方生命周期：
+    // 关闭弹窗不会取消任务（su 命令照跑、Toast 照弹），
+    // 而调用方销毁时又会在 settings put 序列中途取消它。
+    val scope = rememberCoroutineScope()
+
     AlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
@@ -151,9 +160,13 @@ fun WeChatTroubleshootDialog(
 
                 Button(
                     onClick = {
-                        coroutineScope.launch {
+                        scope.launch {
                             if (isRootMode && rootBridge.isRootAvailable()) {
-                                val ok = rootBridge.disableWifiBluetoothScan()
+                                // 已授权的 su 序列必须跑完，中途取消会留下
+                                // 「设置写了一半」的状态。用 NonCancellable 保护。
+                                val ok = withContext(NonCancellable) {
+                                    rootBridge.disableWifiBluetoothScan()
+                                }
                                 if (ok) {
                                     Toast.makeText(context, "已关闭蓝牙 / Wi-Fi 与背景扫描", Toast.LENGTH_SHORT).show()
                                 } else {

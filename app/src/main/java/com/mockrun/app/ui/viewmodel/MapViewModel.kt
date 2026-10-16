@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.ui.viewmodel
+package com.mockrun.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +10,8 @@ import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import javax.inject.Inject
@@ -232,15 +234,30 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    fun importGpx(inputStream: InputStream, defaultName: String = "导入路线") {
+    /**
+     * 导入 GPX。
+     *
+     * 返回解析出的点数（在 IO 线程完成后回调），调用方可据此判断是否真的成功：
+     * 少于 2 个点的 GPX 不会入库，但原实现不返回任何信息，
+     * 于是 UI 无条件弹「导入成功」—— 用户看到成功提示却什么都没有。
+     *
+     * 调用方必须保证 [inputStream] 在本次调用期间保持打开；解析在 IO 线程进行，
+     * 因此这里不能在调用方用 use{} 提前关闭流。
+     */
+    fun importGpx(
+        inputStream: InputStream,
+        defaultName: String = "导入路线",
+        onParsed: ((Int) -> Unit)? = null
+    ) {
         viewModelScope.launch {
-            val points = gpxParser.parse(inputStream)
+            val points = withContext(Dispatchers.IO) { gpxParser.parse(inputStream) }
             if (points.size >= 2) {
                 _drawnWaypoints.value = points
                 val route = Route(name = defaultName, waypoints = points)
                 val id = routeRepository.saveRoute(route)
                 _selectedRoute.value = route.copy(id = id)
             }
+            onParsed?.invoke(points.size)
         }
     }
 

@@ -41,6 +41,7 @@ import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RootSuBridge
 import com.mockrun.app.core.location.SensorMockEngine
 import com.mockrun.app.util.InjectionModePrefs
+import com.mockrun.app.util.Diag
 import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
@@ -71,15 +72,31 @@ fun RouteSimulationScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            try {
-                // use{} 保证流被关闭。原实现只在成功路径上拿到流、从不关闭，
-                // 每次导入泄漏一个 fd，累积后 EMFILE，连路线库和地图瓦片都打不开。
-                context.contentResolver.openInputStream(it)?.use { stream ->
-                    mapViewModel.importGpx(stream, "导入GPX路线")
-                    Toast.makeText(context, "GPX 路线导入成功并已载入", Toast.LENGTH_SHORT).show()
+            // 解析在 ViewModel 内切到 IO 线程（见 MapViewModel.importGpx），
+            // 这里只负责在结果回调里给反馈。
+            // 注意：不能在这里用 use{} 包住流 —— 解析是异步的，
+            // 提前关闭会让解析读到已关闭的流。流由 GpxParser 读完，
+            // 其生命周期与 viewModelScope 的这次任务一致。
+            runCatching {
+                context.contentResolver.openInputStream(it)?.let { stream ->
+                    mapViewModel.importGpx(stream, "导入GPX路线") { count ->
+                        // 只有真的解析出 >= 2 个点才算成功。
+                        // 原实现无条件弹「导入成功」，而少于 2 点的 GPX 不会入库，
+                        // 用户会看到成功提示但列表里什么都没有。
+                        if (count >= 2) {
+                            Toast.makeText(context, "GPX 路线导入成功并已载入（$count 个点）", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "该 GPX 只解析出 $count 个点，至少需要 2 个点才能构成路线",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }.onFailure { e ->
+                Diag.w("RouteSimulation", "GPX 导入失败", e)
+                Toast.makeText(context, "导入失败：${e.message ?: "未知错误"}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -93,9 +110,25 @@ fun RouteSimulationScreen(
         }
     }
 
-    fun applySpeed(speed: Float) {
+    /**
+     * 应用配速。
+     *
+     * @param syncInputField 是否把格式化后的值写回输入框。
+     *   必须为 false 用于「用户在输入框里打字」这条路径 ——
+     *   否则会在输入过程中覆盖用户的文本：
+     *   输入 "12.5" 时，打到 "12." 这一步 `toFloatOrNull()` 失败、
+     *   但前一次成功的 "12" 会被格式化成 "12" 写回，光标与文本被打乱，
+     *   最终可能变成 "125"。预设档位按钮与滑块才需要回写。
+     */
+    fun applySpeed(speed: Float, syncInputField: Boolean = true) {
         selectedSpeed = speed
-        customSpeedInput = if (speed == speed.toInt().toFloat()) speed.toInt().toString() else "%.1f".format(speed)
+        if (syncInputField) {
+            customSpeedInput = if (speed == speed.toInt().toFloat()) {
+                speed.toInt().toString()
+            } else {
+                "%.1f".format(speed)
+            }
+        }
         if (simState.status is SimulationStatus.Running) {
             simulationViewModel.setSpeed(context, speed)
         }
@@ -315,10 +348,19 @@ fun RouteSimulationScreen(
                     )
                 }
                 Spacer(Modifier.height(4.dp))
+                // 拖动进度条时用本地状态，松手才真正 seek。
+                //
+                // 原实现把 onValueChange 直接接到 seekTo：每一次指针移动都会
+                // startForegroundService(ACTION_SEEK)，而服务端每次 seek 都会
+                // currentSessionId++，从而取消并重启整条模拟 flow ——
+                // 拖动一次会触发几十次重启，表现为进度条卡顿、位置跳变。
+                var dragProgress by remember { mutableStateOf<Float?>(null) }
                 Slider(
-                    value = simState.progressPercent,
-                    onValueChange = { percent ->
-                        simulationViewModel.seekTo(context, percent)
+                    value = dragProgress ?: simState.progressPercent,
+                    onValueChange = { percent -> dragProgress = percent },
+                    onValueChangeFinished = {
+                        dragProgress?.let { simulationViewModel.seekTo(context, it) }
+                        dragProgress = null
                     },
                     valueRange = 0f..1f,
                     enabled = simState.status is SimulationStatus.Running || simState.status is SimulationStatus.Paused,
@@ -531,8 +573,9 @@ fun RouteSimulationScreen(
                             value = customSpeedInput,
                             onValueChange = {
                                 customSpeedInput = it
+                                // syncInputField = false：不要覆盖用户正在输入的文本
                                 it.toFloatOrNull()?.let { spd ->
-                                    if (spd > 0) applySpeed(spd)
+                                    if (spd > 0) applySpeed(spd, syncInputField = false)
                                 }
                             },
                             placeholder = {

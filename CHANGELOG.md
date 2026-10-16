@@ -8,6 +8,79 @@
 
 ---
 
+## [2.1.2] - 2026-10-13
+
+> 定位页 / 路线页毛玻璃全面失效修复 + 环境指纹实地采集改取真机真实定位 + **在线更新来源收敛为 GitHub 单源**。签名密钥未变更，可从 v2.1 / v2.1.1 直接覆盖升级。
+
+### 移除 (Removed)
+
+- **「自有服务器（`aqvtc.icu`）」与「蓝奏云（南咒云）」两套更新机制的全部代码路径删除。** 不是降级保留，是删除：分享页元数据解析（`ajaxfile.php` / `ajaxm.php` 的 `url` / `sign`、`action=downprocess&sign=…&kd=1&p=…`、`iframe /fn?` 的 `wp_sign` / `ajaxdata`）、`acw_sc__v2` 二阶直链提取（40 位十六进制置换表 + 固定掩码）及其消费点、分享页 `#pwd=` 解析、`resolveLanzouDirectUrl` 的 302→acw→302 链路、下载队列中的蓝奏云首位，全部移除。
+  - 更新编排现在只剩两段：多 CDN 静态清单 `version.json`（jsDelivr Global / Fastly / Gcore + gh-proxy + `raw.githubusercontent.com`）→ GitHub Releases API 多镜像兜底；两段都不通才返回错误。
+  - 清单字段 `lanzouUrl` / `lanzouPassword` 删除，`downloadUrl` 与 `homepage` 改为 GitHub 侧地址；旧缓存清单里残留的蓝奏云字段被直接忽略，不再进入下载队列。
+  - 保留 `isClosedLegacyDomain` 过滤：它挡的是旧缓存清单里残留的 `aqvtc.icu` 地址，删掉反而会让过期清单生效。
+  - 仓库根 `version.json` 同步删字段改地址；`SHA256.txt` 更新为 v2.1.2 产物；README 删除官网与官网 APK 入口两行。
+
+### 变更 (Changed)
+
+- **`RemoteReleaseInfo` 精简。** 去掉 `lanzouShareUrl` / `lanzouPassword` 两个字段，`downloadUrl` 直接回落到 `cdnDownloadUrl`；来源标签默认值由「蓝奏云极速源」改为「GitHub Releases」。
+- **`HOMEPAGE_URL` 改为 GitHub 仓库主页**（原指向蓝奏云分享页）；更新对话框的「浏览器下载」按钮改为打开 GitHub Release 页。
+
+### 修复 (Fixed)
+
+- **多 ABI / split 资产并存时会下错包。** `parseReleaseJson` 原先只按「第一个 `.apk` 且名字不含 `debug`」挑资产，Release 里一旦多出 `-arm64-v8a` 一类的资产就会选错，表现为「能检测到新版本却下错包」。现优先精确匹配 CI 产出名 `FakeGPS-next-<tag>-release.apk`（见 [`.github/workflows/release.yml`](.github/workflows/release.yml)），匹配不到才回落到原有规则。
+
+### 仓库与发布 (Repo & Release)
+
+- **仓库不再携带二进制产物。** 发行版安装包只作为 GitHub Release 资产上传，不再提交进仓库树、不产生携带二进制的提交；`.github/workflows/release.yml` 与 `.gitignore` 的对应说明同步改写。
+- **`version.json` 下载地址改为 Release 资产地址**（`releases/download/{tag}/{file}.apk`）并保留多镜像代理，移除依赖「仓库树内的 APK」的 jsDelivr `/gh/` 路径。应用内更新的多源容灾链路保持不变（静态清单 → Releases API）。
+- **`version-tracker.md` 与 `SHA256.txt` 移出仓库**（构建记录与产物哈希仍可从 git 历史取回），README 中指向 `version.json` / `package.json` / 安装包 / 签名密钥的链接一并删除。
+
+## [2.1] - 2026-10-12
+
+> 环境指纹采集可用性修复 + 全应用界面统一 + 首次启动免责声明门禁。签名密钥未变更，可从 v2.0.0 直接覆盖升级。
+
+### 新增 (Added)
+
+- **首次启动免责声明门禁。** 应用启动时先展示全屏使用条款，必须**滚动阅读到最底部**才会解锁输入框，随后由用户**手动键入确认短语**（`我已完整阅读并同意`）才能进入主界面；选择「不同意」则直接退出应用。设计上刻意不用「点一下复选框」的形式：本软件会修改系统定位行为，必须留下用户确实读过条款并主动确认的记录。
+
+  - 确认短语是唯一真源常量（`DisclaimerPrefs.requiredPhrase`），UI 展示、校验、文案共用一份，避免多处硬编码走样。
+  - 门禁版本号为 `DisclaimerPrefs.currentVersion`。条款内容有实质修改时递增该值，会让所有用户重新确认一次。
+  - 滚动判定含 24 px 容差（避免像素取整导致永远差一点），并对「内容不足一屏」的情况直接视为已读完，防止大屏或小字号下卡死。
+  - 权限申请移到接受条款**之后**触发，先让用户理解为何需要这些权限，而不是一启动就弹系统授权框。
+  - 官网同步发布网页版条款：<https://aqvtc.icu/disclaimer.html>，并在首页导航、首屏下载区、页脚三处加入口。
+
+### 修复 (Fixed)
+
+- **环境指纹在 release 包中静默失效（严重）。** `EnvironmentFingerprint` 及其内嵌模型（`WifiAp` / `CellTower` / `BleBeacon` / `BondedDevice`）的字段名是 JSON 键的同一份契约：写端由 Gson 按字段名序列化，读端 `FingerprintReplayer` 按硬编码字符串键（`optString("originLat")`、`optJSONArray("wifi")` 等 30 余个）解析。R8 默认把这些字段重命名成单字母，实测 `originLat -> h`、`wifi -> l`、`wifiState -> v`，于是 release 包里写出的键与读取端期望的键完全对不上——回放读到的坐标恒为 0.0、列表恒为空，且不抛任何异常。已发布的 v2.0.0 APK 经 `dexdump` 反查确认同样存在（该类混淆为 `i4/d`），即该缺陷自指纹功能引入起一直存在。修复：`proguard-rules.pro` 增加 `com.mockrun.app.core.location.fingerprint.**` 与 `SourceState` 枚举常量的 keep 规则，并已用 `dexdump` 复核修复后 release APK 的字段名与 32 个读取键逐一对应。
+- **环境指纹采集把失败伪装成 0。** 原实现中「蓝牙关闭」「权限被拒」「扫描失败」「确实没有设备」四者都被压成同一个空列表，界面上无法区分。现每类数据源返回 `SourceState`（正常 / 无结果 / 缓存数据 / 权限被拒 / 开关关闭 / 超时 / 失败 / 不支持），未知状态名解析为 null 而非回落成「正常」。
+- **Wi-Fi 结果可能来自系统缓存而非本次扫描。** 原实现发起 `startScan()` 后固定等待 3 秒直接读 `scanResults`，不检查返回值、不等结果通知、不校验时间戳。现改为注册扫描结果广播 + 超时兜底，校验 `startScan()` 返回值与结果新鲜度，按 BSSID 去重；保留「最强 20 条」设计，但把截断前的原始发现数一并保存，界面上显示为 `Wi-Fi 20/45`，让「被截断」与「只有 20 个」可区分。
+- **5G NR 基站被静默丢弃。** 原 `mapCell()` 只处理 LTE / GSM / WCDMA，其余制式 `else -> null` 直接丢弃，5G 机型上基站计数恒为 0。现补齐 `CellInfoNr` 采集、36-bit NCI（`Long`，`Int` 装不下）、以及回放侧的 `CellIdentityNr` / `CellSignalStrengthNr` / `CellInfoNr` 构造，并统计被丢弃的未支持制式条数。注：`CellInfoNr` 在 API 29/30 无公开构造器，该区间的 NR 回放受平台限制不可实现（不影响 Android 11+ 主流机型）。
+- **基站只读系统缓存。** 按 AOSP 契约，target Q+ 调用 `getAllCellInfo()` 只返回缓存，需 `requestCellInfoUpdate()` 主动请求。现改为异步请求 + 超时，失败时才回落缓存并明确标注为「缓存数据」。
+- **保存失败仍提示「已采集」。** 原 `FingerprintStore.save()` 吞掉写入异常只记日志，调用方照常返回成功。现 `save()` 返回 `Boolean` 并改为原子写（临时文件 + `renameTo`），采集返回 `CaptureOutcome(saved, saveError)`，界面据此区分「已保存」「部分采集」「采集失败」。
+- **同名重采后列表不刷新。** 原实现只在文件名列表变化时重载摘要，而同名覆盖后列表完全相同，导致旧摘要继续显示。现采集成功后强制重载，并把默认名称精度从分钟提升到秒，降低撞名概率。
+- **采集可能被自身模拟污染。** 原实现只清理一次 hook 状态并等待 1.5 秒，未停止仍在注入的定位服务。现检测采集窗口内是否仍被注入，污染风险作为 `mockNotStopped` 暴露给界面，并在采集对话框中对「虚拟定位运行中」给出明确警告。
+- **采集对话框在小屏/大字号下按钮不可达。** 原表单无滚动、无 IME 避让，键盘弹出会顶掉确认按钮。现支持滚动与键盘避让，窄屏下经纬度输入自动改为纵向堆叠，并逐字段显示范围错误原因。
+- **摇杆尺寸上限不一致。** 界面滑块上限为 220 dp，而服务端读写均按 80–240 dp 收敛，存过 240 的用户在界面上会被卡在 220 且拖不回原值。现统一为 80–240 dp。
+- **「常驻前台通知」把权限状态说成服务状态。** 该项只检查通知权限，却显示「运行中」。现改为「已允许」，不再把权限等同于服务运行。
+- **系统防护分组头误用加号图标。** 「使用指南」不是新增动作，现不再挂加号图标。
+
+### 变更 (Changed)
+
+- **全应用界面统一（精致玻璃风）。** 沿用既有 Aurora 背景、Liquid Glass 与 iOS 风格设计系统，不改变品牌与导航架构，四个主 Tab（定位 / 路线 / 功能 / 关于）及全部现有功能入口保持不变。
+  - 新增 `ScreenInsets`：底部留白改由底栏真实几何与系统导航栏实时推导，替换各页写死的 140 / 160 / 100 / 48 dp 与 `navBar + 94 dp`（后者与底栏实际实现相差 16 dp）。
+  - 新增 `Modifier.minTouchTarget()`：把小于 48 dp 的可点击元素（启用 / 删除 / 清除等）抬到可命中尺寸。
+  - `Theme.kt` 将 `IosTypography` 映射进 `MaterialTheme.typography`，消除两套字号并存的根因；`IosPrimaryButton` 增加 `enabled` / `loading`，`IosStatusBadge` 增加 `tone`，`IosSearchField` 支持标准与紧凑两种规格，`IosGroupHeader` 支持自定义链接图标。以上均为向后兼容扩展。
+  - 语义色统一：新增 `IosSemanticColors`（danger / warning / success / info 的深浅档），替换页面中硬编码的 `#FF3B30` 与自定义橙色。
+  - 功能区：常显的反检测警告条改为可折叠入口，不再压过主控操作；分组头统一；指纹列表补充采集时间、实地坐标与空态；「启用 / 已启用」拆分为状态徽章与动作按钮，删除改为二次确认。
+  - 定位 / 路线：统一搜索框与顶部信息层级，搜索结果补充空态与错误态承载，路线流程补充阶段标识与完成 / 异常摘要，运行中数字改用等宽样式。
+  - 路线库：内容宽度约束与其他页对齐，管理操作收进更多菜单，两种空态文案修正（原文案提到并不存在的「地图」标签）并各自给出 CTA，补充显式返回按钮。
+  - 关于：视觉设置、壁纸、数据管理与版本更新提前，品牌介绍与架构说明下移或折叠，内容全部保留可达；卡片与弹窗规格统一。
+  - 弹窗规范：短确认 / 输入用 24 dp 圆角，长表单 / 列表用 32 dp 圆角 sheet；长内容支持滚动与 IME 避让。保留更新对话框「下载中不可关闭」与错误重试的既有行为。
+
+### 测试 (Tests)
+
+- 单元测试从 70 个增至 101 个，全部通过。新增覆盖：指纹存储的旧 JSON 兼容（缺字段必须为「未知」而非 0）、`null` 集合容错、未知状态名归一、NR NCI 超过 `Int.MAX_VALUE` 的 36-bit 值往返不截断、缺 `nci` 键必须解析为 null、混合 LTE+NR 列表构造。
+
 ## [2.0.0] - 2026-10-09
 
 > 系统层 Hook 的全链路修复版：逐一核对 Android 11–14 AOSP 定位框架源码，修掉长期静默失效的 hook 与坐标系错配；新增「环境指纹」实地采集与回放；把 Wi-Fi / 基站伪造从「清空」改为「自洽」。
@@ -18,7 +91,22 @@
   - 采集入口位于「定位」页新增的「环境指纹」区块，可命名、可指定采集点坐标、可启用 / 停用 / 删除。
   - 指纹落盘于 `filesDir/fingerprints/<id>.json`，经 root 导出至 `/data/local/tmp/fakegps_fp_<id>.json` 供 hook 侧读取；id 通过 `setprop debug.fakegps.fingerprint_id` 发布，并以 `Settings.Global.fake_gps_fingerprint_id` 作为无 root 回退。
   - RSSI 按自由空间路径损耗重标定（`RSSI_B = RSSI_A − 20·log10(d_B/d_A)`，衰减上限 35 dB），时间戳一律重写为当前时刻（`ScanResult.timestamp` 为微秒、`CellInfo.setTimeStamp` 为纳秒）。
-- **新增 33 个单元测试。** 覆盖坐标系转换（含 5 个城市的独立参考值往返）、运动学引擎（哈弗辛距离、外接圆半径退化、曲率限速、OU 高程）、指纹 RSSI 重标定（边界、上限、已连接 AP 底噪）。
+- **新增 70 个单元测试（5 个测试类，全部通过）。** 覆盖坐标系转换（含 5 个城市的独立参考值往返）、运动学引擎（哈弗辛距离、外接圆半径退化、曲率限速、OU 高程）、指纹 RSSI 重标定（边界、上限、已连接 AP 底噪）、路线模型（分段距离累加、跨换日线、重复点、多应用分流 key 唯一性）、语义化版本比较（数值序而非字典序、`v` 前缀、缺段补零、预发布与构建元数据）。
+- **内置更新（OTA）改为自有服务器分发。** 原先依赖 GitHub Release API（未认证仅 60 次/小时、国内常被墙），为绕过限制还接入了 4 个第三方加速镜像（`ghproxy.net` / `gh-proxy.com` / `gh.llkk.cc`）—— 任何一个镜像被劫持都会污染整条更新链路。现改为：优先读取自有服务器的更新清单，GitHub 仅作兜底。
+
+  - 清单地址：`https://aqvtc.icu/downloads/latest.json`（与仓库 `version.json` 同源）。
+  - 下载源顺序：自有服务器版本化文件 → `latest.apk` → jsDelivr → 加速镜像 → GitHub。
+  - 下载完成后**先校验清单声明的 SHA-256，再校验签名**：签名只能证明「是谁签的」，哈希能证明「就是这一个文件」，两者叠加把「信任第三方镜像」降级为「信任签名 + 哈希」。
+  - 更新来源会在界面上标明（官方服务器 / jsDelivr CDN / 加速镜像 / GitHub），便于判断当前走的是哪条链路。
+
+- **新增联系方式。** 支持在 App 内直接反馈问题：
+
+  - 「官方主页 / 联系与反馈」分区显示邮箱 `2224958076@qq.com`，提供**复制邮箱**与**一键发送邮件**（自动带上版本号的反馈主题）。
+  - 原「GitHub 源码仓库」分区改为「官方网站」—— 更新与下载的主入口已迁移到官网。
+  - 「查看 GitHub Releases」按钮改为「查看更新日志」，指向官网更新日志。
+  - 官网页脚与下载区同步展示联系邮箱。
+  - OTA 清单新增 `contact` 字段，便于后续扩展。
+
 - **新增 `/data/local/tmp` 配置通道。** 见下方「修复」中对 SELinux 的说明。
 
 ### 修复 (Fixed)
@@ -57,6 +145,32 @@
 - **GPX 导入泄漏文件描述符。** `RouteSimulationScreen` 取到 `InputStream` 后从不关闭（同项目的 `MapScreen` 用的是正确的 `?.use{}`）。累积后 `EMFILE`，随后连路线库与地图瓦片都无法打开。现改为 `?.use { … }`。
 - **摇杆服务的复活闹钟永不取消。** 从最近任务划掉应用后，500 ms 后闹钟会把摇杆服务拉回来，悬浮窗与伪造定位一起恢复 —— 与 `MockLocationService.onTaskRemoved` 注释中声明已修复的症状完全一致（后者当时只改了自己，漏了这个服务）。此外 API 31+ 上由闹钟在后台启动 `location` 型前台服务会在 `onCreate` 抛 `ForegroundServiceStartNotAllowedException`。现改为与 `MockLocationService` 对齐：划掉即真正停止，不调度复活。
 - **点击回调中对 `collectAsState()` 委托值使用 `!!`。** `RouteSimulationScreen` 的「开始模拟路线」与 `MapDialogs` 的「定位」按钮在组合期判定非空，却在稍后的点击 lambda 中重新读取该委托；`clearWaypoints()` / `deleteRoute()` / 「清除」按钮可在这两次读取之间把状态置空，导致点击时抛 `KotlinNullPointerException`。现改为组合期取局部快照。
+- **删除正在使用的路线后点「开启模拟」会崩进程。** `MapScreen` 的 `LaunchedEffect` 只在航点数 ≥ 2 时把 `routeStage` 置为 `READY`，却没有在航点数回落时退出 `READY`。触发路径：路线页 → 2 个以上航点 → 完成规划 → 点书签 → 删除当前路线（内部调用 `clearWaypoints()`）→ `selectedRoute` 变 null、`drawnWaypoints` 变空，但按钮仍可用 → 点击后用空航点构造 `Route` → `RouteSimulator.simulateRoute` 的 `require(size >= 2)` 抛 `IllegalArgumentException`，而该异常发生在 `MockLocationService.serviceScope.launch` 内、无 `CoroutineExceptionHandler` 兜底，直接崩进程。三层同时修复：`LaunchedEffect` 补 `else if (size < 2)` 退回 `SELECTING`；`RouteSimulator` 改为返回空 flow 并记 WARN，不再 `require`；`RouteBottomPanel` 的「开启模拟」按钮加 `enabled = waypoints.size >= 2`。
+- **导出 GPX 会抛 `TransactionTooLargeException`。** `RouteLibraryScreen` 把整份 GPX 文本放进 `Intent.EXTRA_TEXT`，而 `exportRouteToGpx` 每点约 82 字节且无上限 —— 1 万点的轨迹约 820 KB，经 Binder 打包成 UTF-16 后约 1.6 MB，超过事务上限。现改为写入 `cacheDir/gpx/` 并通过 `FileProvider`（`EXTRA_STREAM` + `FLAG_GRANT_READ_URI_PERMISSION`）分享，外层包 `runCatching` 并在失败时提示。
+- **自定义壁纸在主线程解码与复制（ANR 风险）。** `BackgroundThemeManager.setCustomWallpaper` 由 `rememberLauncherForActivityResult` 回调调用，该回调跑在主线程，复制一张 3–25 MB 的照片会卡住 UI；`AppBackground` 的 `produceState` 同样在 Main 上执行 `BitmapFactory.decodeFile`，全尺寸解码在 4000×3000 的照片上约占 48 MB 堆内存。现 `setCustomWallpaper` 改为 `suspend` 且内部切 `Dispatchers.IO`（调用方 `AboutScreen` 用已有的 `scope` 启动），解码改到 IO 并按 1080×2400 目标做 2 的幂次下采样。
+- **`downloadState` 的 `when` + `as` 双重读取存在 `ClassCastException` 风险。** `AboutScreen` 的 `when (downloadState)` 与分支内的 `downloadState as DownloadStatus.X` 是两次独立读取，而该状态由 `VersionSyncManager` 在 `CoroutineScope(Dispatchers.IO)` 上写入；若期间状态被改写，强转会抛 `ClassCastException` 并崩在组合阶段。现改为在 `when` 前取一次局部快照，三个分支全部改用该快照。
+- **「打开关于页闪退」：更新状态的判定与强转是两次独立读取。** `AppNavigation` 里写的是 `if (showUpdatePrompt && updateStatus is HasUpdate) { ... (updateStatus as HasUpdate).info }` —— `updateStatus` 是 `by` 委托的 Compose `State`，由 `VersionSyncManager.checkForUpdates()` 写入，`is` 判定与 `as` 强转是两次独立读取：判定通过后、强转之前若状态被改写（例如用户同时点了「检查更新」，状态回到 `Checking`），强转即抛 `ClassCastException`，且发生在导航层的组合期，整个界面挂掉。
+  <ul class="cl-ul cl-ul--sub">
+  <li>该缺陷长期存在，但原先更新检查走 GitHub API，国内 10 秒超时后状态停在 `Error` 分支，很难命中 `HasUpdate` 分支；改为自有服务器后响应降到毫秒级，`Idle → Checking → HasUpdate` 快速连续翻转，才稳定触发。</li>
+  <li>修复方式：先取一次快照，判定与取值同源 —— `val statusSnapshot = updateStatus`，随后只使用该快照。</li>
+  <li>同时统一 `AboutScreen` 内的读取：原先 4 处判定读 `syncState`、取值读另一份快照，虽同一重组内一致，但混用会掩盖同类问题，现全部走同一份快照。</li>
+  <li>顺带修正：「联系与反馈」卡片补上 `hazeState = pageHaze`，与页面其它 10 张卡片一致（此前漏传会走不透明兜底分支）。</li>
+  <li>新增 8 个回归用例，其中 `two independent reads can throw ClassCastException when state flips` 复现了缺陷本身，证明两次独立读取确实抛异常。</li>
+  </ul>
+- **地图单击添加路点的分支不可达。** `MapScreen` 用恒为 `false` 的 `isContinuousDrawMode` 控制 `MapEventsReceiver.singleTapConfirmedHelper` 里的 `addWaypoint` 分支，导致点地图没有任何反应 —— 路点只能靠「添加第 N 点」按钮取当前中心点逐个加，而界面也没有任何文案提示可以点地图。现改为直接由「路线页 + `SELECTING` 阶段」推导，与该阶段显示的「添加第 N 点」语义一致。
+- **摇杆尺寸在两处 UI 显示不一致。** `LocationMockScreen` 的滑块初值写死 `140f`，而 `FloatingJoystickService` 的默认值与持久化值为 `130`（`coerceIn(80, 240)`），于是应用内显示「140 dp」而悬浮窗实际渲染 130 dp，只有用户拖动滑块后才会同步。现改为读取该服务使用的同一份 `SharedPreferences`（复用 `FloatingJoystickService.PREFS_NAME` / `KEY_JOYSTICK_SIZE` 常量，不再另写一份字面量）。
+- **不可达页面 `RouteSimulationScreen` 携带的三处缺陷。** 该 composable 全仓库无调用点（`AppNavigation` 的 `Screen.RouteSimulation` 别名从未被用作调用点），以下问题在其被接线前属潜在缺陷，一并修掉：(1) GPX 解析在 `ActivityResult` 回调（Main.immediate）中执行，大型文件会卡住 UI，且成功 Toast 无条件弹出 —— 少于 2 点的 GPX 不会入库却提示「导入成功」；现解析改到 IO，并让 `MapViewModel.importGpx` 回调解析点数，UI 据此区分成功与「点数不足」。(2) 进度条 `onValueChange` 直接接 `seekTo`，每次指针移动都触发 `startForegroundService(ACTION_SEEK)` → 服务端 `currentSessionId++` → 取消并重启整条模拟 flow，拖动一次重启几十次；现加本地拖动状态，`onValueChangeFinished` 才真正 seek。(3) 速度输入框在 `onValueChange` 中被格式化回写，输入 "12.5" 时打到 "12." 会被前一次的 "12" 覆盖，最终可能变成 "125"；现 `applySpeed` 增加 `syncInputField` 参数，输入框路径传 `false`，仅预设档位与滑块回写。
+
+### 修复（第二轮审查，共 9 项）
+
+- **地图页「复位到真机位置」会静默掐断悬浮摇杆的定位注入。** `MapFloatingActions` 的复位按钮无条件调用 `MockLocationEngine.forceCleanAllTestProviders`，而该函数会移除 GPS / NETWORK / PASSIVE / fused 四个 test provider。悬浮摇杆持有另一个 `MockLocationEngine` 实例、其 `isRegistered` 仍为 `true`，而 `inject()` 只在 `!isRegistered || activeProviders.isEmpty()` 时才重新注册 —— 条件恒为 false，于是此后每次 `setTestProviderLocation` 都抛 `IllegalArgumentException` 并被内部 `runCatching` 吞掉：界面显示摇杆开启、浮窗仍在移动，但不再注入任何位置，直到服务重启。项目另外三处调用点都带 `if (!stateRepo.isJoystickActive.value)` 守卫，此处漏了。现补上同样的守卫。
+- **一次「复位」触发两路查询，迟到的回调会把准星拽回。** `requestFreshLocation` 本身会同步回调一次，并在 provider 回调里再回调一次（取消信号挂 15 秒），而复位按钮又独立查询 `getRealDeviceLocation` 并第二次调用 `onResetToRealLocation`。用户在复位后重新瞄准时，迟到的回调会覆盖其操作。现改为单路回调。
+- **应用选择器的搜索会静默覆盖分类筛选。** 在「系统应用」分类下搜索一个用户应用时，原实现在本分类无匹配后回落到全量搜索，于是列表显示用户应用、分段控件仍高亮「系统应用」，而「已筛选 N 个应用」与各分类计数都与可见列表矛盾。现只在本分类内搜索（空态已提供「以包名添加」入口）。
+- **`RouteConfigDialog` 的 `remember` 缺键，root 探测结果被锁死。** `isRootAvailable` 由 ViewModel 异步探测，首帧为 `false`；无键的 `remember` 会把步频开关永久锁在关闭态，探测晚于首帧落地时开关显示关闭而步频实际已开启；调用方改速时滑块也会回弹。现改为 `remember(currentSpeed)` / `remember(isCadenceEnabled, isRootAvailable)`。
+- **排查弹窗向外来作用域投递协程。** `WeChatTroubleshootDialog` 接收调用方的 `CoroutineScope`，在其中运行 root 探测与 `disableWifiBluetoothScan`。关闭弹窗不会取消任务（su 命令照跑、Toast 照弹），而调用方销毁时又会在 `settings put` 序列中途取消它。现改为弹窗自持 `rememberCoroutineScope()`，并用 `NonCancellable` 保护已授权的 su 序列，避免「设置写了一半」。
+- **下载更新后连弹两次系统安装界面。** `VersionSyncManager.startDownload` 在成功后自动调用 `installApk`，而 `AppUpdateDialog` 的 Success 分支同时提供「立即安装」按钮再调一次；状态长期停留在 Success，按钮永不消失。现移除管理器内的自动安装，统一由用户点按钮触发。
+- **Android 12+ 选「大致位置」会导致应用永久卡在待机。** `PermissionHelper.hasLocationPermission` 只检查 `ACCESS_FINE_LOCATION`，而 Android 12+ 的位置权限弹窗允许用户选「大致位置」，此时只授予 `ACCESS_COARSE_LOCATION`。于是 `checkPrimaryPermissions` 返回 `LOCATION_PERMISSION_MISSING`，`PermissionCoordinator` 与 `SimulationViewModel` 全部提前返回，模拟与单点伪装永远无法启动；而 `MainActivity` 是一次性同时请求 FINE + COARSE、只在一个缺失时才重弹，所以选过「大致位置」的用户不会再被提示，只能自己去系统设置里改。现改为 `FINE || COARSE` 任一授予即通过，并新增 `hasOnlyCoarseLocation` 供 UI 给出针对性提示。虚拟定位本身不依赖高精度：注入坐标由用户指定，与设备实际精度无关。
+- **底栏毛玻璃「穿模」。** 底栏位于 `LocalHazeState provides null` 块之外，因此解析到外层 `hazeState`，而外层的 `hazeSource` 挂在包含 `MapScreen` 原生 `AndroidView` 地图的区域上。Haze 只能捕获 Compose 自身绘制的内容，遇到 `AndroidView` 会录到空图层 —— 模糊结果为空、半透明底板下真实地图直接透出。底栏容器色 `GlassBgBar` 的 alpha 为 0.722，低于「不透明兜底」的 0.90 阈值，因此拿不到那条兜底路径。现将底栏也用 `CompositionLocalProvider(LocalHazeState provides null)` 包裹，与 `MapScreen` 的处理方式一致。
 
 ### 优化 (Changed & Performance)
 

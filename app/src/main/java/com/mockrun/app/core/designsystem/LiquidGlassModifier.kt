@@ -55,8 +55,12 @@ object LiquidGlassDefaults {
     const val PREFS_NAME = "fake_gps_ui_prefs"
     const val KEY_LIQUID_GLASS_ENABLED = "is_liquid_glass_enabled"
 
-    /** 设计稿唯一规范：blur 30 · saturate 180% */
-    val BlurRadius = 30.dp
+    /** 增强型高斯模糊半径：36.dp，使背后极光与壁纸呈现饱满奶油散景 */
+    val BlurRadius = 36.dp
+
+    /** 细腻光学磨砂噪点：赋予毛玻璃真实微晶质感，避免像单纯半透明塑料遮罩 */
+    const val NoiseFactorDark = 0.035f
+    const val NoiseFactorLight = 0.025f
 
     fun isEnabled(context: Context): Boolean {
         val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -69,21 +73,30 @@ object LiquidGlassDefaults {
     }
 
     /**
-     * 构造设计稿规范的 HazeStyle。
-     * @param tint 玻璃着色（默认 rgba(20,26,42,.72)）
+     * 构造针对明暗模式分别优化的 HazeStyle。
+     *
+     * 关键修复：
+     *  1. [backgroundColor] 必须传入页面真实底色（而非 Color.Transparent），
+     *     防止 HazeChildNode 在采样边缘或局部录制时混入透明黑导致模糊退化为单薄遮罩；
+     *  2. 亮色与暗色采用不同的着色与微噪点，确保亮色不过白、暗色通透有层次。
      */
     fun glassStyle(
         tint: Color,
+        isDark: Boolean = true,
         blurRadius: Dp = BlurRadius,
-        noiseFactor: Float = 0f
+        noiseFactor: Float = if (isDark) NoiseFactorDark else NoiseFactorLight
     ): HazeStyle {
-        val hazeTint = HazeTint(tint)
+        val baseBg = if (isDark) Color(0xFF090C12) else DesignTokens.LBg0
+        val primaryTint = HazeTint(tint)
+        val fallback = HazeTint(
+            if (isDark) DesignTokens.GlassBgOpaque else DesignTokens.LGlassBgOpaque
+        )
         return HazeStyle(
-            Color.Transparent,
-            hazeTint,
-            blurRadius,
-            noiseFactor,
-            hazeTint
+            backgroundColor = baseBg,
+            tint = primaryTint,
+            blurRadius = blurRadius,
+            noiseFactor = noiseFactor,
+            fallbackTint = fallback
         )
     }
 }
@@ -163,44 +176,95 @@ fun Modifier.liquidGlass(
     val solidThreshold = 0.90f
     val isSolidCta = containerColor != null && containerColor.alpha >= solidThreshold
     val tintColor = containerColor ?: palette.glassBg
+    val effectiveNoise = if (noiseFactor > 0f) {
+        noiseFactor
+    } else if (isDark) {
+        LiquidGlassDefaults.NoiseFactorDark
+    } else {
+        LiquidGlassDefaults.NoiseFactorLight
+    }
 
-    val borderColor = if (isDark) palette.glassLine else palette.glassLine
+    // 分别针对暗色与亮色构建高质感光学边框刷子：
+    // 暗色：左上亮白高光向右下柔和衰减；
+    // 亮色：晶透高光白边叠加微妙冷色立体轮廓，解决白卡在浅底上边界模糊的问题。
+    val borderBrush = remember(isDark, palette.glassLine) {
+        if (isDark) {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.28f),
+                    palette.glassLine,
+                    Color.White.copy(alpha = 0.08f)
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.92f),
+                    Color(0xB3FFFFFF),
+                    Color(0x240F172A)
+                )
+            )
+        }
+    }
 
-    // 投影：设计稿 0 18px 44px -20px rgba(0,0,0,.85)
     val shadowElevation = elevation.coerceIn(0.dp, 26.dp)
-    val spotAlpha = if (isDark) 0.55f else 0.16f
+    val spotColor = if (isDark) {
+        Color.Black.copy(alpha = 0.52f)
+    } else {
+        Color(0xFF0F172A).copy(alpha = 0.14f)
+    }
+    val ambientColor = if (isDark) {
+        Color.Black.copy(alpha = 0.24f)
+    } else {
+        Color(0xFF3B82F6).copy(alpha = 0.08f)
+    }
 
     var modifier = this
         .shadow(
             elevation = shadowElevation,
             shape = shape,
-            spotColor = Color.Black.copy(alpha = spotAlpha),
-            ambientColor = Color.Transparent
+            spotColor = spotColor,
+            ambientColor = ambientColor
         )
 
     modifier = if (isSolidCta) {
         // 实心 CTA：直接铺色，不做模糊
         modifier.clip(shape).background(tintColor, shape)
     } else if (resolvedHaze != null) {
-        // 真毛玻璃：Haze 捕获源层 → 高斯模糊 → tint 着色
+        // 真毛玻璃：Haze 捕获源层 → 36dp 高斯模糊 + 光学噪点 → tint 着色
         modifier
-            .hazeChild(
-                resolvedHaze,
-                shape,
-                LiquidGlassDefaults.glassStyle(tintColor, blurRadius, noiseFactor)
-            )
             .clip(shape)
+            .hazeChild(
+                state = resolvedHaze,
+                shape = shape,
+                style = LiquidGlassDefaults.glassStyle(
+                    tint = tintColor,
+                    isDark = isDark,
+                    blurRadius = blurRadius,
+                    noiseFactor = effectiveNoise
+                )
+            )
+            // 叠加极其微妙的顶部到底部光泽渐变层，增强玻璃立体通透感
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDark) {
+                        listOf(
+                            Color.White.copy(alpha = 0.07f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.10f)
+                        )
+                    } else {
+                        listOf(
+                            Color.White.copy(alpha = 0.32f),
+                            Color.White.copy(alpha = 0.06f),
+                            Color(0x0A3B82F6)
+                        )
+                    }
+                ),
+                shape = shape
+            )
     } else {
-        // ---- 无可用模糊源兜底：输出**不透明**磨砂板 ----
-        //
-        // 触发场景有两条：
-        //   ① 上层根本没提供源（LocalHazeState 为 null 且未显式传 hazeState）；
-        //   ② 提供了源，但源层是 AndroidView 承载的**原生 View**（如 OSMDroid MapView）。
-        //      Haze 仅捕获 Compose 自己绘制的内容，此时录到的图层是空的，模糊结果为空。
-        //
-        // 这两种情况下若仍用 72% 半透明底板，背后的真实内容会硬生生透出来 ——
-        // 观感就是「穿模」（例如右侧 FAB 列从底部抽屉里透出来）。
-        // 因此这里改用不透明磨砂底板 + 描边 + 内高光，读起来仍是一整块实心玻璃。
+        // ---- 无可用模糊源兜底（如原生 MapView 之上）：输出高质感磨砂板 ----
         val opaqueFallback = when {
             containerColor != null && containerColor.alpha >= 0.5f -> containerColor.copy(alpha = 1f)
             isDark -> DesignTokens.GlassBgOpaque
@@ -210,14 +274,14 @@ fun Modifier.liquidGlass(
     }
 
     modifier
-        .border(borderWidth, borderColor, shape)
+        .border(borderWidth, borderBrush, shape)
         .drawBehind {
-            // inset 0 1px 0 rgba(255,255,255,.07) —— 顶部内高光，模拟 Apple 连续曲率
-            val stroke = 1.dp.toPx()
+            // 顶部镜面内高光，模拟 Apple 连续曲率折射
+            val stroke = (if (isDark) 1.dp else 1.25.dp).toPx()
             drawLine(
                 color = palette.glassHighlight,
-                start = Offset(stroke * 4f, stroke / 2f),
-                end = Offset(size.width - stroke * 4f, stroke / 2f),
+                start = Offset(stroke * 6f, stroke / 2f),
+                end = Offset(size.width - stroke * 6f, stroke / 2f),
                 strokeWidth = stroke
             )
         }

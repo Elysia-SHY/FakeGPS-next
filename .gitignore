@@ -29,3 +29,7 @@ build/
 
 # Local agent workspace (per-machine state, not shared source)
 .workbuddy/
+
+# Local scratch: UI overhaul patch scripts, APK signature files
+.patch/
+*.idsig

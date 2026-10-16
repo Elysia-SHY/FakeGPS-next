@@ -20,10 +20,45 @@ enum class PermissionIssueType {
 
 object PermissionHelper {
 
+    /**
+     * 是否具备可用的定位权限。
+     *
+     * 必须同时接受 ACCESS_COARSE_LOCATION。
+     * Android 12+ 的位置权限弹窗允许用户选「大致位置」，此时只授予 COARSE，
+     * FINE 返回 DENIED。原实现只测 FINE，于是：
+     *   checkPrimaryPermissions 返回 LOCATION_PERMISSION_MISSING
+     *   → PermissionCoordinator / SimulationViewModel 全部提前 return
+     *   → 模拟与单点伪装永远无法启动，
+     * 而 MainActivity 是一次性同时请求 FINE+COARSE、只在一个缺失时才重弹，
+     * 所以选过「大致位置」的用户不会再被提示，永久卡在待机，
+     * 只能自己去系统设置里改。这是产品级卡死，不是提示问题。
+     *
+     * 虚拟定位本身不依赖高精度：注入坐标由用户指定，与设备实际精度无关。
+     */
     fun hasLocationPermission(context: Context): Boolean {
-        return ContextCompat.checkSelfPermission(
+        val fine = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        return fine || coarse
+    }
+
+    /**
+     * 是否只拿到了「大致位置」（仅 COARSE，无 FINE）。
+     *
+     * 用于在 UI 上给出针对性提示（可去系统设置改为精确位置），
+     * 而不是复用笼统的「缺少定位权限」文案。
+     */
+    fun hasOnlyCoarseLocation(context: Context): Boolean {
+        val fine = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        return coarse && !fine
     }
 
     fun isMockLocationAppSet(context: Context): Boolean {

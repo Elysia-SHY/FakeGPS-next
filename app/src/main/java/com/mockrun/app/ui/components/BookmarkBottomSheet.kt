@@ -1,6 +1,7 @@
 ﻿package com.mockrun.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,11 +21,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.IosBadgeTone
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosDanger
+import com.mockrun.app.core.designsystem.IosStatusBadge
 import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.designsystem.bouncyClickable
+import com.mockrun.app.core.designsystem.minTouchTarget
 
 /**
  * 收藏夹的两种视图。
@@ -36,6 +41,8 @@ enum class BookmarkKind { LOCATION, TRACK }
 
 /**
  * 右上角工具胶囊旁的收藏夹弹层。
+ *
+ * 弹窗规格：长列表 → ModalBottomSheet 顶角 32dp（规范 B）。
  *
  * @param items 当前标签对应的收藏列表，已由调用方过滤。
  * @param selectedRouteId 用于标注「当前载入」的航线，地点收藏不参与该标记。
@@ -58,7 +65,7 @@ fun BookmarkBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         containerColor = IosColors.SecondaryGroupedBackground,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Surface(
                 modifier = Modifier
@@ -82,7 +89,7 @@ fun BookmarkBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (isLocation) "地点收藏" else "航线收藏",
                         style = IosTypography.Headline,
@@ -92,39 +99,41 @@ fun BookmarkBottomSheet(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = if (isLocation) "收藏本中的地点坐标，点按即可跳转定位" else "收藏本中的模拟航线，点按即可载入",
-                        style = IosTypography.Footnote,
+                        style = IosTypography.Caption1,
                         color = IosColors.SecondaryLabel
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(13.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = "${items.size} 条",
-                        color = IosColors.SystemBlue,
-                        style = IosTypography.Caption1,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+                Spacer(Modifier.width(8.dp))
+                IosStatusBadge(
+                    text = "${items.size} 条",
+                    tone = if (items.isEmpty()) null else IosBadgeTone.INFO
+                )
             }
 
             if (items.isEmpty()) {
+                // 空态按类型区分 —— 两种收藏的引导动作不同，不合并文案。
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
+                        .height(160.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = if (isLocation) Icons.Default.Place else Icons.Default.Route,
-                            contentDescription = null,
-                            tint = IosColors.SecondaryLabel,
-                            modifier = Modifier.size(30.dp)
-                        )
-                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = IosColors.TertiarySystemFill,
+                            modifier = Modifier.size(64.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (isLocation) Icons.Default.Place else Icons.Default.Route,
+                                    contentDescription = null,
+                                    tint = IosColors.SecondaryLabel,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
                         Text(
                             text = if (isLocation) "还没有收藏地点" else "还没有收藏航线",
                             style = IosTypography.Subheadline,
@@ -134,7 +143,7 @@ fun BookmarkBottomSheet(
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = if (isLocation) "在地图上选好位置后点「收藏此点」" else "在路线标签画好航线后点「收藏」",
-                            style = IosTypography.Footnote,
+                            style = IosTypography.Caption1,
                             color = IosColors.SecondaryLabel
                         )
                     }
@@ -160,12 +169,12 @@ fun BookmarkBottomSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
                                     modifier = Modifier.size(32.dp),
-                                    shape = RoundedCornerShape(9.dp),
+                                    shape = AppShapes.icon,
                                     color = if (isLocation) {
                                         IosColors.SystemBlue.copy(alpha = 0.14f)
                                     } else {
@@ -222,14 +231,18 @@ fun BookmarkBottomSheet(
                                     Spacer(Modifier.width(4.dp))
                                 }
 
-                                IconButton(
-                                    onClick = { pendingDelete = route },
-                                    modifier = Modifier.size(30.dp)
+                                // 删除：48dp 热区，视觉图标仍是 18dp
+                                Box(
+                                    modifier = Modifier
+                                        .minTouchTarget()
+                                        .clip(CircleShape)
+                                        .bouncyClickable { pendingDelete = route },
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "删除收藏",
-                                        tint = IosColors.SystemRed,
+                                        tint = IosDanger,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -243,6 +256,7 @@ fun BookmarkBottomSheet(
         }
     }
 
+    // 短确认 → 24dp 圆角 AlertDialog（规范 A）
     pendingDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -262,20 +276,26 @@ fun BookmarkBottomSheet(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onDelete(target)
-                    pendingDelete = null
-                }) {
-                    Text("删除", color = IosColors.SystemRed, fontWeight = FontWeight.Bold, style = IosTypography.Headline)
+                TextButton(
+                    onClick = {
+                        onDelete(target)
+                        pendingDelete = null
+                    },
+                    modifier = Modifier.minTouchTarget()
+                ) {
+                    Text("删除", color = IosDanger, fontWeight = FontWeight.Bold, style = IosTypography.Headline)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) {
+                TextButton(
+                    onClick = { pendingDelete = null },
+                    modifier = Modifier.minTouchTarget()
+                ) {
                     Text("取消", color = IosColors.SecondaryLabel, style = IosTypography.Headline)
                 }
             },
             containerColor = IosColors.SecondaryGroupedBackground,
-            shape = RoundedCornerShape(18.dp)
+            shape = RoundedCornerShape(24.dp)
         )
     }
 }

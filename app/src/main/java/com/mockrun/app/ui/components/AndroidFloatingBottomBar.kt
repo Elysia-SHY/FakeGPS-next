@@ -56,8 +56,8 @@ fun AndroidFloatingBottomBar(
     val isDark = palette.isDark
     val tabCount = tabs.size.coerceAtLeast(1)
 
-    // 设计稿 .tabbar —— 72dp 高 / r36 浮空玻璃药丸 / 左右 14dp / 底距 22dp
-    Surface(
+    // 设计稿 .tabbar —— 72dp 高 / r36 浮空玻璃药丸 / 左右 14dp / 底距 6dp
+    Box(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 6.dp)
@@ -69,9 +69,7 @@ fun AndroidFloatingBottomBar(
                 shape = AppShapes.bar,
                 elevation = 18.dp,
                 containerColor = IosColors.GlassBgBar
-            ),
-        shape = AppShapes.bar,
-        color = Color.Transparent
+            )
     ) {
         BoxWithConstraints(
             modifier = Modifier

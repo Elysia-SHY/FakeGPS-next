@@ -1106,6 +1106,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
         val cellInfoWcdmaClass = XposedHelpers.findClassIfExists("android.telephony.CellInfoWcdma", lpparam.classLoader)
         val cellIdentityWcdmaClass = XposedHelpers.findClassIfExists("android.telephony.CellIdentityWcdma", lpparam.classLoader)
         val cellSignalWcdmaClass = XposedHelpers.findClassIfExists("android.telephony.CellSignalStrengthWcdma", lpparam.classLoader)
+        // NR (5G). 缺失时 buildCellInfoList 会跳过 NR 条目并记日志，不影响 LTE/GSM/WCDMA。
+        val cellInfoNrClass = XposedHelpers.findClassIfExists("android.telephony.CellInfoNr", lpparam.classLoader)
+        val cellIdentityNrClass = XposedHelpers.findClassIfExists("android.telephony.CellIdentityNr", lpparam.classLoader)
+        val cellSignalNrClass = XposedHelpers.findClassIfExists("android.telephony.CellSignalStrengthNr", lpparam.classLoader)
 
         // ---------------- Wi-Fi ----------------
         if (wifiManagerClass != null) {
@@ -1176,7 +1180,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             fp, spoof.latitude, spoof.longitude,
                             cellInfoLteClass, cellIdentityLteClass, cellSignalLteClass, cellConfigLteClass,
                             cellInfoGsmClass, cellIdentityGsmClass, cellSignalGsmClass,
-                            cellInfoWcdmaClass, cellIdentityWcdmaClass, cellSignalWcdmaClass
+                            cellInfoWcdmaClass, cellIdentityWcdmaClass, cellSignalWcdmaClass,
+                            cellInfoNrClass, cellIdentityNrClass, cellSignalNrClass
                         )
                         if (list.isNotEmpty()) param.result = list
                     }
@@ -1202,7 +1207,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
                             fp, spoof.latitude, spoof.longitude,
                             cellInfoLteClass, cellIdentityLteClass, cellSignalLteClass, cellConfigLteClass,
                             cellInfoGsmClass, cellIdentityGsmClass, cellSignalGsmClass,
-                            cellInfoWcdmaClass, cellIdentityWcdmaClass, cellSignalWcdmaClass
+                            cellInfoWcdmaClass, cellIdentityWcdmaClass, cellSignalWcdmaClass,
+                            cellInfoNrClass, cellIdentityNrClass, cellSignalNrClass
                         )
                         if (list.isEmpty()) return
 
@@ -1591,34 +1597,49 @@ class XposedLocationHook : IXposedHookLoadPackage {
             return
         }
 
-        // getScanResults() -> Return empty list
-        runCatching {
-            XposedBridge.hookAllMethods(wmClass, "getScanResults", object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val spoof = getActiveLocation() ?: return
-                    if (spoof.isActive) {
-                        param.result = java.util.ArrayList<Any>()
-                    }
-                }
-            })
-        }.logFailure(TAG, "hook WifiManager.getScanResults")
+        // 注意：这里**不再**把 getScanResults 置空。
+        //
+        // 与 hookSystemWifiService 同因：「有 GPS 星数 + 零 Wi-Fi」在物理上不成立，
+        // 风控 SDK 拿这个矛盾一测一个准，比暴露真实 AP 更可疑。
+        // 需要遮蔽时应回放指纹（见 hookFingerprintReplay）；读不到指纹就什么都不做，
+        // 让真实值透出。
 
-        // getConnectionInfo() -> Mask BSSID
+        // getConnectionInfo() -> 遮蔽 BSSID / MAC
         runCatching {
             XposedBridge.hookAllMethods(wmClass, "getConnectionInfo", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val spoof = getActiveLocation() ?: return
-                    if (spoof.isActive) {
-                        val wifiInfo = param.result ?: return
-                        runCatching {
-                            XposedHelpers.setObjectField(wifiInfo, "mBSSID", "02:00:00:00:00:00")
-                            XposedHelpers.setObjectField(wifiInfo, "mMacAddress", "02:00:00:00:00:00")
-                        }.logFailure(
-                            TAG,
-                            "mask WifiInfo BSSID/MAC — field names absent on this ROM, real BSSID leaked",
-                            Diag.Level.DEBUG
-                        )
-                    }
+                    if (!spoof.isActive) return
+                    val wifiInfo = param.result ?: return
+                    runCatching {
+                        // 不能再用 02:00:00:00:00:00 —— AOSP 明确把它定义为
+                        // 「调用者权限不足」的哨兵值（WifiInfo.DEFAULT_MAC_ADDRESS）。
+                        // 保留真实 OUI 前三字节、只随机化后三字节，
+                        // 看起来像「换了一个同厂商的 AP」。
+                        val real = XposedHelpers.getObjectField(wifiInfo, "mBSSID") as? String
+                        val newBssid = if (real != null && real.length == 17 &&
+                            real != "02:00:00:00:00:00"
+                        ) {
+                            val r = java.util.Random(
+                                spoof.latitude.hashCode().toLong() xor spoof.longitude.hashCode().toLong()
+                            )
+                            "%s:%02X:%02X:%02X".format(
+                                real.substring(0, 8), r.nextInt(256), r.nextInt(256), r.nextInt(256)
+                            )
+                        } else {
+                            val r = java.util.Random(SystemClock.elapsedRealtime())
+                            "%02X:%02X:%02X:%02X:%02X:%02X".format(
+                                (r.nextInt(256) and 0xFE), r.nextInt(256), r.nextInt(256),
+                                r.nextInt(256), r.nextInt(256), r.nextInt(256)
+                            )
+                        }
+                        XposedHelpers.setObjectField(wifiInfo, "mBSSID", newBssid)
+                        XposedHelpers.setObjectField(wifiInfo, "mMacAddress", newBssid)
+                    }.logFailure(
+                        TAG,
+                        "mask WifiInfo BSSID/MAC — field names absent on this ROM, real BSSID leaked",
+                        Diag.Level.WARN
+                    )
                 }
             })
         }.logFailure(TAG, "hook WifiManager.getConnectionInfo")

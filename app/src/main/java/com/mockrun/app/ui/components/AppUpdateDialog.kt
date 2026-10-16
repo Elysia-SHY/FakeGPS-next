@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -35,9 +36,24 @@ import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.RemoteReleaseInfo
 import com.mockrun.app.core.data.repository.VersionSyncManager
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosDanger
+import com.mockrun.app.core.designsystem.IosSuccess
+import com.mockrun.app.core.designsystem.IosTypography
+import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.liquidGlass
+import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.util.Diag
 
+/**
+ * 品牌更新对话框。
+ *
+ * 弹窗规范例外：本弹窗是唯一使用 28dp 圆角的 Dialog
+ * （规范 A = 24dp 短确认，规范 B = 32dp sheet）。
+ *
+ * **下载中不可关闭是有意为之**：`dismissOnBackPress` / `dismissOnClickOutside`
+ * 在 [DownloadStatus.Downloading] 期间都为 false，用户必须显式点「取消下载」。
+ * 不要为了「所有弹窗可随意关」把这个行为统一掉。
+ */
 @Composable
 fun AppUpdateDialog(
     info: RemoteReleaseInfo,
@@ -72,9 +88,14 @@ fun AppUpdateDialog(
             shape = RoundedCornerShape(28.dp),
             color = if (isLiquidGlass) Color.Transparent else if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
         ) {
+            // 内容可滚动：错误详情展开后叠加长更新日志，小屏会超出对话框可视高度，
+            // 滚动保证「重试下载 / 关闭」始终可达。上限取屏幕高度的 78%。
+            val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.78f).dp
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = maxDialogHeight)
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -192,7 +213,7 @@ fun AppUpdateDialog(
                             onClick = { VersionSyncManager.startDownload(context, info) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp),
+                                .height(48.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = IosColors.SystemBlue
@@ -213,18 +234,23 @@ fun AppUpdateDialog(
                             TextButton(
                                 onClick = {
                                     try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseHtmlUrl))
+                                        val targetUrl = info.releaseHtmlUrl.ifBlank { info.downloadUrl }
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        // Silent to the user (button just no-ops), but recorded for diagnosis
                                         Diag.d("AppUpdateDialog", "open browser for release page failed: ${e.message}")
+                                        android.widget.Toast.makeText(context, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
                                     }
-                                }
+                                },
+                                modifier = Modifier.minTouchTarget()
                             ) {
                                 Text("浏览器下载", fontSize = 12.5.sp, color = IosColors.SecondaryLabel)
                             }
 
-                            TextButton(onClick = onDismiss) {
+                            TextButton(
+                                onClick = onDismiss,
+                                modifier = Modifier.minTouchTarget()
+                            ) {
                                 Text("稍后提醒", fontSize = 13.sp, color = IosColors.SecondaryLabel)
                             }
                         }
@@ -297,7 +323,7 @@ fun AppUpdateDialog(
                                 onClick = { VersionSyncManager.cancelDownload() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(42.dp),
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Text("取消下载", fontSize = 13.5.sp, color = IosColors.SecondaryLabel)
@@ -317,57 +343,86 @@ fun AppUpdateDialog(
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = IosColors.SystemGreen,
+                                    tint = IosSuccess,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "下载完成，正在调起安装...",
+                                    text = "安装包下载完成并已通过安全校验",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.SystemGreen
+                                    color = IosSuccess
                                 )
                             }
 
                             Spacer(Modifier.height(12.dp))
 
-                            Button(
-                                onClick = { VersionSyncManager.installApk(context, state.file) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = IosColors.SystemGreen
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("立即安装", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                OutlinedButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Text("稍后", fontSize = 13.5.sp)
+                                }
+
+                                Button(
+                                    onClick = { VersionSyncManager.installApk(context, state.file) },
+                                    modifier = Modifier
+                                        .weight(1.4f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = IosSuccess
+                                    )
+                                ) {
+                                    Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("立即安装", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                }
                             }
                         }
                     }
 
                     is DownloadStatus.Error -> {
+                        // 错误详情默认 2 行省略，长错误（HTTP 状态 + 堆栈摘要）
+                        // 由用户点按展开，避免撑破对话框。
+                        var errorExpanded by remember(state.message) { mutableStateOf(false) }
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .minTouchTarget()
+                                    .bouncyClickable { errorExpanded = !errorExpanded },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
                                     Icons.Default.ErrorOutline,
                                     contentDescription = null,
-                                    tint = IosColors.SystemRed,
+                                    tint = IosDanger,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
                                     text = state.message,
                                     fontSize = 12.5.sp,
-                                    color = IosColors.SystemRed,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+                                    color = IosDanger,
+                                    maxLines = if (errorExpanded) Int.MAX_VALUE else 2,
+                                    overflow = if (errorExpanded) TextOverflow.Visible else TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = if (errorExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (errorExpanded) "收起错误详情" else "展开错误详情",
+                                    tint = IosDanger,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
@@ -381,7 +436,7 @@ fun AppUpdateDialog(
                                     onClick = onDismiss,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(44.dp),
+                                        .height(48.dp),
                                     shape = RoundedCornerShape(16.dp)
                                 ) {
                                     Text("关闭", fontSize = 13.5.sp)
@@ -391,7 +446,7 @@ fun AppUpdateDialog(
                                     onClick = { VersionSyncManager.startDownload(context, info) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(44.dp),
+                                        .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = IosColors.SystemBlue

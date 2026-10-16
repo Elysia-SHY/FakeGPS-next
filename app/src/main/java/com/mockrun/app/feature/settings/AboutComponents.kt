@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.feature.settings
+package com.mockrun.app.feature.settings
 
 import android.content.Context
 import android.content.Intent
@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.minTouchTarget
 
 @Composable
 fun ChangelogDialog(
@@ -35,7 +37,6 @@ fun ChangelogDialog(
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -61,7 +62,7 @@ fun ChangelogDialog(
                     text = dialogContent,
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
-                    color = if (isDark) Color(0xFFE0E0E0) else Color(0xFF2C2C2E)
+                    color = IosColors.Label
                 )
             }
         },
@@ -69,15 +70,18 @@ fun ChangelogDialog(
             Button(
                 onClick = {
                     try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Elysia-SHY/FakeGPS-next/releases"))
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(com.mockrun.app.core.data.repository.VersionSyncManager.CHANGELOG_URL)
+                        )
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        Toast.makeText(context, "无法打开发布页面", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "无法打开更新日志", Toast.LENGTH_SHORT).show()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
             ) {
-                Text("查看 GitHub Releases", color = Color.White)
+                Text("在线更新日志", color = Color.White)
             }
         },
         dismissButton = {
@@ -85,8 +89,8 @@ fun ChangelogDialog(
                 Text("关闭", color = IosColors.SystemBlue)
             }
         },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White
+        shape = AppShapes.card,
+        containerColor = IosColors.SecondaryGroupedBackground
     )
 }
 
@@ -104,7 +108,7 @@ fun DiagnosticRow(label: String, value: String) {
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
-            color = if (isDark) Color.White else Color.Black
+            color = IosColors.Label
         )
     }
 }
@@ -121,7 +125,8 @@ fun CreditItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(9.dp))
+            .minTouchTarget()
+            .clip(AppShapes.chip)
             .clickable {
                 try {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
@@ -147,7 +152,7 @@ fun CreditItem(
                     text = name,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.Black
+                    color = IosColors.Label
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
@@ -215,7 +220,7 @@ fun FeatureItem(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isDark) Color.White else Color.Black
+                color = IosColors.Label
             )
 
             if (tags.isNotEmpty()) {

@@ -81,19 +81,63 @@ fun LocationMockScreen(
     var showAppPickerSheet by remember { mutableStateOf(false) }
 
     // 环境指纹状态
+    //
+    // 原来 activeFingerprintId 只 remember(null)，页面切走再回来就显示"未启用"，
+    // 但 hook 侧发布的 id 其实还在 —— 界面状态与实际回放状态不一致。
+    // 现在启动时从 Coordinator 读回真实发布的 id。
     var fingerprintIds by remember { mutableStateOf(FingerprintStore.list(context)) }
     var fingerprintSummaries by remember { mutableStateOf(emptyMap<String, String>()) }
-    var activeFingerprintId by remember { mutableStateOf<String?>(null) }
+    var activeFingerprintId by remember {
+        mutableStateOf(FingerprintCoordinator.readPublishedId(context).takeIf { it.isNotBlank() })
+    }
     var isCapturingFingerprint by remember { mutableStateOf(false) }
     var showFingerprintCaptureDialog by remember { mutableStateOf(false) }
+    // 采集结果反馈：失败/部分成功不能只闪一个 Toast 就消失
+    var captureResult by remember { mutableStateOf<CaptureFeedback?>(null) }
+    // 待确认删除的指纹 id（删除是不可逆操作，原实现点一下就删）
+    var pendingDeleteFingerprintId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(fingerprintIds) {
-        fingerprintSummaries = fingerprintIds.associateWith { fid ->
-            FingerprintStore.load(context, fid)?.let { FingerprintStore.summary(it) } ?: ""
-        }
+    // 用 fingerprintIds + 一个自增的刷新计数当 key。
+    //
+    // 原实现只用 fingerprintIds 当 key：同名覆盖后文件名列表完全相等，
+    // Compose 的结构性相等判断不触发重组，列表里会一直显示旧摘要，
+    // 看起来像"采了没反应"。加 reloadToken 后每次采集成功都强制重载。
+    var reloadToken by remember { mutableIntStateOf(0) }
+
+    // 指纹详情（时间、坐标）与摘要一起在副作用里加载。
+    // 不在 forEach 里用 remember 读文件：列表变化时 remember 的槽位会错位，
+    // 显示的可能不是当前这一行的指纹。
+    var fingerprintDetails by remember {
+        mutableStateOf(emptyMap<String, com.mockrun.app.core.location.fingerprint.EnvironmentFingerprint>())
     }
 
-    var joystickSizeDp by remember { mutableFloatStateOf(140f) }
+    LaunchedEffect(fingerprintIds, reloadToken) {
+        val loaded = fingerprintIds.associateWith { fid ->
+            FingerprintStore.load(context, fid)
+        }
+        fingerprintSummaries = loaded.mapValues { (_, fp) ->
+            fp?.let { FingerprintStore.summary(it) } ?: ""
+        }
+        fingerprintDetails = loaded.filterValues { it != null }
+            .mapValues { (_, fp) -> fp!! }
+        // 列表刷新后同步一次真实的启用状态，避免显示与实际回放不符
+        activeFingerprintId = FingerprintCoordinator.readPublishedId(context)
+            .takeIf { it.isNotBlank() && it in fingerprintIds }
+    }
+
+    // 初值必须与 FloatingJoystickService 的默认值一致（130 dp）。
+    // 原实现写死 140f，导致界面显示「140 dp」而悬浮窗实际渲染 130 dp ——
+    // 两者可见地不一致，且只有用户拖动滑块后才会同步。
+    // 这里直接读该服务使用的同一份 SharedPreferences，避免再写一份常量。
+    var joystickSizeDp by remember {
+        mutableFloatStateOf(
+            context.getSharedPreferences(
+                FloatingJoystickService.PREFS_NAME, Context.MODE_PRIVATE
+            ).getInt(FloatingJoystickService.KEY_JOYSTICK_SIZE, 130)
+                .coerceIn(80, 240)
+                .toFloat()
+        )
+    }
     var realLocationCoord by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var permissionIssueDialogType by remember { mutableStateOf<PermissionIssueType?>(null) }
 
@@ -115,6 +159,48 @@ fun LocationMockScreen(
         ?: selectedTargetLocation?.longitude
         ?: realLocationCoord?.second
         ?: 116.4074
+
+    // 当前主控坐标的来源，供采集对话框提示用户"这个默认值是不是你实际站的位置"。
+    // 采集坐标是回放时重标定 RSSI 的输入，默认值取错会让整包指纹失真。
+    val activeCoordSourceLabel = when {
+        pointMockLocation != null -> "主控虚拟点"
+        joystickLocation != null -> "摇杆漫游点"
+        selectedTargetLocation != null -> "地图选定点"
+        realLocationCoord != null -> "真机物理定位"
+        else -> "默认坐标（未获取到任何定位）"
+    }
+    // 同上，落库时用枚举名而不是中文短语，便于回放端与后续分析按值判断。
+    val coordSourceTag = when {
+        pointMockLocation != null -> "MOCK_TARGET"
+        joystickLocation != null -> "MOCK_TARGET"
+        selectedTargetLocation != null -> "MOCK_TARGET"
+        realLocationCoord != null -> "DEVICE"
+        else -> "MANUAL"
+    }
+
+    // 环境指纹采集专用坐标（实地采集优先直取真机物理真实定位，杜绝误用选定模拟点）
+    val captureRealCoord = realLocationCoord ?: CoordinateConverter.getRealDeviceLocation(context)
+    val captureDefaultLat = captureRealCoord?.first ?: activeLat
+    val captureDefaultLon = captureRealCoord?.second ?: activeLon
+    val captureCoordSourceLabel = when {
+        captureRealCoord != null -> "真机物理定位"
+        pointMockLocation != null -> "主控虚拟点"
+        joystickLocation != null -> "摇杆漫游点"
+        selectedTargetLocation != null -> "地图选定点"
+        else -> "默认坐标（未获取到任何定位）"
+    }
+
+    val onTriggerFingerprintCapture: () -> Unit = {
+        // 打开弹窗前优先抓取最新物理硬件定位并触发刷新
+        val fresh = CoordinateConverter.getRealDeviceLocation(context)
+        if (fresh != null) {
+            realLocationCoord = fresh
+        }
+        CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
+            realLocationCoord = freshLat to freshLon
+        }
+        showFingerprintCaptureDialog = true
+    }
 
     var currentAddress by remember { mutableStateOf("正在解析地址...") }
 
@@ -196,7 +282,7 @@ fun LocationMockScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 140.dp),
+                .padding(bottom = ScreenInsets.bottomInset(extra = 16.dp)),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
         // =====================================================================
@@ -211,16 +297,47 @@ fun LocationMockScreen(
         )
 
         // =====================================================================
-        // 反检测排查警告条（设计稿 .alert —— 橙渐变 + 36dp 图标 + 行动链接）
+        // 反检测排查入口（原为常显橙渐变警告条，压过主控操作）。
+        //
+        // 现在默认折叠为一行次级入口：日常操作（选点、开关虚拟定位）不再被
+        // 橙色警示抢占视觉重心，遇到「仍显示真实位置」时点开即可看到完整说明。
+        // 功能与文案一字未删，只是默认收起。
         // =====================================================================
-        IosAlertBanner(
-            title = "微信/打卡软件仍显示真实位置？",
-            subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
-            actionText = "排查解决",
-            onAction = { showWeChatGuideSheet = true },
-            icon = Icons.Default.Info,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        var showTroubleshootHint by remember { mutableStateOf(false) }
+
+        IosInsetGroupCard(hazeState = pageHaze) {
+            IosListRow(
+                title = "微信/打卡软件仍显示真实位置？",
+                subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
+                icon = Icons.Default.Info,
+                iconBackground = IosColors.SystemOrange,
+                trailingText = if (showTroubleshootHint) "收起" else "排查",
+                showChevron = !showTroubleshootHint,
+                onClick = { showTroubleshootHint = !showTroubleshootHint }
+            )
+
+            AnimatedVisibility(visible = showTroubleshootHint) {
+                Column {
+                    IosHairlineDivider(startIndent = 58.dp)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            text = "若目标应用仍读取到真实位置，通常是系统级 Wi‑Fi / 蓝牙背景扫描" +
+                                "仍在回传真实周边环境。可在下方「系统防护与保活状态」中开启 " +
+                                "Root 注入模式，由系统底层关闭扫描并分发虚拟坐标。",
+                            style = IosTypography.Footnote,
+                            color = IosColors.SecondaryLabel
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        IosPrimaryButton(
+                            text = "查看完整排查指南",
+                            containerColor = IosColors.SystemOrange,
+                            icon = Icons.Default.Build,
+                            onClick = { showWeChatGuideSheet = true }
+                        )
+                    }
+                }
+            }
+        }
 
         // =====================================================================
         // 2. Target Location & Primary Master Controller (iOS Inset Group Card)
@@ -256,8 +373,28 @@ fun LocationMockScreen(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = "WGS-84: ${"%.6f".format(activeLat)}, ${"%.6f".format(activeLon)}",
-                        style = IosTypography.Footnote,
+                        style = IosTypography.Mono13,
                         color = IosColors.SecondaryLabel
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    // 标明这个坐标从哪来。它不是装饰性元数据 —— 环境指纹回放时
+                    // 用它重标定 RSSI，用户必须知道当前值是自己选的点还是真机位置。
+                    Text(
+                        text = when {
+                            pointMockLocation != null -> "来源：主控虚拟点"
+                            joystickLocation != null -> "来源：摇杆漫游点"
+                            selectedTargetLocation != null -> "来源：地图选定点"
+                            realLocationCoord != null -> "来源：真机物理定位"
+                            else -> "来源：默认坐标（未获取到定位）"
+                        },
+                        style = IosTypography.Caption2,
+                        color = if (realLocationCoord == null && pointMockLocation == null &&
+                            joystickLocation == null && selectedTargetLocation == null
+                        ) {
+                            IosColors.SystemOrange
+                        } else {
+                            IosColors.TertiaryLabel
+                        }
                     )
                 }
                 IconButton(
@@ -266,9 +403,10 @@ fun LocationMockScreen(
                         cb?.setPrimaryClip(ClipData.newPlainText("Coordinates", "$activeLat, $activeLon"))
                         Toast.makeText(context, "已复制经纬度坐标", Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier.size(30.dp)
+                    // 原为 30dp，低于 48dp 最小触区
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "复制", tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = "复制坐标", tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -353,7 +491,12 @@ fun LocationMockScreen(
         // =====================================================================
         // 2.5 环境指纹（实地采集 Wi-Fi / 基站 / 蓝牙，之后在虚拟点回放）
         // =====================================================================
-        IosSectionHeader("环境指纹（实地采集）")
+        IosGroupHeader(
+            title = "环境指纹",
+            count = fingerprintIds.size.takeIf { it > 0 },
+            linkText = "实地采集",
+            onLinkClick = onTriggerFingerprintCapture
+        )
 
         IosInsetGroupCard(hazeState = pageHaze) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -375,33 +518,55 @@ fun LocationMockScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Button(
-                        onClick = { showFingerprintCaptureDialog = true },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isCapturingFingerprint,
-                        colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
-                    ) {
-                        if (isCapturingFingerprint) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("采集中…", style = IosTypography.Footnote)
-                        } else {
-                            Icon(Icons.Filled.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("采集当前地点", style = IosTypography.Footnote)
+                IosPrimaryButton(
+                    text = "采集当前地点",
+                    containerColor = IosColors.SystemBlue,
+                    icon = Icons.Filled.Wifi,
+                    loading = isCapturingFingerprint,
+                    loadingText = "采集中…",
+                    onClick = onTriggerFingerprintCapture
+                )
+
+                // 采集结果反馈：失败或部分成功必须留在页面上，
+                // 不能只闪一个 Toast —— 用户看不到原因就无法判断该怎么办。
+                captureResult?.let { result ->
+                    Spacer(Modifier.height(12.dp))
+                    FingerprintResultCard(
+                        result = result,
+                        onDismiss = { captureResult = null },
+                        onRetry = {
+                            captureResult = null
+                            onTriggerFingerprintCapture()
                         }
-                    }
+                    )
                 }
 
-                if (fingerprintIds.isNotEmpty()) {
+                if (fingerprintIds.isEmpty()) {
+                    // 原实现只在非空时渲染列表，没有指纹时页面上只有一段说明，
+                    // 用户看不出"还没有采集过"还是"采集失败了"。
+                    Spacer(Modifier.height(14.dp))
+                    IosHairlineDivider(startIndent = 0.dp)
+                    Spacer(Modifier.height(14.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "还没有采集过环境指纹",
+                            style = IosTypography.Headline,
+                            color = IosColors.Label
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "站在目标地点、关闭虚拟定位后点上方按钮开始采集。",
+                            style = IosTypography.Footnote,
+                            color = IosColors.SecondaryLabel,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    IosHairlineDivider(startIndent = 0.dp)
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = "已保存 (${fingerprintIds.size})".uppercase(),
@@ -413,7 +578,8 @@ fun LocationMockScreen(
 
                     fingerprintIds.forEach { fid ->
                         val isActiveFp = fid == activeFingerprintId
-                        Row(
+                        val detail = fingerprintDetails[fid]
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
@@ -421,34 +587,63 @@ fun LocationMockScreen(
                                     if (isActiveFp) IosColors.SystemBlue.copy(alpha = 0.12f)
                                     else Color.Transparent
                                 )
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = fid,
-                                    style = IosTypography.Footnote,
-                                    color = IosColors.Label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                fingerprintSummaries[fid]?.let {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = it,
-                                        style = IosTypography.Caption2,
-                                        color = IosColors.SecondaryLabel
+                                        text = fid,
+                                        style = IosTypography.Footnote,
+                                        color = IosColors.Label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    // 采集时间与坐标让用户能认出"这是哪个地点采的"。
+                                    // 坐标是回放时重标定 RSSI 的输入，不是装饰元数据。
+                                    detail?.let { fp ->
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = formatCapturedAt(fp.capturedAt) +
+                                                " · ${"%.5f".format(fp.originLat)}, ${"%.5f".format(fp.originLon)}",
+                                            style = IosTypography.Mono13,
+                                            color = IosColors.TertiaryLabel,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    fingerprintSummaries[fid]?.takeIf { it.isNotBlank() }?.let {
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = it,
+                                            style = IosTypography.Caption2,
+                                            color = IosColors.SecondaryLabel
+                                        )
+                                    }
+                                }
+
+                                if (isActiveFp) {
+                                    IosStatusBadge(
+                                        text = "已启用",
+                                        running = true,
+                                        tone = IosBadgeTone.RUNNING
                                     )
                                 }
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = if (isActiveFp) "已启用" else "启用",
-                                    style = IosTypography.Caption1,
-                                    color = if (isActiveFp) IosColors.SystemGreen else IosColors.SystemBlue,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.bouncyClickable {
+                            Spacer(Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 「已启用」不再是一个既能看状态又能反向停用的按钮，
+                                // 状态归状态徽章，动作归动作按钮，避免误读与误触。
+                                IosGhostButton(
+                                    text = if (isActiveFp) "停用" else "启用",
+                                    modifier = Modifier.weight(1f),
+                                    height = 48.dp,
+                                    onClick = {
                                         if (isActiveFp) {
                                             FingerprintCoordinator.deactivate(context)
                                             activeFingerprintId = null
@@ -458,28 +653,28 @@ fun LocationMockScreen(
                                             activeFingerprintId = if (ok) fid else null
                                             Toast.makeText(
                                                 context,
-                                                if (ok) "已启用 $fid" else "导出失败：需要 root 写入 /data/local/tmp",
+                                                if (ok) "已启用 $fid"
+                                                else "导出失败：需要 root 写入 /data/local/tmp",
                                                 Toast.LENGTH_SHORT
                                             ).show()
                                         }
                                     }
                                 )
 
-                                Text(
+                                IosGhostButton(
                                     text = "删除",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SystemRed,
-                                    modifier = Modifier.bouncyClickable {
-                                        FingerprintStore.delete(context, fid)
-                                        if (activeFingerprintId == fid) {
-                                            FingerprintCoordinator.deactivate(context)
-                                            activeFingerprintId = null
-                                        }
-                                        fingerprintIds = FingerprintStore.list(context)
-                                        fingerprintSummaries = fingerprintSummaries - fid
+                                    contentColor = IosColors.SystemRed,
+                                    modifier = Modifier.weight(1f),
+                                    height = 48.dp,
+                                    onClick = {
+                                        pendingDeleteFingerprintId = fid
                                     }
                                 )
                             }
+                        }
+
+                        if (fid != fingerprintIds.last()) {
+                            Spacer(Modifier.height(8.dp))
                         }
                     }
                 }
@@ -491,28 +686,12 @@ fun LocationMockScreen(
         // =====================================================================
         // 3. Multi-Target Per-App Virtualization Routing (iOS Inset Group Card)
         // =====================================================================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "多应用独立分流 (${multiTargetRules.size})".uppercase(),
-                style = IosTypography.Footnote,
-                color = IosColors.SecondaryLabel,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Text(
-                text = "+ 添加分流应用",
-                style = IosTypography.Footnote,
-                color = IosColors.SystemBlue,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.bouncyClickable { showAppPickerSheet = true }
-            )
-        }
+        IosGroupHeader(
+            title = "多应用独立分流",
+            count = multiTargetRules.size,
+            linkText = "添加分流应用",
+            onLinkClick = { showAppPickerSheet = true }
+        )
 
         IosInsetGroupCard(hazeState = pageHaze) {
             if (multiTargetRules.isEmpty()) {
@@ -629,7 +808,9 @@ fun LocationMockScreen(
                                 joystickSizeDp = it
                                 simulationViewModel.setJoystickSize(context, it.toInt())
                             },
-                            valueRange = 80f..220f,
+                            // 与服务端 FloatingJoystickService 的 coerceIn(80, 240) 对齐。
+                            // 原上限 220 会让存过 240 的用户在界面上被卡在 220，拖不回原值。
+                            valueRange = 80f..240f,
                             colors = SliderDefaults.colors(thumbColor = IosColors.SystemBlue, activeTrackColor = IosColors.SystemBlue)
                         )
                     }
@@ -640,28 +821,13 @@ fun LocationMockScreen(
         // =====================================================================
         // 4. System Shield & Health Matrix (iOS Inset Grouped Table)
         // =====================================================================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "系统防护与保活状态".uppercase(),
-                style = IosTypography.Footnote,
-                color = IosColors.SecondaryLabel,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Text(
-                text = "使用指南",
-                style = IosTypography.Footnote,
-                color = IosColors.SystemBlue,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.bouncyClickable { showHelpSheet = true }
-            )
-        }
+        IosGroupHeader(
+            title = "系统防护与保活状态",
+            linkText = "使用指南",
+            onLinkClick = { showHelpSheet = true },
+            // 「使用指南」不是新增动作，去掉默认的加号图标
+            linkIcon = null
+        )
 
         IosInsetGroupCard(hazeState = pageHaze) {
             // Item 0: Developer Options Mock Location App Check
@@ -796,12 +962,14 @@ fun LocationMockScreen(
             IosHairlineDivider(startIndent = 58.dp)
 
             // Item 3: Notification
+            // 注意：这里只能证明「通知权限已允许」，不能证明前台服务正在运行。
+            // 原文案用「运行中」把权限状态说成了服务状态，属于过度承诺，已改正。
             IosListRow(
                 title = "常驻前台通知",
-                subtitle = if (areNotificationsEnabled) "前台服务运行中 · 提升后台留存" else "未开启通知保护 (易被系统清理)",
+                subtitle = if (areNotificationsEnabled) "通知已允许 · 可提升后台留存" else "未开启通知保护 (易被系统清理)",
                 icon = Icons.Default.Notifications,
                 iconBackground = if (areNotificationsEnabled) IosColors.SystemBlue else IosColors.SystemRed,
-                trailingText = if (areNotificationsEnabled) "运行中" else "去开启",
+                trailingText = if (areNotificationsEnabled) "已允许" else "去开启",
                 showChevron = !areNotificationsEnabled,
                 onClick = {
                     try {
@@ -928,7 +1096,6 @@ fun LocationMockScreen(
     if (showWeChatGuideSheet) {
         WeChatTroubleshootDialog(
             context = context,
-            coroutineScope = coroutineScope,
             rootBridge = rootBridge,
             isRootMode = isRootMode,
             isRootAvailable = isRootAvailable,
@@ -967,27 +1134,117 @@ fun LocationMockScreen(
 
     if (showFingerprintCaptureDialog) {
         FingerprintCaptureDialog(
-            defaultLat = activeLat,
-            defaultLon = activeLon,
+            defaultLat = captureDefaultLat,
+            defaultLon = captureDefaultLon,
+            defaultCoordSource = captureCoordSourceLabel,
+            // 污染路径不止单点/摇杆：多应用分流规则可以独立于主控生效，
+            // 同样会让采集读到模块自己伪造的环境。任一处于启用即警告。
+            isMockActive = isMockOn || multiTargetRules.any { it.isEnabled },
+            onRequestRealLocation = {
+                val fresh = CoordinateConverter.getRealDeviceLocation(context)
+                if (fresh != null) {
+                    realLocationCoord = fresh
+                    fresh
+                } else {
+                    realLocationCoord
+                }
+            },
+            onStopMock = {
+                if (isPointMockActive) {
+                    simulationViewModel.stopPointMock(context)
+                }
+                simulationViewModel.stopSimulation(context)
+                CoordinateConverter.clearSavedRealLocation(context)
+                com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+                val fresh = CoordinateConverter.getRealDeviceLocation(context)
+                if (fresh != null) {
+                    realLocationCoord = fresh
+                }
+                CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
+                    realLocationCoord = freshLat to freshLon
+                    simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
+                }
+            },
             onDismissRequest = { showFingerprintCaptureDialog = false },
             onConfirm = { name, lat, lon ->
                 showFingerprintCaptureDialog = false
                 coroutineScope.launch {
                     isCapturingFingerprint = true
+                    captureResult = null
                     runCatching {
-                        FingerprintCoordinator.captureAndSave(context, name, lat, lon)
-                    }.onSuccess { fp ->
+                        // 精准判定坐标来源：优先对比真机真实物理定位，避免将真机物理位置误标为虚拟点
+                        val finalSourceTag = if (realLocationCoord != null &&
+                            Math.abs(lat - realLocationCoord!!.first) < 0.005 &&
+                            Math.abs(lon - realLocationCoord!!.second) < 0.005
+                        ) {
+                            "DEVICE"
+                        } else if ((pointMockLocation != null && Math.abs(lat - pointMockLocation!!.latitude) < 0.0001 && Math.abs(lon - pointMockLocation!!.longitude) < 0.0001) ||
+                            (selectedTargetLocation != null && Math.abs(lat - selectedTargetLocation!!.latitude) < 0.0001 && Math.abs(lon - selectedTargetLocation!!.longitude) < 0.0001)
+                        ) {
+                            "MOCK_TARGET"
+                        } else {
+                            "MANUAL"
+                        }
+                        FingerprintCoordinator.captureAndSave(
+                            context, name, lat, lon,
+                            originSource = finalSourceTag
+                        )
+                    }.onSuccess { outcome ->
+                        // 采集完成 ≠ 采集成功。原来的实现只要不抛异常就报"已采集"，
+                        // 但保存失败、四类数据全空、扫描被系统限流都可能是"完成"的。
+                        captureResult = CaptureFeedback.from(outcome, name)
+                        // 强制重载列表：同名覆盖时文件名列表不变，
+                        // 只靠 fingerprintIds 当 key 不会触发摘要刷新。
                         fingerprintIds = FingerprintStore.list(context)
-                        Toast.makeText(
-                            context,
-                            "已采集：${FingerprintStore.summary(fp)}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        reloadToken++
                     }.onFailure { e ->
                         Diag.w("LocationMockScreen", "fingerprint capture failed", e)
-                        Toast.makeText(context, "采集失败：${e.message}", Toast.LENGTH_LONG).show()
+                        captureResult = CaptureFeedback(
+                            id = name,
+                            severity = FeedbackSeverity.ERROR,
+                            title = "采集失败",
+                            detail = e.message ?: "采集过程抛出异常，未产生指纹文件。",
+                            saved = false
+                        )
                     }
                     isCapturingFingerprint = false
+                }
+            }
+        )
+    }
+
+    // 删除确认：原实现点一下"删除"就立即抹掉文件，且没有撤销。
+    pendingDeleteFingerprintId?.let { fid ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteFingerprintId = null },
+            title = { Text("删除环境指纹", style = IosTypography.Headline) },
+            text = {
+                Text(
+                    text = "确定删除「$fid」吗？删除后该地点的 Wi-Fi / 基站 / 蓝牙快照" +
+                        "会一并移除，无法撤销。",
+                    style = IosTypography.Footnote,
+                    color = IosColors.SecondaryLabel
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    FingerprintStore.delete(context, fid)
+                    if (activeFingerprintId == fid) {
+                        FingerprintCoordinator.deactivate(context)
+                        activeFingerprintId = null
+                    }
+                    fingerprintIds = FingerprintStore.list(context)
+                    fingerprintSummaries = fingerprintSummaries - fid
+                    if (captureResult?.id == fid) captureResult = null
+                    pendingDeleteFingerprintId = null
+                    Toast.makeText(context, "已删除 $fid", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("删除", color = IosColors.SystemRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteFingerprintId = null }) {
+                    Text("取消", color = IosColors.SecondaryLabel)
                 }
             }
         )

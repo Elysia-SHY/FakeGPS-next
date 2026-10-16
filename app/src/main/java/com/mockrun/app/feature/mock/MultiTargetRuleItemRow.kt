@@ -137,10 +137,12 @@ fun MultiTargetRuleItemRow(
                             TargetMockMode.REAL_PASSTHROUGH -> IosColors.SystemGray.copy(alpha = 0.15f)
                             else -> IosColors.SystemBlue.copy(alpha = 0.12f)
                         },
-                        modifier = Modifier.bouncyClickable { showModeMenu = true }
+                        modifier = Modifier
+                            .minTouchTarget()
+                            .bouncyClickable { showModeMenu = true }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -182,10 +184,13 @@ fun MultiTargetRuleItemRow(
                 Surface(
                     shape = RoundedCornerShape(9.dp),
                     color = IosColors.SystemBlue.copy(alpha = 0.12f),
-                    modifier = Modifier.bouncyClickable { onSetLocationOnMap() }
+                    // 原触区只有 8dp 内距 + 13dp 图标 ≈ 26dp 高，拇指难以命中
+                    modifier = Modifier
+                        .minTouchTarget()
+                        .bouncyClickable { onSetLocationOnMap() }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -194,7 +199,7 @@ fun MultiTargetRuleItemRow(
                             tint = IosColors.SystemBlue,
                             modifier = Modifier.size(13.dp)
                         )
-                        Spacer(Modifier.width(2.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
                             text = "地图选点",
                             style = IosTypography.Caption2,
@@ -206,13 +211,14 @@ fun MultiTargetRuleItemRow(
 
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(26.dp)
+                    // 原 26dp，低于 48dp 最小触区
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除规则",
-                        tint = IosColors.SecondaryLabel,
-                        modifier = Modifier.size(15.dp)
+                        tint = IosColors.SystemRed,
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }
