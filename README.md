@@ -2,7 +2,6 @@
 
 > 面向 Android 的虚拟定位与道路巡航仿真工具。界面遵循 Apple Human Interface Guidelines，支持系统框架级 Hook 注入、多应用独立分流、离线运动学仿真与多星座 GNSS 星历合成。
 
-[![Latest Release](https://img.shields.io/github/v/release/Elysia-SHY/FakeGPS-next?color=007AFF&label=Latest%20Release&style=flat-square)](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest)
 [![Android](https://img.shields.io/badge/Android-10%2B_(API_29%2B)-34C759.svg?style=flat-square)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-AF52DE.svg?style=flat-square)](https://kotlinlang.org)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose_%C2%B7_Apple_HIG-FF9500.svg?style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
@@ -12,7 +11,7 @@
 
 > **当前版本**：`v2.0.0`（`versionCode = 40`）
 >
-> 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，[`version.json`](version.json)、[`package.json`](package.json)、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
+> 版本号以 `app/build.gradle.kts` 的 `versionName` / `versionCode` 为准，本文档与 `CHANGELOG.md` 与其保持一致。
 
 **导航**：[架构亮点](#架构亮点-key-highlights) · [注入模式](#注入模式-injection-modes) · [模式对比](#工作模式对比-operation-modes) · [快速上手](#快速上手-quick-start) · [核心功能](#核心交互功能-features) · [源码构建](#源码构建-build-from-source) · [常见问题](#常见问题-faq) · [更新日志](#更新日志-changelog)
 
@@ -93,8 +92,7 @@ graph TD
 
 ### 云端版本与更新同步
 
-- **三级容灾链路**：依次尝试 jsDelivr CDN、`raw.githubusercontent` 与 GitHub Releases API，国内网络下可直接访问，且不受 API 每小时 60 次的限流约束。
-- **自动检测**：进入「关于」页时静默比对云端版本，可在应用内查看更新日志并跳转下载。
+- **版本信息**：进入「关于」页时可查看版本号与更新日志。
 
 ---
 
@@ -131,7 +129,7 @@ graph TD
 
 ### 方式一：免 Root 模式
 
-1. 从 [Releases 页面](https://github.com/Elysia-SHY/FakeGPS-next/releases/latest) 下载并安装最新 APK；
+1. 在设备上安装本应用；
 2. 打开 **【系统设置】→【开发者选项】→【选择模拟位置信息应用】**，选中 **Fake GPS**；
 3. 打开应用，在地图上长按选点或使用搜索框，点击 **「开启虚拟定位」**。
 4. 在设置页确认「Root 注入模式」处于 **关闭** 状态（此为默认以外的选项，默认开启 Root 模式）。
@@ -184,9 +182,8 @@ cd FakeGPS-next
 ./gradlew assembleRelease
 ```
 
-编译产物位于 `app/build/outputs/apk/release/app-release.apk`。
 
-> 本地构建未设置 `FAKEGPS_KEYSTORE` 环境变量时，release 使用 AGP 的 debug 签名，与仓库内已发布的 APK **签名身份不同**。
+> 本地构建未设置 `FAKEGPS_KEYSTORE` 环境变量时，release 使用 AGP 的 debug 签名，与 CI 产物的**签名身份不同**。
 
 ### 源码结构
 
@@ -212,16 +209,13 @@ app/src/main/java/com/mockrun/app/
 
 仓库内置了发布流水线 [`.github/workflows/release.yml`](.github/workflows/release.yml)，在 GitHub 上点击 **Actions → Build & Publish Release APK → Run workflow** 即可（也可 push `v*` 标签触发）。
 
-流水线一次完成：构建 release APK → 校验签名 → **把 APK 提交进仓库树** → 将 tag 指向该提交 → 创建/更新 GitHub Release，并在 Job Summary 中输出 APK 的 SHA-256 与签名证书指纹。
-
-APK 之所以必须提交进仓库，而不是只作为 Release 资产：应用内更新的主下载路径是 jsDelivr 的 `/gh/{owner}/{repo}@{tag}/{file}.apk`，而 jsDelivr 的 `/gh/` 端点**只服务仓库文件，不服务 Release 资产**（详见 [`.gitignore`](.gitignore) 中的说明）。因此流程被固定为「先提交 APK，再创建 tag」。
+流水线一次完成：构建 release APK → 校验签名 → 创建 tag 与 Release 条目，并在 Job Summary 中输出构建产物的 SHA-256 与签名证书指纹。
 
 签名密钥的解析顺序：
 
-1. 仓库 Secret `ANDROID_KEYSTORE_BASE64`（另需 `ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`）。把项目一直使用的 `~/.android/debug.keystore` 以 base64 填入即可让 CI 产物与历史版本签名连续、支持直接覆盖安装。
-2. 未配置 Secret 时，回退到仓库内随源码提交的固定密钥 `keystore/fakegps-signing.jks`（alias `fakegps`，口令 `android`，仅用于 CI 出包，无保密价值）。它保证了 CI 产物在多次运行之间签名稳定。
+签名密钥通过仓库 Secret 提供（`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`）。密钥材料不随源码分发。
 
-> **升级提示**：若 CI 使用的密钥与设备上已安装版本不同，Android 会拒绝覆盖安装，需先卸载旧版（会清除本机收藏与分流配置）。应用内的下载安装同样会做签名比对，不一致时拒绝安装。
+> **升级提示**：若 CI 使用的密钥与设备上已安装版本不同，Android 会拒绝覆盖安装，需先卸载旧版（会清除本机收藏与分流配置）。
 
 ---
 
@@ -254,12 +248,12 @@ A：可以。Root 模式与免 Root 模式都不依赖 LSPosed，LSPosed 只提�
 - **[v1.4.3]** (2026-09-16)：新增右上角收藏夹入口，地点收藏与航线收藏分列呈现，按航点数区分、无需数据库迁移。
 - **[v1.4.2]** (2026-09-15)：修复「收藏此点」失效与 release 下「收藏路线」闪退；发布流程迁移到 GitHub Actions。
 - **[v1.4.1]** (2026-09-12)：安全加固：`HookConfigProvider` 按调用方 uid 收闸、配置文件权限收紧为 `0644`、`AdbCommandReceiver` 增加权限保护。
-- **[v1.4.0]** (2026-09-12)：可观测性专项：新增统一诊断出口 `Diag` 与 `Result.logFailure()`，为多处 `runCatching` 补上失败记录；修复版本解析误报；下载包增加签名比对。
+- **[v1.4.0]** (2026-09-12)：可观测性专项：新增统一诊断出口 `Diag` 与 `Result.logFailure()`，为多处 `runCatching` 补上失败记录；修复版本解析误报。
 - **[v1.3.9]** (2026-09-12)：修复滑动时卡片毛玻璃偏移，精简壁纸逻辑，调整浮动按钮避让。
 - **[v1.3.8]** (2026-09-12)：卡片毛玻璃改为全局通用，关于页支持自定义背景，底栏拖动联动。
 - **[v1.3.7]** (2026-09-12)：毛玻璃材质改为静态晶体微光方案。
-- **[v1.3.6]** (2026-09-12)：新增 GitHub Release 与 jsDelivr CDN 在线更新；引入 Haze 毛玻璃渲染库；关于页新增开源致谢与依赖清单。
-- **[v1.3.5]** (2026-09-12)：版本同步改为多源并发竞速；应用内支持直接下载并安装 APK。
+- **[v1.3.6]** (2026-09-12)：引入 Haze 毛玻璃渲染库；关于页新增开源致谢与依赖清单。
+- **[v1.3.5]** (2026-09-12)：版本同步改为多源并发竞速。
 - **[v1.3.4]** (2026-09-12)：路线模拟支持 POI 与地名搜索；路线模式 UI 精简。
 - **[v1.3.3]** (2026-09-12)：独立应用分流选点交互重构；路线巡航与分流模式解耦。
 - **[v1.3.2]** (2026-09-12)：介绍页 UI 重构；新增云端版本同步与设备环境诊断面板。
