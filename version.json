@@ -1,20 +1,20 @@
 {
-  "versionName": "v2.1.2",
-  "versionCode": 52,
-  "releaseDate": "2026-10-13",
+  "versionName": "v2.2.0",
+  "versionCode": 53,
+  "releaseDate": "2026-10-17",
   "minSdk": 29,
-  "releaseNotes": "FakeGPS-next 2.1.2：修复定位页 / 路线页毛玻璃全面失效 + 环境指纹真机定位优先。\n\n签名密钥保持一致，可从历史版本直接覆盖升级。\n\n主要改动：\n\n1. 修复定位页 / 路线页所有卡片与底部悬浮栏毛玻璃失效（严重）：这两页此前没有可被 Haze 捕获的 Compose 源层（底层是 OSMDroid 原生 View），全部玻璃卡片静默退化为不透明色块，底部悬浮栏同样无模糊。现叠加 Compose 绘制的 Aurora 雾面源层（上下厚、中间薄，中央地图区保持干净），并让底部悬浮 Tab 栏接入页面内容源，全部恢复真实高斯模糊。\n\n2. 环境指纹实地采集默认直取真机真实物理定位，不再误填地图选定模拟点，无需再退回首页点击「恢复本机位置」。\n\n3. 采集弹窗内置「获取本机真实位置」实时校准与「一键停止模拟」。\n\n4. 在线更新回到 GitHub 单源（静态版本清单 + GitHub Releases API 多镜像容灾），下载后双重校验 SHA-256 与签名证书。",
-  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.1.2",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-  "sha256": "4c557fd330ac81da912f7d12bd96cc13718494e1d698e0bb0ba7ad1732fe0aff",
-  "sizeBytes": 4441624,
+  "releaseNotes": "FakeGPS-next 2.2.0：LSPosed 通道迁移至 Vector 框架，修复 HyperOS / Android 17 模块零派发。\n\n签名密钥保持一致，可从历史版本直接覆盖升级。\n\n主要改动：\n\n1. LSPosed 通道迁移至 JingMatrix Vector v2.2：官方 LSPosed 2.2.1 在 HyperOS 上仅注入 hyos_spawner / artd（Rust 运行时，无 ART/Java 回调），导致 handleLoadPackage 全设备零触发、模块形同未加载；迁移后系统框架与目标应用双侧正常注入。\n\n2. 系统框架定位注入在 HyperOS 真机恢复生效：system_server 侧 onReportLocation / acceptLocationChange / reportLocation 钩子正常触发，系统定位返回值与合成卫星状态可按模拟点输出（高德地图实测已跳到模拟点）；地图 SDK 兼容层挂钩逻辑整理为 hookAmapLocationGetters。\n\n3. 坐标偏差修复：瞄准点改为 Pin 尖端投影（抽屉展开时偏差 >400m 已消除），热门城市常量修正为 GCJ-02 → WGS-84。\n\n4. 坐标系收敛为唯一实现 GeoTransform（WGS-84 / GCJ-02 / BD-09），纯函数、全量单测覆盖。\n\n5. 应用独立分流重构：移除全局 kill-switch、空规则清缓存、按方法记账可重试、IPackageManager 兜底，规则逻辑抽出为 TargetRuleResolver + 单测。\n\n6. 新增注入通道维度 AUTO / LSPOSED / PROVIDER 与 HookChannelStatus 状态判定，Provider 通道不发布 hook 配置以消除坐标残留。\n\n7. 构建升级支持 Android 16+ 16KB 页对齐（AGP 8.5.1 + Gradle 8.9）。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.2.0",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk",
+  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk",
+  "sha256": "01a17234f758ba975a744dc95cd1a86652e61582d3939e7d2c89ea0e8df41f42",
+  "sizeBytes": 4017250,
   "contact": "2224958076@qq.com",
   "homepage": "https://github.com/Elysia-SHY/FakeGPS-next",
   "mirrorUrls": [
-    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk"
+    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk",
+    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk",
+    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk",
+    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.2.0/FakeGPS-next-v2.2.0-release.apk"
   ]
 }
