@@ -37,6 +37,7 @@ import com.mockrun.app.core.location.CoordinateConverter
 import com.mockrun.app.core.location.RoadMode
 import com.mockrun.app.core.location.RoadRouteResult
 import com.mockrun.app.core.location.SearchResultItem
+import com.mockrun.app.util.GeoTransform
 import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
@@ -233,13 +234,18 @@ fun SearchLocationDialog(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // 这些常量是**高德/腾讯地图上读到的 GCJ-02 值**（例：天安门 GCJ-02 ≈ 39.9087,116.3975，
+                // 同一地点的 WGS-84 ≈ 39.9074,116.3913）。旧实现把它们直接当 WGS-84 消费：
+                // 显示时又转一次 GCJ、注入时按 WGS-84 下发，于是「点热门地点」选出来的点
+                // 和标签上的地方相差一个 GCJ 偏移（约 500m 东北）。
+                // 这里在定义处显式声明来源坐标系，并转成内部统一的 WGS-84。
                 val quickPois = listOf(
-                    "北京天安门" to (39.9087 to 116.3975),
-                    "上海外滩" to (31.2397 to 121.4904),
-                    "广州塔" to (23.1064 to 113.3245),
-                    "深圳湾" to (22.5025 to 113.9510),
-                    "成都春熙路" to (30.6558 to 104.0818),
-                    "杭州西湖" to (30.2460 to 120.1490)
+                    "北京天安门" to GeoTransform.toWgs84(39.9087, 116.3975, GeoTransform.CoordSystem.GCJ02),
+                    "上海外滩" to GeoTransform.toWgs84(31.2397, 121.4904, GeoTransform.CoordSystem.GCJ02),
+                    "广州塔" to GeoTransform.toWgs84(23.1064, 113.3245, GeoTransform.CoordSystem.GCJ02),
+                    "深圳湾" to GeoTransform.toWgs84(22.5025, 113.9510, GeoTransform.CoordSystem.GCJ02),
+                    "成都春熙路" to GeoTransform.toWgs84(30.6558, 104.0818, GeoTransform.CoordSystem.GCJ02),
+                    "杭州西湖" to GeoTransform.toWgs84(30.2460, 120.1490, GeoTransform.CoordSystem.GCJ02)
                 )
                 items(quickPois) { (name, coords) ->
                     TappableChip(

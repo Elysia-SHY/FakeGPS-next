@@ -48,7 +48,26 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.1.2 更新日志】
+private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.2.0 更新日志】
+
+1. 🛠️ LSPosed 通道迁移至 Vector 框架（修复 HyperOS / Android 17 模块零派发）：
+   - 官方 LSPosed 2.2.1 在 HyperOS 上仅注入 hyos_spawner/artd（Rust 运行时，无 ART/Java 回调），
+     handleLoadPackage 全设备零触发；迁移到 JingMatrix Vector v2.2 后系统框架与目标应用双侧正常注入。
+
+2. 🗺️ 系统框架定位注入在 HyperOS 真机恢复生效：
+   - system_server 侧 onReportLocation / acceptLocationChange / reportLocation 钩子正常触发，
+     系统定位返回值与合成卫星状态可按模拟点输出（高德地图实测已跳到模拟点）。
+   - 地图 SDK 兼容层挂钩逻辑整理为 hookAmapLocationGetters，按已加载 Class 直接挂钩。
+
+3. 🎯 坐标偏差修复：瞄准点改为 Pin 尖端投影；热门城市常量修正为 GCJ-02→WGS-84。
+
+4. 🧭 坐标系收敛为唯一实现 GeoTransform（WGS-84/GCJ-02/BD-09），全量单测覆盖。
+
+5. 🔀 应用独立分流：移除全局 kill-switch、空规则清缓存、按方法记账可重试、IPackageManager 兜底。
+
+6. 🧩 新增注入通道维度 AUTO / LSPOSED / PROVIDER，Provider 通道不发布 hook 配置消除坐标残留。
+
+—— 以下为 v2.1.2 历史更新 ——
 
 1. 💧 修复定位页 / 路线页毛玻璃全面失效（严重）：
    - 这两页此前没有可被 Haze 捕获的 Compose 源层（底层是 OSMDroid 原生 View），

@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.core.location
+package com.mockrun.app.core.location
 
 import kotlin.math.*
 import com.mockrun.app.util.Diag
@@ -13,59 +13,22 @@ import com.mockrun.app.util.logFailure
  *  - User taps on Amap: convert back to WGS-84 before saving
  *
  * OSMDroid uses WGS-84 natively, so no conversion is needed when using OSMDroid.
+ *
+ * 算法本体已收敛到 [com.mockrun.app.util.GeoTransform]（纯函数、无 Android 依赖、可单测）。
+ * 本对象只保留「需要 Context 的硬件定位查询」这类应用侧职责，以及给既有调用点用的同名 API ——
+ * hook 侧（XposedLocationHook）现在也从 GeoTransform 取同一份算法，两处不会再各自漂移。
  */
 object CoordinateConverter {
 
     private const val TAG = "CoordConverter"
-    private const val A = 6378245.0
-    private const val EE = 0.00669342162296594323
-
-    private fun outOfChina(lat: Double, lon: Double) =
-        lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
-
-    private fun transformLat(x: Double, y: Double): Double {
-        var r = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * sqrt(abs(x))
-        r += (20.0 * sin(6.0 * x * PI) + 20.0 * sin(2.0 * x * PI)) * 2.0 / 3.0
-        r += (20.0 * sin(y * PI) + 40.0 * sin(y / 3.0 * PI)) * 2.0 / 3.0
-        r += (160.0 * sin(y / 12.0 * PI) + 320.0 * sin(y * PI / 30.0)) * 2.0 / 3.0
-        return r
-    }
-
-    private fun transformLon(x: Double, y: Double): Double {
-        var r = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * sqrt(abs(x))
-        r += (20.0 * sin(6.0 * x * PI) + 20.0 * sin(2.0 * x * PI)) * 2.0 / 3.0
-        r += (20.0 * sin(x * PI) + 40.0 * sin(x / 3.0 * PI)) * 2.0 / 3.0
-        r += (150.0 * sin(x / 12.0 * PI) + 300.0 * sin(x / 30.0 * PI)) * 2.0 / 3.0
-        return r
-    }
 
     /** WGS-84 -> GCJ-02. Returns (lat, lon). */
-    fun wgs84ToGcj02(lat: Double, lon: Double): Pair<Double, Double> {
-        if (lat.isNaN() || lon.isNaN() || lat.isInfinite() || lon.isInfinite() || outOfChina(lat, lon)) {
-            return lat to lon
-        }
-        var dLat = transformLat(lon - 105.0, lat - 35.0)
-        var dLon = transformLon(lon - 105.0, lat - 35.0)
-        val rLat = Math.toRadians(lat)
-        var magic = sin(rLat); magic = 1 - EE * magic * magic
-        val sqrtMagic = sqrt(magic)
-        dLat = dLat * 180.0 / (A * (1 - EE) / (magic * sqrtMagic) * PI)
-        dLon = dLon * 180.0 / (A / sqrtMagic * cos(rLat) * PI)
-        return (lat + dLat) to (lon + dLon)
-    }
+    fun wgs84ToGcj02(lat: Double, lon: Double): Pair<Double, Double> =
+        com.mockrun.app.util.GeoTransform.wgs84ToGcj02(lat, lon)
 
     /** GCJ-02 -> WGS-84 (iterative approximation, ~1 cm accuracy). */
-    fun gcj02ToWgs84(lat: Double, lon: Double): Pair<Double, Double> {
-        if (lat.isNaN() || lon.isNaN() || lat.isInfinite() || lon.isInfinite() || outOfChina(lat, lon)) {
-            return lat to lon
-        }
-        var wLat = lat; var wLon = lon
-        repeat(10) {
-            val (gLat, gLon) = wgs84ToGcj02(wLat, wLon)
-            wLat -= gLat - lat; wLon -= gLon - lon
-        }
-        return wLat to wLon
-    }
+    fun gcj02ToWgs84(lat: Double, lon: Double): Pair<Double, Double> =
+        com.mockrun.app.util.GeoTransform.gcj02ToWgs84(lat, lon)
 
     /**
      * Retrieves the best last known physical location from available system hardware providers.

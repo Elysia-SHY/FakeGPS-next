@@ -125,9 +125,17 @@ class VersionSyncManifestParseTest {
             "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.1.2",
             info.releaseHtmlUrl
         )
+        // 2026-10-16 发版时按 CHANGELOG 把 version.json 的下载地址从
+        // `cdn.jsdelivr.net/gh/...@tag/...` 改成了 GitHub Release 资产地址
+        // （`releases/download/{tag}/{file}.apk`），这里同步断言新的地址形态。
+        // 旧断言停留在 jsDelivr 形式，自那次发版起一直是红的。
         assertEquals(
-            "https://cdn.jsdelivr.net/gh/Elysia-SHY/FakeGPS-next@v2.1.2/FakeGPS-next-v2.1.2-release.apk",
+            "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
             info.fallbackDownloadUrls.first()
+        )
+        assertTrue(
+            "必须保留多镜像回落列表（下载容灾）",
+            info.fallbackDownloadUrls.isNotEmpty()
         )
         assertTrue("version.json 不得再包含蓝奏云字段", !content.contains("lanzou", ignoreCase = true))
     }

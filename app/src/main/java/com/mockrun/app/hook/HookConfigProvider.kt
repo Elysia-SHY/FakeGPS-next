@@ -62,6 +62,10 @@ object HookStateBridge {
     @Volatile
     private var lastSyncedActive: Boolean? = null
 
+    /** 只有显式清理（clearPublishedState）才擦坐标，见该方法注释。 */
+    @Volatile
+    private var wipeCoordsOnNextInactive = false
+
     @Volatile
     var multiTargetRulesJson: String = ""
         private set
@@ -110,6 +114,22 @@ object HookStateBridge {
         return (System.currentTimeMillis() - lastSystemHookHeartbeat) < 60_000L
     }
 
+    /**
+     * 立刻清掉已发布的 hook 配置（SystemProperties / /data 文件 / Settings.Global）。
+     *
+     * 使用场景：用户切到 [com.mockrun.app.util.HookChannel.PROVIDER] 通道 ——
+     * 此后没有消费者，残留必须当场消失，而不是等下一次模拟停止或重启。
+     */
+    fun clearPublishedState(context: Context) {
+        // 显式清理（切到 Provider 通道 / 真正停止）才擦坐标；
+        // 普通的 update(false) 只把 active 置 0，不动坐标 ——
+        // 否则"发布 active=1 后又被某处 update(false)"会把坐标清空，
+        // 表现为 hook 永远拿不到坐标（真机实测：active=0 且 lat/lon 为空）。
+        wipeCoordsOnNextInactive = true
+        // active 由 true 变 false，update() 里的节流条件 (stateChanged) 必然成立，不会被 250ms 窗口挡住。
+        update(context, false)
+    }
+
     @Volatile
     var isRouteSimulation: Boolean = false
         private set
@@ -132,6 +152,13 @@ object HookStateBridge {
         bear: Float = 0f,
         spd: Float = 0f
     ) {
+        // 溯源：真机上出现过"update(true) 之后又被某处 update(false) 清零"，
+        // 导致 active=0 / time=0 而坐标还在 —— hook 于是永远判定过期、不接管。
+        // 这条日志把调用者打出来，用来定位那个多余的 update(false)。
+        runCatching {
+            val c = Throwable().stackTrace.getOrNull(2)
+            Diag.i(TAG, "update(active=$active) from ${c?.className?.substringAfterLast('.')}.${c?.methodName}")
+        }
         isHookActive = active
         latitude = lat
         longitude = lon
@@ -143,6 +170,14 @@ object HookStateBridge {
         val elapsed = updateElapsed
 
         context?.let { ctx ->
+            // PROVIDER 通道没有任何消费者：不再往 setprop / /data 文件 / Settings.Global 发布坐标。
+            // 这些位置对任何进程可读（getprop 全局可读），写了就是纯粹的坐标残留。
+            // 注意：
+            //  1) 内存态（HookStateBridge）仍然更新 —— 它只在本进程内被 getLocation 读取；
+            //  2) **active=false 的清理路径必须放行**，否则「切到 Provider 时清残留」会被自己挡住。
+            if (active && !com.mockrun.app.util.HookChannelPrefs.shouldPublishHookConfig(ctx)) {
+                return@let
+            }
             // 1. SharedPreferences update (Immediate)
             runCatching {
                 val sp = ctx.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
@@ -243,6 +278,17 @@ object HookStateBridge {
                                 append("setprop debug.fakegps.active 0; ")
                                 append("setprop debug.fakegps.time 0; ")
                                 append("setprop debug.fakegps.elapsed 0; ")
+                                // 坐标本身也必须清：`setprop` 的属性对任何进程可读，
+                                // 只清 active 而把 lat/lon 留到重启，等于把"用户上次伪造到哪"一直挂在系统里。
+                                if (wipeCoordsOnNextInactive) {
+                                    append("setprop debug.fakegps.lat \"\" 2>/dev/null; ")
+                                    append("setprop debug.fakegps.lon \"\" 2>/dev/null; ")
+                                    append("setprop debug.fakegps.alt \"\" 2>/dev/null; ")
+                                    append("setprop debug.fakegps.bearing \"\" 2>/dev/null; ")
+                                    append("setprop debug.fakegps.speed \"\" 2>/dev/null; ")
+                                    wipeCoordsOnNextInactive = false
+                                }
+                                append("setprop debug.fakegps.is_route 0 2>/dev/null; ")
                                 append("rm -f /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("rm -f /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings delete global fake_gps_config 2>/dev/null; ")
@@ -314,6 +360,16 @@ class HookConfigProvider : ContentProvider() {
      * fix is to have the app push state into XSharedPreferences rather than relaxing this check.
      */
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
+        // 分流规则**不**走 uid 门禁。
+        //
+        // 规则内容（包名 + 用户自己选的坐标）本来就已经通过三条通道暴露给任何进程：
+        // 0644 的 hook_config.xml、0644 的 /data/local/tmp/fake_gps_multitarget.json、
+        // 以及 Settings.Global —— 在这里加门禁保护不了任何东西，却会让 hook 在**目标应用进程**里
+        // 的 ContentProvider 通道必然失效（该 uid 不在白名单里），于是"必须把应用也加进 LSPosed
+        // 作用域才能生效"。真正敏感的是实时伪造坐标（getLocation），那一个仍然门禁。
+        if (method == "getMultiTargetRules") {
+            return Bundle().apply { putString("json", readMultiTargetRulesJson()) }
+        }
         if (!isTrustedCaller()) {
             Diag.w(TAG, "refused call '$method' from untrusted uid ${Binder.getCallingUid()}")
             return null
@@ -338,8 +394,9 @@ class HookConfigProvider : ContentProvider() {
                 }
             }
             "getMultiTargetRules" -> {
+                // 保留分支：上面的提前返回已经处理，这里只为可读性留一个显式出口。
                 Bundle().apply {
-                    putString("json", HookStateBridge.multiTargetRulesJson)
+                    putString("json", readMultiTargetRulesJson())
                 }
             }
             "isHookActive" -> {
@@ -355,6 +412,44 @@ class HookConfigProvider : ContentProvider() {
             }
             else -> null
         }
+    }
+
+    /**
+     * 读分流规则 JSON，按「内存 → 主副本 → XSharedPreferences 兼容副本 → 缓存文件」顺序回落。
+     *
+     * 为什么不能只读内存：`HookStateBridge.multiTargetRulesJson` 是由 Hilt 单例
+     * `MultiTargetRepository` 在构造时灌进去的，而 ContentProvider 可能在任何组件之前被调用
+     * （system_server 或目标应用进程的第一次查询）。旧实现只回内存态，于是**模块应用重启之后**，
+     * provider 会回答空字符串，system_server 侧读不到规则 → per-app 分流静默退化成真实定位。
+     * 这里直接从磁盘副本读，重启不再丢规则。
+     */
+    private fun readMultiTargetRulesJson(): String {
+        val inMemory = HookStateBridge.multiTargetRulesJson
+        if (inMemory.isNotEmpty()) return inMemory
+
+        val ctx = runCatching { context }.getOrNull()
+        if (ctx == null) {
+            Diag.w(TAG, "getMultiTargetRules: no provider context — rules channel degraded")
+            return ""
+        }
+
+        val fromPrefs = runCatching {
+            ctx.getSharedPreferences("multi_target_prefs", Context.MODE_PRIVATE)
+                .getString("key_rules_json", null)
+        }.logFailure(TAG, "read rules from multi_target_prefs", Diag.Level.DEBUG).getOrNull()
+        if (!fromPrefs.isNullOrEmpty()) return fromPrefs
+
+        val fromHookPrefs = runCatching {
+            ctx.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
+                .getString("multitarget_rules_json", null)
+        }.logFailure(TAG, "read rules from hook_config", Diag.Level.DEBUG).getOrNull()
+        if (!fromHookPrefs.isNullOrEmpty()) return fromHookPrefs
+
+        val fromCache = runCatching {
+            val f = java.io.File(ctx.cacheDir, "multitarget_rules.json")
+            if (f.exists() && f.canRead()) f.readText() else null
+        }.logFailure(TAG, "read rules from cacheDir copy", Diag.Level.DEBUG).getOrNull()
+        return fromCache.orEmpty()
     }
 
     /** See [call] for why gating happens here rather than via a manifest permission. */

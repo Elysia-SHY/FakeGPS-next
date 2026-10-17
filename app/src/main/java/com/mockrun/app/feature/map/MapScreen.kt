@@ -42,7 +42,10 @@ import com.mockrun.app.feature.map.tabs.RouteBottomPanel
 import com.mockrun.app.feature.map.tabs.RouteConfigDialog
 import com.mockrun.app.feature.map.tabs.RouteStage
 import com.mockrun.app.ui.components.PermissionGuideDialog
+import com.mockrun.app.hook.HookChannelStatus
+import com.mockrun.app.hook.XposedStatusHelper
 import com.mockrun.app.util.Diag
+import com.mockrun.app.util.HookChannelPrefs
 import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.util.logFailure
 import com.mockrun.app.core.designsystem.LiquidGlassDefaults
@@ -59,6 +62,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -117,6 +121,38 @@ private const val ADDRESS_PLACEHOLDER = "正在获取当前地址..."
 private val CENTER_PIN_BLOCK_HEIGHT = 109.dp
 
 /**
+ * Pin 尖端相对「Pin 块中心」的垂直偏移（dp）。
+ *
+ * 块内自顶向下：胶囊提示条 ≈33 + 间距 10 + 水滴 Pin 56 + 间距 3 + 落地阴影 7 = 109dp，
+ * 水滴的尖端在 33+10+56 = 99dp 处，块中心在 54.5dp 处 → 尖端在块中心下方 44.5dp。
+ * 即：`CENTER_PIN_BLOCK_HEIGHT / 2 - (3 + 7)`。
+ */
+private val PIN_TIP_BELOW_BLOCK_CENTER = CENTER_PIN_BLOCK_HEIGHT / 2 - 10.dp
+
+/** Pin 尖端与底部抽屉顶边之间必须保留的呼吸距离。 */
+private val PIN_TIP_GAP = 12.dp
+
+/**
+ * Pin 尖端需要从容器中心再上移多少像素（抽屉让位量）。
+ *
+ * 约束：`容器中心 − 让位量 ≤ 抽屉顶边 − PIN_TIP_GAP`
+ *     ⇒ 让位量 ≥ 抽屉高 − 容器高/2 + PIN_TIP_GAP
+ * 抽屉不高时取 0：此时尖端正好压在容器中心，瞄准点 = 地图中心 = 尖端，三者重合。
+ *
+ * 纯函数，方便单测；`panelHeightPx` 为 0（首帧还没测量）时用折叠态兜底高度。
+ */
+private fun pinTipClearancePx(
+    boxHeightPx: Int,
+    panelHeightPx: Int,
+    fallbackPanelPx: Int,
+    gapPx: Int
+): Int {
+    if (boxHeightPx <= 0) return 0
+    val panelPx = if (panelHeightPx > 0) panelHeightPx else fallbackPanelPx
+    return maxOf(0, panelPx - boxHeightPx / 2 + gapPx)
+}
+
+/**
  * 右列悬浮控件（缩放胶囊 + 物理定位 FAB）的几何常量，与实现逐条对齐：
  * - 54dp / 12dp 来自 MapFloatingActions（MapFloatingActions.kt:54「全览路线」FAB、
  *   :80「真机物理定位」FAB，以及它自己 Column 的 spacedBy(12.dp)）。
@@ -140,6 +176,32 @@ private val TOP_ICON_ROW_HEIGHT = 56.dp
 private val TOP_MARGIN = 12.dp
 private val RIGHT_MIN_CAPSULE = 112.dp
 private val RIGHT_MAX_CAPSULE = 180.dp
+
+/**
+ * 应用分流胶囊行（「全局通用」+ 各应用分流 +「添加分流」）的固有高度 [估算]：
+ * 胶囊 48dp + LazyRow 上下各 4dp 内边距 = 56dp（顶部 Column 的第二行，仅定位页有）。
+ * 与 TOP_ICON_ROW_HEIGHT 一样，只用于 onGloballyPositioned 首次回填之前的那一帧。
+ */
+private val TOP_CAPSULE_ROW_HEIGHT = 56.dp
+
+/**
+ * 地图必须留给用户操作的净空高度 —— 任何悬浮控件都不许侵入这一条带。
+ *
+ * = 右列紧凑形态的高度（max(胶囊几何下限 112dp, 路线页双 FAB 块 120dp)）
+ *   + 与底部抽屉的呼吸 12dp + 与顶部控件的呼吸 12dp = 144dp。
+ *
+ * 由右列几何常量推导而非写死数字：改右列尺寸时这里自动跟随。底部抽屉的高度上限
+ * 就是用这条净空反推的（见 MapScreen 的 panelMaxHeight），因此右列在任何抽屉档位下
+ * 都放得下，且顶部控件永远压不到。
+ */
+private val MAP_MIN_VISIBLE_BAND =
+    maxOf(RIGHT_MIN_CAPSULE, RIGHT_FAB_BLOCK_ROUTE) + RIGHT_PANEL_GAP + TOP_MARGIN
+
+/**
+ * 抽屉的物理下限（卡片内容高）：拖拽手柄 48dp + 卡片上下内边距 28dp。
+ * 屏幕再矮也不能把抽屉压到连手柄都点不到 —— 那会让「收起 / 展开」交互直接失效。
+ */
+private val PANEL_MIN_CONTENT_HEIGHT = 76.dp
 
 /**
  * 抽屉折叠（COLLAPSED）态下卡片部分的固有高度 [估算]。
@@ -307,6 +369,29 @@ fun MapScreen(
     val multiTargetRules by simulationViewModel.multiTargetRules.collectAsState()
     val activeTargetKey by simulationViewModel.activeTargetKey.collectAsState()
     val isRootAvailable by simulationViewModel.isRootAvailable.collectAsState()
+
+    // ---- 生效通道指示 ----
+    // 地图页的「虚拟定位中」只说明应用层在模拟；hook 可能没生效（LSPosed 未激活、作用域没勾）。
+    // 这里把真实通道算出来显示，避免"以为在伪造、实际是真值"。
+    var lsposedAlive by remember { mutableStateOf(XposedStatusHelper.isLsposedHookReallyActive(context)) }
+    val hookChannelPref = remember(isPointMockActive) { HookChannelPrefs.get(context) }
+    LaunchedEffect(isPointMockActive) {
+        // 只有正在模拟时才轮询：逻辑定位停止后就没人看了，不必持续 IPC。
+        while (isPointMockActive) {
+            lsposedAlive = XposedStatusHelper.isLsposedHookReallyActive(context)
+            delay(3000)
+        }
+        lsposedAlive = XposedStatusHelper.isLsposedHookReallyActive(context)
+    }
+    val hookChannelStatus = remember(hookChannelPref, lsposedAlive, isPointMockActive) {
+        HookChannelStatus.resolve(
+            preference = hookChannelPref,
+            isLsposedAlive = lsposedAlive,
+            // 应用侧发布的"是否 active"镜像：框架活着但没拿到配置时，这里仍是 false
+            hookConfigActive = com.mockrun.app.hook.HookStateBridge.isHookActive,
+            isMockActive = isPointMockActive || isJoystickRunning
+        )
+    }
     var showMapAppPickerSheet by remember { mutableStateOf(false) }
 
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -340,6 +425,10 @@ fun MapScreen(
     // 会被面板盖住）。这里测容器高度与面板高度，实时校准。
     var mapBoxHeightPx by remember { mutableIntStateOf(0) }
     var bottomPanelHeightPx by remember { mutableIntStateOf(0) }
+    // 顶部控件簇（状态栏 + 地址条 + 定位页的应用分流胶囊行）的实测高度。
+    // 与 bottomPanelHeightPx 一起构成本页「地图可用区」的上下边界：
+    // 右列悬浮控件的顶边限制线与底部抽屉的高度上限都由它推导。
+    var topChromeHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
 
     // 首帧兜底用的折叠态面板高度：onGloballyPositioned 要等第一次布局结束才回填真实值，
@@ -347,12 +436,45 @@ fun MapScreen(
     // ScreenInsets 的底部预留是设备相关的（系统导航栏 + 浮空底栏 72 + 外距 12 + 呼吸 12）。
     val collapsedPanelFallback = ScreenInsets.bottomInset(extra = 12.dp) + COLLAPSED_PANEL_CARD_HEIGHT
 
-    // 顶部安全区高度，以及右列顶边不得越过的限制线：
-    // 状态栏 + 顶部图标簇（56dp）+ 呼吸（12dp）。图标簇底边在 statusBarTop + 60dp，
-    // 故这条线到图标簇底边的真实余量是 8dp。参考设备 = 24 + 56 + 12 = 92dp；
-    // EXPANDED 档可用 114.7dp，仍 >= 紧凑形态下限 112dp，结论不变。
+    // 顶部安全区高度（只用于 onGloballyPositioned 首次回填之前的兜底估算）。
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val rightColumnTopLimit = statusBarTop + TOP_ICON_ROW_HEIGHT + TOP_MARGIN
+
+    // 顶部控件簇的实测高度 = 状态栏 + 地址条（56dp）+ 定位页的应用分流胶囊行（56dp）。
+    // 首帧还没有实测值时用常量兜底，之后完全跟随实测（旋转、平板、字体缩放都会自动跟上）。
+    // 这是「地图可用区」的上边界：右列悬浮控件与底部抽屉都不许越过它。
+    val topChromeFallback = statusBarTop + TOP_ICON_ROW_HEIGHT +
+        (if (activeMapTab == MapTab.LOCATION) TOP_CAPSULE_ROW_HEIGHT else 0.dp)
+    val topChromeHeight = if (topChromeHeightPx > 0) {
+        with(density) { topChromeHeightPx.toDp() }
+    } else {
+        topChromeFallback
+    }
+
+    // 右列顶边不得越过的限制线 = 顶部控件簇实测底边 + 呼吸。
+    // 旧实现写死「状态栏 + 56dp 图标行 + 12dp」，漏掉了定位页第二行的应用分流胶囊行
+    // （它的底边比图标行再低 56dp）：抽屉长高、右列被压缩上移时，缩放控件会被顶进
+    // 胶囊行里盖住「添加分流」等入口。改为跟随实测高度后这条重叠在物理上不可能发生。
+    val rightColumnTopLimit = topChromeHeight + TOP_MARGIN
+
+    // 统一「地图可用区」约束：底部抽屉允许长到的最大高度（含底部安全区）。
+    //   上限 = 容器高 − 顶部控件簇实测高 − 地图净空（MAP_MIN_VISIBLE_BAND）
+    //          → 抽屉在物理上够不到应用分流胶囊行，顶部控件不可能被抽屉遮挡；
+    //   下限 = 底部安全区 + 拖拽手柄 + 卡片内边距
+    //          → 屏幕再矮也保证手柄可点、抽屉可收放（此时宁可让抽屉压住顶部控件，
+    //            也不能把抽屉压成一条点不到手柄的窄缝）。
+    // 抽屉内容超出上限的部分由面板内部的 verticalScroll 承载，功能一个不少。
+    // collapsedPanelFallback = 底部安全区 + 折叠卡片 140dp，扣掉卡片高度即得底部安全区。
+    val panelMinHeight =
+        collapsedPanelFallback - COLLAPSED_PANEL_CARD_HEIGHT + PANEL_MIN_CONTENT_HEIGHT
+    // 容器高：首帧 onGloballyPositioned 还没回填时用窗口高度兜底 ——
+    // 高度上限因此永远是具体值（面板内部要用 weight 分配剩余空间，不能是无限约束）。
+    val containerHeight = if (mapBoxHeightPx > 0) {
+        with(density) { mapBoxHeightPx.toDp() }
+    } else {
+        LocalConfiguration.current.screenHeightDp.dp
+    }
+    val panelMaxHeight = (containerHeight - topChromeHeight - MAP_MIN_VISIBLE_BAND)
+        .coerceAtLeast(panelMinHeight)
 
     // 右列形态与胶囊目标高度 —— 由抽屉实测高度推导。
     // 用 derivedStateOf 而不是直接读 state：只有结果真的变了才通知读取者 ——
@@ -465,6 +587,54 @@ fun MapScreen(
         }
     }
 
+    /**
+     * 把「Pin 尖端所指的地图位置」写回瞄准坐标（内部统一 WGS-84）。
+     *
+     * 瞄准点必须跟着**尖端**走，而不是跟着地图中心走：尖端为了让开底部抽屉会上移，
+     * 用中心点会让注入位置落在尖端以南（折叠态几十米，抽屉全展可达数百米）。
+     */
+    fun recomputeAimingFromPinTip() {
+        val mapView = mapViewRef ?: return
+        if (mapView.width <= 0 || mapView.height <= 0) return
+        val clearancePx = with(density) {
+            pinTipClearancePx(
+                boxHeightPx = mapBoxHeightPx,
+                panelHeightPx = bottomPanelHeightPx,
+                fallbackPanelPx = collapsedPanelFallback.roundToPx(),
+                gapPx = PIN_TIP_GAP.roundToPx()
+            )
+        }
+        val tipY = (mapView.height / 2f - clearancePx).toInt()
+            .coerceIn(0, (mapView.height - 1).coerceAtLeast(0))
+        val tipGeo = runCatching { mapView.projection.fromPixels(mapView.width / 2, tipY) }
+            .logFailure("MapScreen", "project pin tip to GeoPoint", Diag.Level.DEBUG)
+            .getOrNull() ?: return
+        val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+        val (wgsLat, wgsLon) = if (isGcjMap) {
+            CoordinateConverter.gcj02ToWgs84(tipGeo.latitude, tipGeo.longitude)
+        } else {
+            tipGeo.latitude to tipGeo.longitude
+        }
+        centerAimingCoord = wgsLat to wgsLon
+        if (activeTargetKey == null) {
+            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
+        }
+    }
+
+    /**
+     * 抽屉高度变化后延迟重算瞄准点（防抖 160ms：展开动画期间只算最后一帧）。
+     *
+     * 由面板的 `onGloballyPositioned` 触发 —— 刻意不放在组合期：
+     * 组合期读 `bottomPanelHeightPx` 会让整页在抽屉动画的每一帧重组（连带地图 overlay 重建）。
+     */
+    fun scheduleAimingRecompute() {
+        updateCenterJob?.cancel()
+        updateCenterJob = coroutineScope.launch {
+            delay(160)
+            recomputeAimingFromPinTip()
+        }
+    }
+
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -522,19 +692,8 @@ fun MapScreen(
                                 updateCenterJob?.cancel()
                                 updateCenterJob = coroutineScope.launch {
                                     delay(120)
-                                    mapViewRef?.mapCenter?.let { centerGeo ->
-                                        val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                        val (wgsLat, wgsLon) = if (isGcjMap) {
-                                            CoordinateConverter.gcj02ToWgs84(centerGeo.latitude, centerGeo.longitude)
-                                        } else {
-                                            centerGeo.latitude to centerGeo.longitude
-                                        }
-                                        centerAimingCoord = wgsLat to wgsLon
-                                        val activeKey = activeTargetKey
-                                        if (activeKey == null) {
-                                            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
-                                        }
-                                    }
+                                    // 瞄准点 = Pin 尖端所指的位置（不是地图中心），见 recomputeAimingFromPinTip
+                                    recomputeAimingFromPinTip()
                                 }
                                 return false
                             }
@@ -807,6 +966,10 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    // 实测顶部控件簇高度（含 statusBarsPadding 的安全区），
+                    // 作为「地图可用区」上边界、右列顶边限制线与抽屉高度上限的输入。
+                    // 必须挂在 statusBarsPadding() 之前：挂在之后量到的是不含状态栏的内容高。
+                    .onGloballyPositioned { topChromeHeightPx = it.size.height }
                     .statusBarsPadding()
             ) {
                 Row(
@@ -1175,13 +1338,17 @@ fun MapScreen(
             //
             // 垂直偏移在布局阶段求值：offset {} 的 lambda 在放置时调用，对 bottomPanelHeightPx
             // 的读取只登记在放置作用域 —— 抽屉逐帧改高度只触发重新放置，不重组、不闪，
-            // 也不会「先按旧高度摆一帧再纠正」。组合期读同一个 state（如 pinBottomPadding 的
-            // remember(key) 写法）会让整页每帧重组，这里刻意不照抄。
+            // 也不会「先按旧高度摆一帧再纠正」。中心 Pin 的让位量同样已改到放置阶段
+            // （原先在组合期用 remember(bottomPanelHeightPx) 算 padding，会让整页每帧重组）。
+            //
+            // 列顶限制线 = 顶部控件簇实测底边 + 呼吸（见 rightColumnTopLimit），
+            // 因此缩放控件不会越进应用分流胶囊行；底部恒胶着在抽屉顶边上方 12dp，
+            // 而抽屉高度又被 panelMaxHeight 限制在地图净空之外 —— 三者的重叠在物理上不可能发生。
             //
             // 形态：两个子节点（0 = 缩放胶囊、1 = FAB 块）在 RightFloatingControlsLayout 里按
             // rightColumnCompactFraction 于「竖排 / 紧凑」之间插值，整列高度因此始终 <= 可用高度，
             // 列顶不会越过 rightColumnTopLimit；连紧凑形态都放不下时保①（底边依旧胶着在抽屉顶边
-            // 上方 12dp），列顶会越线，越线量见交付说明里的三档数字表。
+            // 上方 12dp），列顶会越线 —— 该情形只可能出现在极矮屏幕（抽屉已被压到操作下限）。
             RightFloatingControlsLayout(
                 compactFraction = rightColumnFraction,
                 modifier = Modifier
@@ -1245,7 +1412,10 @@ fun MapScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
-                        .padding(top = 76.dp, start = 12.dp)
+                        // 旧值是写死的 76dp（= 状态栏 + 地址条），正好压在应用分流胶囊行上：
+                        // 一旦开启虚拟定位，这条胶囊就把「全局通用 / 添加分流」盖住、点不到。
+                        // 改为跟随实测的顶部控件簇底边，永远落在分流行下方。
+                        .padding(top = topChromeHeight + 8.dp, start = 12.dp)
                         .clip(RoundedCornerShape(30.dp))
                         .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(30.dp)),
                     color = Color(0xEB000000),
@@ -1268,6 +1438,25 @@ fun MapScreen(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
+                        // 生效通道徽标：明确告诉用户现在靠哪条通道伪造。
+                        // LSPosed = 系统服务/SDK 一起被改写；"仅 Provider" = 只有应用层 mock，
+                        // 地图与社交类应用很可能仍显示真实位置；"未生效" = 选了 LSPosed 但模块没起来。
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = when (hookChannelStatus.active) {
+                                com.mockrun.app.hook.ActiveChannel.LSPOSED -> IosColors.SystemPurple.copy(alpha = 0.85f)
+                                com.mockrun.app.hook.ActiveChannel.PROVIDER_ONLY -> IosColors.SystemOrange.copy(alpha = 0.85f)
+                                com.mockrun.app.hook.ActiveChannel.NONE -> IosRed.copy(alpha = 0.85f)
+                            }
+                        ) {
+                            Text(
+                                text = hookChannelStatus.shortLabel,
+                                color = Color.White,
+                                style = IosTypography.Caption2,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         Surface(
                             shape = RoundedCornerShape(13.dp),
                             color = IosRed,
@@ -1309,30 +1498,32 @@ fun MapScreen(
                         .getOrNull()
                 } ?: IosBlue
 
-                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 46×56 水滴 Pin（偏上 34%）
-                // 让位量 = 2 × (面板高 − 容器高/2 + Pin 块高/2) + 呼吸 24dp，
-                // 下限保留原来的 130dp（面板不高时行为与旧版一致）。
-                // 推导：面板底部锚定，其顶边在 容器高 − 面板高；Pin 块（居中 + bottom padding X）
-                // 的底边在 容器高/2 − X/2 + Pin块高/2，令其不高于面板顶边即得该式。
-                val pinBottomPadding = remember(bottomPanelHeightPx, mapBoxHeightPx) {
-                    if (bottomPanelHeightPx == 0 || mapBoxHeightPx == 0) {
-                        130.dp
-                    } else {
-                        with(density) {
-                            val boxH = mapBoxHeightPx.toDp()
-                            val panelH = bottomPanelHeightPx.toDp()
-                            val clearance = panelH - boxH / 2 + CENTER_PIN_BLOCK_HEIGHT / 2
-                            maxOf(130.dp, clearance * 2 + 24.dp)
-                        }
-                    }
-                }
+                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 46×56 水滴 Pin。
+                //
+                // 几何（关键）：Pin 的**尖端**才是瞄准点，因此让位量按尖端算：
+                //   尖端屏幕 y = 容器中心 − 让位量，让位量 = pinTipClearancePx(...)
+                //   ⇒ 块中心需要上移 = PIN_TIP_BELOW_BLOCK_CENTER + 让位量
+                // 旧实现按「块底边」算让位（且带 130dp 下限与 ×2/+24 的推导），尖端因此既不落在
+                // 容器中心、也不随抽屉线性移动：瞄准点恒为容器中心，而尖端在它北面几十到几百米，
+                // 用户"用 Pin 瞄的点"和"真正注入的点"根本不是同一个位置。
+                // 现在两者由同一个让位量驱动：让位量为 0 时尖端正好在中心（瞄准点 = 中心 = 尖端），
+                // 抽屉长高时尖端上移，瞄准点同步上移（见 ScrollEvent 用 projection.fromPixels 取点）。
                 IosCenterPin(
                     label = if (currentActiveRule != null) "【${currentActiveRule.appName}】分流选点"
                             else if (activeMapTab == MapTab.ROUTE) "路线航点选点"
                             else "目标定位点",
                     pinColor = currentAimingColor,
                     icon = if (currentActiveRule != null) Icons.AutoMirrored.Filled.AltRoute else Icons.Default.Place,
-                    modifier = Modifier.padding(bottom = pinBottomPadding)
+                    modifier = Modifier.offset {
+                        val tipOffsetPx = PIN_TIP_BELOW_BLOCK_CENTER.roundToPx()
+                        val clearancePx = pinTipClearancePx(
+                            boxHeightPx = mapBoxHeightPx,
+                            panelHeightPx = bottomPanelHeightPx,
+                            fallbackPanelPx = collapsedPanelFallback.roundToPx(),
+                            gapPx = PIN_TIP_GAP.roundToPx()
+                        )
+                        IntOffset(x = 0, y = -(tipOffsetPx + clearancePx))
+                    }
                 )
             }
 
@@ -1347,7 +1538,16 @@ fun MapScreen(
                 LocationControlPanel(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .onGloballyPositioned { bottomPanelHeightPx = it.size.height },
+                        // 统一可用区约束：抽屉最高只能长到「容器高 − 顶部控件 − 地图净空」，
+                        // 超出部分由面板内部滚动承载（LocationControlPanel 的 verticalScroll），
+                        // 因此应用分流胶囊行永远不会被抽屉盖住。
+                        .heightIn(max = panelMaxHeight)
+                        .onGloballyPositioned { coords ->
+                            bottomPanelHeightPx = coords.size.height
+                            // 抽屉高度变了 ⇒ Pin 尖端在屏幕上的位置变了 ⇒ 瞄准点要跟着重算，
+                            // 否则「存的坐标」与「Pin 指的位置」会再次分叉。
+                            scheduleAimingRecompute()
+                        },
                     isMockActive = isPointMockActive || isJoystickRunning,
                     latitude = activeCoord.first,
                     longitude = activeCoord.second,
@@ -1461,7 +1661,14 @@ fun MapScreen(
                 RouteBottomPanel(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .onGloballyPositioned { bottomPanelHeightPx = it.size.height },
+                        // 与定位页同一套可用区约束：路线面板长高时同样不许侵入顶部控件簇。
+                        .heightIn(max = panelMaxHeight)
+                        .onGloballyPositioned { coords ->
+                            bottomPanelHeightPx = coords.size.height
+                            // 抽屉高度变了 ⇒ Pin 尖端在屏幕上的位置变了 ⇒ 瞄准点要跟着重算，
+                            // 否则「存的坐标」与「Pin 指的位置」会再次分叉。
+                            scheduleAimingRecompute()
+                        },
                     stage = routeStage,
                     waypoints = drawnWaypoints,
                     simState = simState,

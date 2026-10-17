@@ -6,7 +6,9 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import com.mockrun.app.hook.XposedStatusHelper
 import com.mockrun.app.util.Diag
+import com.mockrun.app.util.HookChannelPrefs
 import com.mockrun.app.util.logFailure
 import java.util.Collections
 
@@ -65,6 +67,19 @@ class MockLocationEngine(private val context: Context) {
 
     @Synchronized
     fun register(): Boolean {
+        // hook 通道可用时不注册 test provider：
+        //  1) 不依赖 appops，彻底避开 SecurityException（无 op 时注册必然抛）；
+        //  2) 不给所有位置盖上 mock 标记 —— 那是反作弊最直接的指纹；
+        //  3) 坐标由服务发布给 hook，由 system_server 侧改写，Provider 只是多余的兜底。
+        // 判据必须是「hook 真的拿到了 active 配置」，而不是「hook 通道可用」：
+        // 可用只代表框架活着，配置没送到时 hook 什么都不会做 —— 那样跳过 Provider
+        // 就等于两条路都没了（踩过一次，结果是"完全没效果"）。
+        if (HookChannelPrefs.isHookChannelUsable(context, XposedStatusHelper.isLsposedHookReallyActive(context)) &&
+            com.mockrun.app.hook.HookStateBridge.isHookActive
+        ) {
+            Diag.i("MockLocationEngine", "hook channel active — skipping test provider registration")
+            return true
+        }
         activeProviders.clear()
 
         // 1. GPS Provider

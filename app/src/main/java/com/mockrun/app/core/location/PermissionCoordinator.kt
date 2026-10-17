@@ -1,7 +1,9 @@
-﻿package com.mockrun.app.core.location
+package com.mockrun.app.core.location
 
 import android.content.Context
+import com.mockrun.app.hook.XposedStatusHelper
 import com.mockrun.app.util.Diag
+import com.mockrun.app.util.HookChannelPrefs
 import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
@@ -36,6 +38,20 @@ class PermissionCoordinator @Inject constructor(
         if (!PermissionHelper.hasLocationPermission(context)) {
             Diag.w(TAG, "Missing base location permission")
             return PermissionIssueType.LOCATION_PERMISSION_MISSING
+        }
+
+        // 1.5 LSPosed 通道可用时，不需要 Provider 的许可。
+        //     框架层是在 system_server 里原地改写，既不调用 addTestProvider，也不读 appops；
+        //     此时再强制用户去开发者选项勾「模拟位置信息应用」纯属多余的强制。
+        if (HookChannelPrefs.isHookChannelUsable(context, XposedStatusHelper.isLsposedHookReallyActive(context))) {
+            // hook 可用 → 不弹"需设置模拟位置应用"，不强制开发者选项。
+            // 但仍然**尽力把 Provider 许可备好**（root 下静默 appops 授予）：
+            // hook 万一没拿到配置，Provider 兜底能立刻接管，而不是两条路一起哑。
+            if (rootBridge.isRootAvailable()) {
+                runCatching { rootBridge.grantMockLocation(context.packageName) }
+            }
+            Diag.d(TAG, "hook channel usable — provider permission pre-armed, no user prompt")
+            return PermissionIssueType.NONE
         }
 
         // 2. Root 模式自动授权与放行

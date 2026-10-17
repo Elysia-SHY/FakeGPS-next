@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -279,6 +281,9 @@ fun RouteBottomPanel(
             .fillMaxWidth()
             .padding(horizontal = 14.dp)
             .padding(bottom = bottomInset.coerceAtLeast(0.dp))
+            // 与定位页抽屉同一套「地图可用区」约束：调用方的 heightIn(max = …) 把面板压在
+            // 地图净空以内后，超出的内容在这里滚动查看，而不是把面板顶到顶部控件上或裁掉内容。
+            .verticalScroll(rememberScrollState())
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,

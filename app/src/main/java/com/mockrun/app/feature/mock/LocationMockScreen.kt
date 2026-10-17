@@ -40,6 +40,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.mockrun.app.BuildConfig
+import com.mockrun.app.hook.HookStateBridge
 import com.mockrun.app.hook.XposedStatusHelper
 import com.mockrun.app.core.location.AddressResolver
 import com.mockrun.app.core.location.CoordinateConverter
@@ -49,6 +50,8 @@ import com.mockrun.app.core.location.RootSuBridge
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.InjectionMode
+import com.mockrun.app.util.HookChannel
+import com.mockrun.app.util.HookChannelPrefs
 import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.util.logFailure
@@ -219,6 +222,9 @@ fun LocationMockScreen(
     var isRootMode by remember {
         mutableStateOf(InjectionModePrefs.isRootMode(context))
     }
+
+    // 注入通道（与 isRootMode 正交）：AUTO / LSPOSED / PROVIDER，见 util/HookChannel.kt
+    var hookChannel by remember { mutableStateOf(HookChannelPrefs.get(context)) }
     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
     var isBatteryIgnoring by remember {
         mutableStateOf(
@@ -956,6 +962,45 @@ fun LocationMockScreen(
                     } else {
                         Toast.makeText(context, "免 Root 模式下可通过系统设置优化", Toast.LENGTH_SHORT).show()
                     }
+                }
+            )
+
+            IosHairlineDivider(startIndent = 58.dp)
+
+            // Item 2.5: 注入通道（与上面的「Root / 免 Root」正交的第二个维度）
+            //
+            // 上面那一项决定「怎么拿到注入许可」，这一项决定「hook 走哪条路送到目标进程」。
+            // 分开的理由见 util/HookChannel.kt 的注释：两条通道的成功判据、失败面、
+            // 停机清理方式完全不同，不能混在同一个开关里。
+            IosListRow(
+                title = "注入通道",
+                subtitle = when (hookChannel) {
+                    HookChannel.AUTO -> "自动：框架层存活就走 LSPosed，否则回退系统 MockProvider"
+                    HookChannel.LSPOSED -> "仅框架层（system_server 改写）：需 LSPosed 已激活，否则会明确报警"
+                    HookChannel.PROVIDER -> "仅系统 MockProvider：不向 hook 发布配置，无坐标残留"
+                },
+                icon = Icons.Default.Tune,
+                iconBackground = when (hookChannel) {
+                    HookChannel.LSPOSED -> IosColors.SystemPurple
+                    HookChannel.PROVIDER -> IosColors.SystemOrange
+                    HookChannel.AUTO -> IosColors.SystemBlue
+                },
+                trailingText = HookChannelPrefs.shortLabel(hookChannel),
+                showChevron = true,
+                onClick = {
+                    val next = HookChannelPrefs.next(hookChannel)
+                    HookChannelPrefs.set(context, next)
+                    hookChannel = next
+                    // 切到 Provider：立刻清掉已发布的 hook 配置。
+                    // 否则 setprop / /data 文件里的旧坐标没人消费，却对任何进程可读。
+                    if (next == HookChannel.PROVIDER) {
+                        HookStateBridge.clearPublishedState(context)
+                    }
+                    Toast.makeText(
+                        context,
+                        "注入通道：${HookChannelPrefs.shortLabel(next)}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             )
 

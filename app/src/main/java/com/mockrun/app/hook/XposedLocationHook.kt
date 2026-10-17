@@ -40,66 +40,26 @@ data class SpoofLocation(
 private const val TAG = "LocationHook"
 
 // ============================================================================
-// 坐标系转换（内联实现）
+// 坐标系转换
 //
-// 为什么不复用 core.location.CoordinateConverter：那个 object 反向引用了
-// hook.HookStateBridge（CoordinateConverter.kt:88），而本文件属于 hook 包。
-// 直接 import 会形成 hook -> core.location -> hook 的循环依赖。
-//
-// 为什么 hook 侧必须自己转：
+// 为什么 hook 侧要转：
 //   AMapLocation  对外契约是 GCJ-02（国内），BDLocation 是 BD-09，
-//   TencentLocation 是 GCJ-02。而 mock 注入的是 WGS-84。
+//   TencentLocation 是 GCJ-02。而 mock 注入的系统 Location 是 WGS-84。
 //   直接塞 WGS-84 会被 SDK 再转一次，偏差被放大一倍。
+//
+// 算法本体**只有一份**：com.mockrun.app.util.GeoTransform（纯函数、无 Android/Xposed 依赖）。
+// 旧实现把同一套公式在本文件里又抄了一遍，而文件私有的函数无法被单元测试覆盖 ——
+// 两份实现一旦漂移（少一个 isInfinite 判断、常数抄错），注入坐标与地图显示就会不一致，
+// 且没有任何测试能发现。这里只保留两个转发函数，公式一律走 GeoTransform。
 // ============================================================================
 
-private const val GCJ_A = 6378245.0
-private const val GCJ_EE = 0.00669342162296594323
-private const val BD_X_PI = Math.PI * 3000.0 / 180.0
+/** WGS-84 -> GCJ-02（高德 / 腾讯 SDK 对外契约）。 */
+private fun wgs84ToGcj02(lat: Double, lon: Double): Pair<Double, Double> =
+    com.mockrun.app.util.GeoTransform.wgs84ToGcj02(lat, lon)
 
-private fun outOfChina(lat: Double, lon: Double): Boolean =
-    lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
-
-private fun gcjTransformLat(x: Double, y: Double): Double {
-    var r = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * kotlin.math.sqrt(kotlin.math.abs(x))
-    r += (20.0 * kotlin.math.sin(6.0 * x * Math.PI) + 20.0 * kotlin.math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
-    r += (20.0 * kotlin.math.sin(y * Math.PI) + 40.0 * kotlin.math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0
-    r += (160.0 * kotlin.math.sin(y / 12.0 * Math.PI) + 320.0 * kotlin.math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0
-    return r
-}
-
-private fun gcjTransformLon(x: Double, y: Double): Double {
-    var r = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * kotlin.math.sqrt(kotlin.math.abs(x))
-    r += (20.0 * kotlin.math.sin(6.0 * x * Math.PI) + 20.0 * kotlin.math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
-    r += (20.0 * kotlin.math.sin(x * Math.PI) + 40.0 * kotlin.math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0
-    r += (150.0 * kotlin.math.sin(x / 12.0 * Math.PI) + 300.0 * kotlin.math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0
-    return r
-}
-
-/** WGS-84 -> GCJ-02 */
-private fun wgs84ToGcj02(lat: Double, lon: Double): Pair<Double, Double> {
-    if (lat.isNaN() || lon.isNaN() || outOfChina(lat, lon)) return lat to lon
-    var dLat = gcjTransformLat(lon - 105.0, lat - 35.0)
-    var dLon = gcjTransformLon(lon - 105.0, lat - 35.0)
-    val rLat = Math.toRadians(lat)
-    var magic = kotlin.math.sin(rLat); magic = 1 - GCJ_EE * magic * magic
-    val sqrtMagic = kotlin.math.sqrt(magic)
-    dLat = dLat * 180.0 / (GCJ_A * (1 - GCJ_EE) / (magic * sqrtMagic) * Math.PI)
-    dLon = dLon * 180.0 / (GCJ_A / sqrtMagic * kotlin.math.cos(rLat) * Math.PI)
-    return (lat + dLat) to (lon + dLon)
-}
-
-/** GCJ-02 -> BD-09 */
-private fun gcj02ToBd09(lat: Double, lon: Double): Pair<Double, Double> {
-    val z = kotlin.math.sqrt(lon * lon + lat * lat) + 0.00002 * kotlin.math.sin(lat * BD_X_PI)
-    val theta = kotlin.math.atan2(lat, lon) + 0.000003 * kotlin.math.cos(lon * BD_X_PI)
-    return (z * kotlin.math.sin(theta) + 0.006) to (z * kotlin.math.cos(theta) + 0.0065)
-}
-
-/** WGS-84 -> BD-09 */
-private fun wgs84ToBd09(lat: Double, lon: Double): Pair<Double, Double> {
-    val (gLat, gLon) = wgs84ToGcj02(lat, lon)
-    return gcj02ToBd09(gLat, gLon)
-}
+/** WGS-84 -> BD-09（百度 SDK 对外契约）。 */
+private fun wgs84ToBd09(lat: Double, lon: Double): Pair<Double, Double> =
+    com.mockrun.app.util.GeoTransform.wgs84ToBd09(lat, lon)
 
 /**
  * 硬件侧超过这个时长没有任何一次真实分发，就判定为"静默"（GPS 关闭、室内无信号、
@@ -227,13 +187,20 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     private fun hookSystemServer(lpparam: XC_LoadPackage.LoadPackageParam) {
         // 1.1 Hook LocationProviderManager (Android 11 - 15+)
-        hookLocationProviderManager(lpparam)
+        // 这两条必须在 runCatching 里：任一抛异常会中断 handleLoadPackage，
+        // 导致整个模块在 system_server 里"静默不加载"（真机症状：LSPosed 日志零记录）。
+        runCatching { hookLocationProviderManager(lpparam) }
+            .onFailure { Diag.w(TAG, "hookLocationProviderManager failed: ${'$'}{it.javaClass.simpleName}: ${'$'}{it.message}") }
+        runCatching { hookLmsDispatchers(lpparam) }
+        runCatching { hookProviderReportLayer(lpparam) }
+            .onFailure { Diag.w(TAG, "hookLmsDispatchers failed: ${'$'}{it.javaClass.simpleName}: ${'$'}{it.message}") }
 
         // 1.2 Hook LocationManagerService (All Android versions)
         hookLocationManagerService(lpparam)
+        // 这两条此前是死代码（有定义、无调用）：Provider 层改写与 Registration 分发钩子
+        // 从未安装，所以只有 getLastLocation 一次性查询被改写 —— 表现为"首次跳到假点、之后不跟随"。
 
         // 1.3 Hook LMS Listener Dispatchers (Receiver / LocationRegistration)
-        hookLmsDispatchers(lpparam)
 
         // 1.4 Hook System-level WifiServiceImpl (Cut off Wi-Fi BSSID scanner)
         hookSystemWifiService(lpparam)
@@ -467,12 +434,12 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(lpmClass, "onReportLocation", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         loadMultiTargetRules()
-                        // If per-app multi-target rules exist, do NOT replace raw hardware location globally!
-                        // Allow raw location to reach LocationRegistration so each app can be routed independently.
-                        if (multiTargetCache.isNotEmpty()) {
-                            return
-                        }
-
+                        // 旧实现在这里「只要存在任何分流规则就整体 return」，把 provider 层的替换全部关掉：
+                        // 分流能否生效就完全押在 Registration 分发钩子上 —— 钩子没落上（ROM 改名/混淆）、
+                        // 或身份解析失败时，**整台设备所有应用**都会退回真实位置；
+                        // 而且一条「暂停(REAL_PASSTHROUGH)」的规则同样会填进 multiTargetCache，连全局模拟都被关掉。
+                        // 现在照常按全局配置替换：per-app 规则仍由分发钩子（那里能拿到 uid/包名）覆盖成该应用自己的点，
+                        // 没有规则命中的应用按产品设计拿到全局点；全局模拟未开启时这里什么都不做。
                         val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         val resultArg = param.args.getOrNull(0) ?: return
@@ -615,7 +582,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(lmsClass, "reportLocation", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         loadMultiTargetRules()
-                        if (multiTargetCache.isNotEmpty()) return // Let per-app dispatch handle it
+                        // 同 onReportLocation：不再因为「存在分流规则」而整体关掉这一层的替换。
                         val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         val originalLoc = param.args.firstOrNull { it is Location } as? Location
@@ -635,7 +602,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(lmsClass, "handleLocationChanged", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         loadMultiTargetRules()
-                        if (multiTargetCache.isNotEmpty()) return // Let per-app dispatch handle it
+                        // 同 onReportLocation：不再因为「存在分流规则」而整体关掉这一层的替换。
                         val spoof = getGlobalActiveLocation() ?: return
                         if (!spoof.isActive) return
                         for (i in param.args.indices) {
@@ -1440,12 +1407,15 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }
 
         // 3. requestLocationUpdates listener hook
+        //
+        // 这里**不能**用「注册的这一刻模拟是否已经开启」做门槛。
+        // 应用普遍在启动阶段就注册监听器，而模拟是用户之后才开的；旧写法在这种情况下直接 return，
+        // 于是该进程的监听器类永远没被挂上，此后无论模拟是否开启都一直收到真实位置
+        // —— 表现为「开了独立分流，目标应用却还是真实定位」。
+        // 是否伪造改由回调内部逐次调用 getActiveLocation() 判定（见 hookLocationListener）。
         runCatching {
             XposedBridge.hookAllMethods(lmClass, "requestLocationUpdates", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    val spoof = getActiveLocation() ?: return
-                    if (!spoof.isActive) return
-
                     for (arg in param.args) {
                         if (arg is LocationListener) {
                             hookLocationListener(arg.javaClass)
@@ -1514,52 +1484,152 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 }
             })
         }.logFailure(TAG, "hook LocationManager.getGpsStatus")
+
+        // 7. Provider 可用性查询（客户端侧）
+        //
+        // 系统侧虽然已经挂了 LMS.isProviderEnabled / getBestProvider / getProviders，但
+        // android.location.LocationManager 在**客户端进程**里还有一份自己的 provider 状态缓存
+        // （AOSP 13 的 LocationManager 会缓存并本地失效），而模块此前完全没有挂客户端这几个方法。
+        // 后果：应用启动时先问一句"GPS 开着吗"，拿到"没开"就直接不做定位 —— 后面的注入根本没机会发生。
+        // 这里只在「确实存在模拟配置」时把 GPS 报成可用；未配置时一律透传系统真实状态。
+        runCatching {
+            XposedBridge.hookAllMethods(lmClass, "isProviderEnabled", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (param.result != false) return
+                    if (!hasSpoofConfig()) return
+                    val provider = param.args.firstOrNull { it is String } as? String
+                    if (provider == null || isLocationProviderName(provider)) {
+                        param.result = true
+                    }
+                }
+            })
+
+            XposedBridge.hookAllMethods(lmClass, "getBestProvider", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!hasSpoofConfig()) return
+                    val current = param.result as? String
+                    if (current == null || current == LocationManager.PASSIVE_PROVIDER) {
+                        param.result = LocationManager.GPS_PROVIDER
+                    }
+                }
+            })
+
+            XposedBridge.hookAllMethods(lmClass, "getProviders", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!hasSpoofConfig()) return
+                    @Suppress("UNCHECKED_CAST")
+                    val list = param.result as? MutableList<String> ?: return
+                    if (!list.contains(LocationManager.GPS_PROVIDER)) {
+                        list.add(LocationManager.GPS_PROVIDER)
+                    }
+                }
+            })
+        }.logFailure(TAG, "hook LocationManager provider-state queries")
+    }
+
+    /**
+     * 是否「存在模拟配置」：全局模拟已开启，或至少配了一条分流规则。
+     *
+     * 只用于 provider 可用性查询这类"要不要告诉应用 GPS 可用"的判断 ——
+     * 没有配置时必须原样透传系统状态，不能影响任何未使用模拟的应用。
+     */
+    private fun hasSpoofConfig(): Boolean {
+        loadMultiTargetRules()
+        if (multiTargetCache.isNotEmpty()) return true
+        val spoof = getGlobalActiveLocation()
+        return spoof != null && spoof.isActive
     }
 
     private val hookedListenerClasses: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
+    /**
+     * 已经挂成功的「类#方法」键。
+     *
+     * 旧实现按「类名」记录，而且在**尝试挂载之前**就把类名写进集合：某个方法一旦挂失败
+     * （抽象方法、被 ROM 改写、被混淆），这个类就被永久标记成"已处理"，之后再也不会重试 ——
+     * 应用于是整个进程生命周期都在收真实位置。改成按方法记录，且只在挂成功后才保留。
+     */
+    private val hookedListenerMethods: MutableSet<String> =
+        java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     private fun hookLocationListener(listenerClass: Class<*>) {
         val className = listenerClass.name
-        if (!hookedListenerClasses.add(className)) return
 
         // Hook onLocationChanged(Location)
-        runCatching {
-            XposedHelpers.findAndHookMethod(
-                listenerClass,
-                "onLocationChanged",
-                Location::class.java,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (spoof.isActive) {
-                            val originalLoc = param.args[0] as? Location
-                            val provider = originalLoc?.provider ?: LocationManager.GPS_PROVIDER
-                            param.args[0] = createSpoofedLocation(provider, spoof)
+        val locKey = "$className#onLocationChanged(Location)"
+        if (hookedListenerMethods.add(locKey)) {
+            runCatching {
+                XposedHelpers.findAndHookMethod(
+                    listenerClass,
+                    "onLocationChanged",
+                    Location::class.java,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                val originalLoc = param.args[0] as? Location
+                                val provider = originalLoc?.provider ?: LocationManager.GPS_PROVIDER
+                                param.args[0] = createSpoofedLocation(provider, spoof)
+                            }
                         }
                     }
-                }
-            )
-        }.logFailure(TAG, "hook ${className}.onLocationChanged(Location)")
+                )
+            }.onFailure { hookedListenerMethods.remove(locKey) }
+                .logFailure(TAG, "hook ${className}.onLocationChanged(Location)")
+        }
 
         // Hook onLocationChanged(List<Location>) - Android 12~16
-        runCatching {
-            XposedHelpers.findAndHookMethod(
-                listenerClass,
-                "onLocationChanged",
-                List::class.java,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val spoof = getActiveLocation() ?: return
-                        if (spoof.isActive) {
-                            val list = param.args[0] as? List<*> ?: return
-                            val provider = (list.firstOrNull() as? Location)?.provider ?: LocationManager.GPS_PROVIDER
-                            val spoofed = createSpoofedLocation(provider, spoof)
-                            param.args[0] = listOf(spoofed)
+        val listKey = "$className#onLocationChanged(List)"
+        if (hookedListenerMethods.add(listKey)) {
+            runCatching {
+                XposedHelpers.findAndHookMethod(
+                    listenerClass,
+                    "onLocationChanged",
+                    List::class.java,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (spoof.isActive) {
+                                val list = param.args[0] as? List<*> ?: return
+                                val provider = (list.firstOrNull() as? Location)?.provider ?: LocationManager.GPS_PROVIDER
+                                val spoofed = createSpoofedLocation(provider, spoof)
+                                param.args[0] = listOf(spoofed)
+                            }
                         }
                     }
-                }
-            )
-        }.logFailure(TAG, "hook ${className}.onLocationChanged(List<Location>)")
+                )
+            }.onFailure { hookedListenerMethods.remove(listKey) }
+                .logFailure(TAG, "hook ${className}.onLocationChanged(List<Location>)")
+        }
+
+        // Hook onLocationAvailability(LocationAvailability)
+        //
+        // AOSP 在"当前拿不到定位"时会回调它（例如只注册了 GPS 而此刻无星）。不挂这个回调时，
+        // 应用可以据此把界面切成"无法定位/定位失败"，即使 onLocationChanged 已经被替换成模拟点。
+        //
+        // 注意：`android.location.LocationAvailability` **不在公开 SDK 桩里**（它只存在于隐藏 API），
+        // 所以这里不能用 findAndHookMethod 传参数类型 —— 那样会直接编译不过（这也正是本模块此前
+        // 从未挂上这个回调的原因）。改用 hookAllMethods 按方法名挂载，参数对象只做反射改字段。
+        val availKey = "$className#onLocationAvailability"
+        if (hookedListenerMethods.add(availKey)) {
+            runCatching {
+                XposedBridge.hookAllMethods(
+                    listenerClass,
+                    "onLocationAvailability",
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (!spoof.isActive) return
+                            val availability = param.args.getOrNull(0) ?: return
+                            runCatching {
+                                XposedHelpers.setBooleanField(availability, "mIsLocationAvailable", true)
+                            }.logFailure(TAG, "force LocationAvailability.mIsLocationAvailable", Diag.Level.DEBUG)
+                        }
+                    }
+                )
+            }.onFailure { hookedListenerMethods.remove(availKey) }
+                .logFailure(TAG, "hook ${className}.onLocationAvailability")
+        }
     }
 
     private val hookedGnssCallbackClasses: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
@@ -1669,11 +1739,26 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }.logFailure(TAG, "hook TelephonyManager.getCellLocation")
     }
 
+    /** 已挂钩过的 AMapLocation Class 引用，防止 loadClass 监听重复挂钩。 */
+    private val hookedAmapClasses = java.util.Collections.synchronizedSet(mutableSetOf<Class<*>>())
+
     private fun hookProprietaryMapSdks(lpparam: XC_LoadPackage.LoadPackageParam) {
-        // Amap Location SDK
+        // Amap Location SDK —— 立即尝试（类可能已在 bootclasspath 关联路径）
         runCatching {
             val amapLocationClass = XposedHelpers.findClassIfExists("com.amap.api.location.AMapLocation", lpparam.classLoader)
             if (amapLocationClass != null) {
+                hookAmapLocationGetters(amapLocationClass)
+            }
+        }.logFailure(TAG, "hook AMapLocation immediate")
+
+        // 其余地图 SDK（AMapLocationQualityReport / Baidu / Tencent）保持原有立即尝试逻辑
+        hookOtherMapSdks(lpparam)
+    }
+
+    /** 对已加载的 AMapLocation Class 挂钩全部 getter（幂等，由 hookedAmapClasses 去重）。 */
+    private fun hookAmapLocationGetters(amapLocationClass: Class<*>) {
+        runCatching {
+            run {
                 XposedBridge.hookAllMethods(amapLocationClass, "getLatitude", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
@@ -1695,7 +1780,16 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(amapLocationClass, "getCoordType", object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val spoof = getActiveLocation() ?: return
-                        if (spoof.isActive) param.result = "GCJ02"
+                        if (spoof.isActive) {
+                            // 境外不做 GCJ 偏移（GeoTransform 的国界判断），此时若仍宣称 GCJ02，
+                            // 信任该字段的应用会把一个 WGS-84 值按 GCJ 解释 —— 又是 ~500m。
+                            param.result =
+                                if (com.mockrun.app.util.GeoTransform.outOfChina(spoof.latitude, spoof.longitude)) {
+                                    "WGS84"
+                                } else {
+                                    "GCJ02"
+                                }
+                        }
                     }
                 })
                 XposedBridge.hookAllMethods(amapLocationClass, "getErrorCode", object : XC_MethodHook() {
@@ -1752,8 +1846,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
                     }
                 })
             }
-        }.logFailure(TAG, "hook AMapLocation getters (com.amap.api.location.AMapLocation)")
+        }.logFailure(TAG, "hook AMapLocation getters")
+    }
 
+    /** AMapLocationQualityReport / Baidu / Tencent 等其他 SDK 的挂钩（保持原立即尝试逻辑）。 */
+    private fun hookOtherMapSdks(lpparam: XC_LoadPackage.LoadPackageParam) {
         // AMapLocationQualityReport：isInstalledHighDangerMockApp() 会扫本机包名，
         // 而本模块 manifest 里就有 ACCESS_MOCK_LOCATION + xposedmodule meta-data，
         // 是静态可扫的，必须在返回值上盖掉。
@@ -2125,18 +2222,14 @@ class XposedLocationHook : IXposedHookLoadPackage {
         return (now - elapsed) <= 30_000L
     }
 
-    private data class TargetAppRule(
-        val packageName: String,
-        val userId: Int,
-        val isEnabled: Boolean,
-        val mode: String,
-        val latitude: Double,
-        val longitude: Double,
-        val altitude: Double,
-        val speed: Float
-    )
+    // TargetAppRule / RuleDecision / TargetRuleResolver 见同包 TargetRuleResolver.kt ——
+    // 匹配逻辑抽成纯函数是为了能被单元测试覆盖（这里原本埋着一个 2600 行类里的私有判断）。
 
     private val multiTargetCache = java.util.concurrent.ConcurrentHashMap<String, TargetAppRule>()
+
+    /** 「无规则」这条日志只在状态翻转时打一次，避免高频刷屏。 */
+    @Volatile
+    private var loggedRoutingInactive = false
     @Volatile
     private var lastMultiTargetReadTime = 0L
 
@@ -2216,15 +2309,40 @@ class XposedLocationHook : IXposedHookLoadPackage {
     private fun getPackageForUid(uid: Int): String? {
         if (uid <= 1000) return "android"
         uidPackageCache[uid]?.let { return it }
-        val ctx = getAnyContext() ?: return null
-        val pkg = runCatching { ctx.packageManager.getPackagesForUid(uid)?.firstOrNull() }
-            .logFailure(TAG, "resolve package name for uid $uid", Diag.Level.DEBUG)
-            .getOrNull()
+        val pkg = resolvePackageViaContext(uid) ?: resolvePackageViaPackageManagerService(uid)
         if (pkg != null) {
             uidPackageCache[uid] = pkg
+        } else {
+            Diag.d(TAG, "cannot resolve package for uid $uid — per-app rule lookup degrades to global/real")
         }
         return pkg
     }
+
+    private fun resolvePackageViaContext(uid: Int): String? {
+        val ctx = getAnyContext() ?: return null
+        return runCatching { ctx.packageManager.getPackagesForUid(uid)?.firstOrNull() }
+            .logFailure(TAG, "resolve package for uid $uid via Context", Diag.Level.DEBUG)
+            .getOrNull()
+    }
+
+    /**
+     * 不依赖 Context 的兜底：直接问 PackageManagerService。
+     *
+     * system_server 里 `getAnyContext()` 走的是 ActivityThread 的 hidden API，在部分 ROM（MIUI 等）
+     * 上拿不到；一旦拿不到，uid→包名解析整体失败，per-app 规则匹配就静默退化成"全局或真实位置"，
+     * 表现正是「必须把目标应用也加进 LSPosed 作用域才能生效」。
+     * IPackageManager 是 system_server 自己持有的对象，绕开 Context 更可靠。
+     */
+    private fun resolvePackageViaPackageManagerService(uid: Int): String? = runCatching {
+        val ipm = Class.forName("android.app.AppGlobals")
+            .getMethod("getPackageManager")
+            .invoke(null)
+            ?: return@runCatching null
+        val method = Class.forName("android.content.pm.IPackageManager")
+            .getMethod("getPackagesForUid", Int::class.javaPrimitiveType)
+        @Suppress("UNCHECKED_CAST")
+        (method.invoke(ipm, uid) as? Array<String>)?.firstOrNull()
+    }.logFailure(TAG, "resolve package for uid $uid via IPackageManager", Diag.Level.DEBUG).getOrNull()
 
     @Volatile
     private var lastMultiTargetVersion: String = ""
@@ -2289,10 +2407,21 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }
 
         if (jsonText.isNullOrEmpty()) {
-            // All five channels came up empty. Previously this returned silently, which made
-            // "per-app routing is not configured" indistinguishable from "every channel is
-            // broken" — and the difference matters a lot when routing appears to do nothing.
-            Diag.d(TAG, "no multi-target rules from any of the 5 channels — routing inactive")
+            // 五个通道全空：规则被删掉，或所有通道都读不到。
+            // 旧实现直接 return，**保留上一次读到的规则** —— 用户删除/停用规则后，已 hook 的进程
+            // 仍按旧规则继续伪造，直到进程重启。这里显式清空，让"删除即失效"成立。
+            if (multiTargetCache.isNotEmpty()) {
+                multiTargetCache.clear()
+                loggedRoutingInactive = false
+            Diag.i(TAG, "no multi-target rules from any of the 5 channels — cache cleared, per-app routing off")
+            } else {
+                // 只在状态翻转时打一次：这段在每次 getActiveLocation 都会走到，
+            // 无节流时会 1ms 内连打 5 行，真机 logcat 直接被刷爆。
+            if (!loggedRoutingInactive) {
+                loggedRoutingInactive = true
+                Diag.d(TAG, "no multi-target rules from any of the 5 channels — routing inactive")
+            }
+            }
             return
         }
 
@@ -2320,6 +2449,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
         targetPackage: String? = null,
         targetUid: Int? = null
     ): SpoofLocation? {
+        Diag.i(TAG, "[diag] getActiveLocation called pkg=$targetPackage uid=$targetUid proc=$currentProcessPackage")
         loadMultiTargetRules()
 
         if (multiTargetCache.isNotEmpty()) {
@@ -2330,13 +2460,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
             if (resolvedPkg != null) {
                 val userId = if (uid > 1000) uid / 100000 else 0
-                val rule = multiTargetCache["${resolvedPkg}_$userId"]
-                    ?: multiTargetCache["${resolvedPkg}_0"]
-                    ?: multiTargetCache[resolvedPkg]
-
-                if (rule != null) {
-                    if (!rule.isEnabled || rule.mode == "REAL_PASSTHROUGH") {
-                        // Pass through 100% real hardware location (Do NOT spoof)
+                when (val decision = TargetRuleResolver.resolve(multiTargetCache, resolvedPkg, userId)) {
+                    is RuleDecision.PassThrough -> {
+                        // 命中但暂停 / 显式透传：透出 100% 真实硬件位置（绝不回落到全局模拟点）
                         return SpoofLocation(
                             isActive = false,
                             latitude = 0.0,
@@ -2348,28 +2474,37 @@ class XposedLocationHook : IXposedHookLoadPackage {
                         )
                     }
 
-                    // Route simulation is strictly global: if route cruising is running, all apps follow moving route
-                    val isRouteSimulating = runCatching { getSystemProperty("debug.fakegps.is_route") == "1" }.getOrDefault(false)
-                    if (isRouteSimulating) {
-                        return getGlobalActiveLocation()
+                    is RuleDecision.Spoof -> {
+                        val rule = decision.rule
+                        // Route simulation is strictly global: if route cruising is running, all apps follow moving route
+                        val isRouteSimulating = runCatching { getSystemProperty("debug.fakegps.is_route") == "1" }.getOrDefault(false)
+                        if (isRouteSimulating) {
+                            return getGlobalActiveLocation()
+                        }
+
+                        return SpoofLocation(
+                            isActive = true,
+                            latitude = rule.latitude,
+                            longitude = rule.longitude,
+                            altitude = rule.altitude,
+                            // 不要固定 0f：会被 applyPlausibleDefaults 统一补成恒定值，
+                            // 成为一个「朝向永远不变」的指纹。按包名派生一个稳定但非恒定的方位角。
+                            bearing = ((rule.packageName.hashCode() % 360).toFloat() + 360f) % 360f,
+                            speed = rule.speed,
+                            timestamp = System.currentTimeMillis()
+                        )
                     }
 
-                    return SpoofLocation(
-                        isActive = true,
-                        latitude = rule.latitude,
-                        longitude = rule.longitude,
-                        altitude = rule.altitude,
-                        // 不要固定 0f：会被 applyPlausibleDefaults 统一补成恒定值，
-                        // 成为一个「朝向永远不变」的指纹。按包名派生一个稳定但非恒定的方位角。
-                        bearing = ((rule.packageName.hashCode() % 360).toFloat() + 360f) % 360f,
-                        speed = rule.speed,
-                        timestamp = System.currentTimeMillis()
-                    )
+                    RuleDecision.NoRule -> {
+                        // 没命中：交给下面的全局逻辑
+                    }
                 }
             }
         }
 
-        return getGlobalActiveLocation()
+        val g = getGlobalActiveLocation()
+        Diag.i(TAG, "[diag] getActiveLocation -> global result: active=${g?.isActive} lat=${g?.latitude} lon=${g?.longitude} ts=${g?.timestamp} nowMs=${System.currentTimeMillis()}")
+        return g
     }
 
     private fun getGlobalActiveLocation(): SpoofLocation? {
@@ -2664,5 +2799,88 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 loc.elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
             }
         }.logFailure(TAG, "apply plausible defaults", Diag.Level.WARN)
+    }
+
+    // ================= Provider 上报层改写 =================
+    // 参考开源实现的核心思路（不照搬代码）：
+    //  1) AbstractLocationProvider.reportLocation 是所有 provider（gps/network/fused）上报的唯一咽喉；
+    //  2) LocationProviderManager.onReportLocation 里必须**自己驱动分发**：
+    //     acceptLocationChange 返回的是惰性 ListenerOperation，必须再调 executeOperation 才会回调；
+    //  3) 每个伪造点显式 isMock = false（否则反作弊一眼看穿）。
+    // 这三点正是"首次跳到假点、之后不跟随"的解药。
+    private fun hookProviderReportLayer(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val cl = lpparam.classLoader
+        val locationResultClass = XposedHelpers.findClassIfExists("android.location.LocationResult", cl)
+        val abstractProvider = XposedHelpers.findClassIfExists(
+            "com.android.server.location.provider.AbstractLocationProvider", cl
+        )
+        if (locationResultClass != null && abstractProvider != null) {
+            runCatching {
+                val m = XposedHelpers.findMethodExactIfExists(abstractProvider, "reportLocation", locationResultClass)
+                if (m != null) {
+                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val spoof = getActiveLocation() ?: return
+                            if (!spoof.isActive) return
+                            rewriteLocationResult(param.args.getOrNull(0), LocationManager.GPS_PROVIDER, spoof)
+                        }
+                    })
+                    Diag.i(TAG, "reportLayer: AbstractLocationProvider.reportLocation hooked")
+                }
+            }.onFailure { Diag.w(TAG, "reportLayer: hook reportLocation failed: ${it.message}") }
+        }
+
+        val lpm = XposedHelpers.findClassIfExists(
+            "com.android.server.location.provider.LocationProviderManager", cl
+        ) ?: run {
+            Diag.w(TAG, "reportLayer: LocationProviderManager not found")
+            return
+        }
+        runCatching {
+            XposedBridge.hookAllMethods(lpm, "onReportLocation", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    val result = param.args.getOrNull(0) ?: return
+                    val regsField = XposedHelpers.findFieldIfExists(lpm, "mRegistrations") ?: return
+                    regsField.isAccessible = true
+                    @Suppress("UNCHECKED_CAST")
+                    val regs = regsField.get(param.thisObject) as? MutableMap<Any?, Any?> ?: return
+                    if (regs.isEmpty()) return
+                    rewriteLocationResult(result, LocationManager.GPS_PROVIDER, spoof)
+                    for (v in regs.values.toList()) {
+                        if (v == null) continue
+                        val op = runCatching {
+                            XposedHelpers.callMethod(v, "acceptLocationChange", result)
+                        }.getOrNull() ?: continue
+                        runCatching { XposedHelpers.callMethod(v, "executeOperation", op) }
+                    }
+                    // 清空原 map：原方法不再向这些 registration 投递真实位置
+                    runCatching { regsField.set(param.thisObject, HashMap<Any?, Any?>()) }
+                }
+            })
+            Diag.i(TAG, "reportLayer: LocationProviderManager.onReportLocation hooked")
+        }.onFailure { Diag.w(TAG, "reportLayer: hook onReportLocation failed: ${it.message}") }
+    }
+
+    /** 把 LocationResult.mLocations 换成一个伪造 Location（含 isMock=false）。 */
+    private fun rewriteLocationResult(result: Any?, provider: String, spoof: SpoofLocation) {
+        if (result == null) return
+        runCatching {
+            val field = XposedHelpers.findFieldIfExists(result.javaClass, "mLocations") ?: return
+            field.isAccessible = true
+            val list = field.get(result) as? List<*> ?: return
+            val origin = list.firstOrNull() as? Location
+            val loc = createSpoofedLocation(origin?.provider ?: provider, spoof)
+            runCatching { loc.isMock = false }
+            origin?.let {
+                loc.time = it.time
+                loc.elapsedRealtimeNanos = it.elapsedRealtimeNanos
+                loc.accuracy = it.accuracy
+                loc.speed = it.speed
+                runCatching { loc.extras = it.extras }
+            }
+            field.set(result, arrayListOf(loc))
+        }.onFailure { Diag.d(TAG, "reportLayer: rewrite LocationResult failed: ${it.message}") }
     }
 }
