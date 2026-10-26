@@ -94,17 +94,15 @@ fun RouteLibraryScreen(
     ) { uri: Uri? ->
         uri?.let {
             runCatching {
-                context.contentResolver.openInputStream(it)?.let { stream ->
-                    mapViewModel.importGpx(stream, "导入GPX路线") { count ->
-                        if (count >= 2) {
-                            Toast.makeText(context, "GPX 路线导入成功（$count 个点）", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "该 GPX 只解析出 $count 个点，至少需要 2 个点才能构成路线",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                mapViewModel.importGpx(context, it, "导入GPX路线") { count ->
+                    if (count >= 2) {
+                        Toast.makeText(context, "GPX 路线导入成功（$count 个点）", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "该 GPX 只解析出 $count 个点，至少需要 2 个点才能构成路线",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }.onFailure { e ->

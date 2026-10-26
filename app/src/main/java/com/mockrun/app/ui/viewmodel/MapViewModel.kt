@@ -1,5 +1,7 @@
 package com.mockrun.app.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mockrun.app.core.data.parser.GpxParser
@@ -14,7 +16,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
-import java.io.InputStream
 import javax.inject.Inject
 
 import com.mockrun.app.core.location.LocationSearchService
@@ -255,16 +256,24 @@ class MapViewModel @Inject constructor(
      * 少于 2 个点的 GPX 不会入库，但原实现不返回任何信息，
      * 于是 UI 无条件弹「导入成功」—— 用户看到成功提示却什么都没有。
      *
-     * 调用方必须保证 [inputStream] 在本次调用期间保持打开；解析在 IO 线程进行，
-     * 因此这里不能在调用方用 use{} 提前关闭流。
+     * 由 ViewModel 在 IO 线程自行打开并关闭 Uri 对应的流。调用方不得提前打开/关闭，
+     * 也不能让异步解析读到已关闭的流；解析失败只回调 0，不能把协程异常抛到主线程。
      */
     fun importGpx(
-        inputStream: InputStream,
+        context: Context,
+        uri: Uri,
         defaultName: String = "导入路线",
         onParsed: ((Int) -> Unit)? = null
     ) {
         viewModelScope.launch {
-            val points = withContext(Dispatchers.IO) { gpxParser.parse(inputStream) }
+            val points = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        gpxParser.parse(stream)
+                    } ?: emptyList()
+                }.logFailure(TAG, "import GPX $uri", Diag.Level.DEBUG)
+                    .getOrDefault(emptyList())
+            }
             if (points.size >= 2) {
                 _drawnWaypoints.value = points
                 val route = Route(name = defaultName, waypoints = points)

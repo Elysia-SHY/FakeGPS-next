@@ -78,26 +78,18 @@ fun RouteSimulationScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            // 解析在 ViewModel 内切到 IO 线程（见 MapViewModel.importGpx），
-            // 这里只负责在结果回调里给反馈。
-            // 注意：不能在这里用 use{} 包住流 —— 解析是异步的，
-            // 提前关闭会让解析读到已关闭的流。流由 GpxParser 读完，
-            // 其生命周期与 viewModelScope 的这次任务一致。
+            // 解析与流的打开/关闭都在 ViewModel 的 IO 任务内完成。
             runCatching {
-                context.contentResolver.openInputStream(it)?.let { stream ->
-                    mapViewModel.importGpx(stream, "导入GPX路线") { count ->
-                        // 只有真的解析出 >= 2 个点才算成功。
-                        // 原实现无条件弹「导入成功」，而少于 2 点的 GPX 不会入库，
-                        // 用户会看到成功提示但列表里什么都没有。
-                        if (count >= 2) {
-                            Toast.makeText(context, "GPX 路线导入成功并已载入（$count 个点）", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "该 GPX 只解析出 $count 个点，至少需要 2 个点才能构成路线",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                mapViewModel.importGpx(context, it, "导入GPX路线") { count ->
+                    // 只有真的解析出 >= 2 个点才算成功。
+                    if (count >= 2) {
+                        Toast.makeText(context, "GPX 路线导入成功并已载入（$count 个点）", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "该 GPX 只解析出 $count 个点，至少需要 2 个点才能构成路线",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }.onFailure { e ->

@@ -598,8 +598,10 @@ fun MapScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            context.contentResolver.openInputStream(it)?.use { stream ->
-                mapViewModel.importGpx(stream, "导入GPX路线")
+            mapViewModel.importGpx(context, it, "导入GPX路线") { count ->
+                if (count < 2) {
+                    Toast.makeText(context, "GPX 解析失败或点数不足", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
