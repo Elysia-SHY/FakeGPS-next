@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * 真正的落盘在 Room；这里只放「当前是否在录」这类瞬时状态。
  */
 object TrackRecordState {
+    const val PREFS_MOCK_SERVICE = "mock_location_service_prefs"
+    const val KEY_IS_SIMULATION_ACTIVE = "key_is_sim_active"
+    const val KEY_IS_POINT_MOCK_ACTIVE = "key_is_point_mock_active"
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()

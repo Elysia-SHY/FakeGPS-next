@@ -129,6 +129,16 @@ class MockLocationService : Service() {
 
         val action = intent.action ?: return START_STICKY
 
+        // 录制必须读取真实 GPS；开始或恢复任何模拟前先把已采轨迹正常保存。
+        if (TrackRecordState.isRecording.value && action in setOf(
+                ACTION_START, ACTION_RESUME, ACTION_START_POINT_MOCK
+            )) {
+            Diag.i(TAG, "模拟请求与轨迹录制冲突，先停止并保存轨迹")
+            startService(Intent(this, TrackRecordService::class.java).apply {
+                this.action = TrackRecordService.ACTION_STOP
+            })
+        }
+
         when (action) {
             ACTION_START -> {
                 val route = stateRepo.pendingRoute ?: run {
@@ -352,6 +362,8 @@ class MockLocationService : Service() {
         currentSpeedKmh = speedKmh
         currentMode = mode
         currentDistanceMeters = startDistanceMeters.coerceAtLeast(0.0)
+        lastNotifyAt = 0L
+        lastNotifiedPercent = -1f
 
         if (!mockEngine.isRegistered() && !mockEngine.register()) {
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
@@ -389,7 +401,7 @@ class MockLocationService : Service() {
                 sensorEngine.updateTick(dynamicSpeedKmh, 1.0f)
                 saveSimulationProgress(
                     distanceMeters = point.distanceTraveled,
-                    speed = dynamicSpeedKmh,
+                    speed = currentSpeedKmh,
                     progressPercent = point.progressPercent
                 )
                 if (shouldRefreshNotification(point.progressPercent)) {
@@ -419,7 +431,7 @@ class MockLocationService : Service() {
     private fun shouldRefreshNotification(progressPercent: Float): Boolean {
         val now = SystemClock.elapsedRealtime()
         val percentJumped = abs(progressPercent - lastNotifiedPercent) >= 0.01f
-        if (percentJumped || now - lastNotifyAt >= 5_000L) {
+        if (now - lastNotifyAt >= 5_000L && (percentJumped || lastNotifiedPercent < 0f)) {
             lastNotifyAt = now
             lastNotifiedPercent = progressPercent
             return true
@@ -509,7 +521,16 @@ class MockLocationService : Service() {
     /** 兼容旧的「进度 0..1」入参：折算成绝对距离。 */
     private fun progressToDistance(progress: Float): Double {
         val route = currentRoute ?: return currentDistanceMeters
-        return route.totalDistanceMeters * progress.coerceIn(0f, 1f)
+        val lapDistance = if (currentMode == RouteMode.LOOP && route.closingGapMeters <= RouteSimulator.LOOP_MAX_GAP_M) {
+            route.totalDistanceMeters + route.closingGapMeters
+        } else {
+            route.totalDistanceMeters
+        }
+        if (lapDistance <= 0.0) return 0.0
+        val lapBase = if (currentMode == RouteMode.ONE_WAY) 0.0 else {
+            kotlin.math.floor(currentDistanceMeters / lapDistance) * lapDistance
+        }
+        return lapBase + lapDistance * progress.coerceIn(0f, 1f)
     }
 
     private fun modeOf(intent: Intent, route: Route): RouteMode {

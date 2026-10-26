@@ -92,6 +92,7 @@ class TrackRecordService : Service(), SensorEventListener {
     private var stepOffset: Long = 0L
     private var lastTotalSteps: Long = 0L
     private var currentCadence = 0
+    private var lastStepEventNanos = 0L
     private val stepWindow = ArrayDeque<Pair<Long, Long>>()
 
     private var recording = false
@@ -122,14 +123,21 @@ class TrackRecordService : Service(), SensorEventListener {
             else -> Unit
         }
 
-        // 录制读的是真实定位；mock 在跑的时候录到的全是假点，直接拒绝
-        val mockRunning = stateRepo.currentState.status is com.mockrun.app.domain.model.SimulationStatus.Running ||
+        if (recording) return START_STICKY
+
+        // 冷进程不能只信内存状态；暂停中的 Provider 仍在注假点，也必须拒绝。
+        val mockPrefs = getSharedPreferences(TrackRecordState.PREFS_MOCK_SERVICE, Context.MODE_PRIVATE)
+        val status = stateRepo.currentState.status
+        val mockRunning = status is com.mockrun.app.domain.model.SimulationStatus.Running ||
+            status is com.mockrun.app.domain.model.SimulationStatus.Paused ||
             stateRepo.isPointMockActive.value ||
-            stateRepo.isJoystickActive.value
+            stateRepo.isJoystickActive.value ||
+            mockPrefs.getBoolean(TrackRecordState.KEY_IS_SIMULATION_ACTIVE, false) ||
+            mockPrefs.getBoolean(TrackRecordState.KEY_IS_POINT_MOCK_ACTIVE, false)
         if (mockRunning) {
             Diag.w(TAG, "拒绝录制：模拟/单点/摇杆正在运行")
             TrackRecordState.onStopped()
-            stopSelf()
+            stopSelf(startId)
             return START_NOT_STICKY
         }
 
@@ -168,6 +176,7 @@ class TrackRecordService : Service(), SensorEventListener {
         stepOffset = 0L
         stepWindow.clear()
         currentCadence = 0
+        lastStepEventNanos = 0L
         TrackRecordState.onStarted(startedAt)
 
         acquireWakeLock()
@@ -216,7 +225,8 @@ class TrackRecordService : Service(), SensorEventListener {
                 WayPoint(location.latitude, location.longitude)
             )
             val dtSec = (location.time - prev.time) / 1000.0
-            if (dtSec > 0.0) {
+            if (dtSec <= 0.0) return  // 同时间/乱序点不能参与距离累计
+            run {
                 val speed = stepDistance / dtSec
                 if (speed > MAX_SPEED_MPS) return          // 跳点
                 if (stepDistance < MIN_MOVE_M && speed < 0.4) return   // 静止抖动
@@ -226,6 +236,10 @@ class TrackRecordService : Service(), SensorEventListener {
         distanceMeters += stepDistance
         lastAccepted = location
 
+        if (lastStepEventNanos == 0L || location.elapsedRealtimeNanos - lastStepEventNanos > 3_000_000_000L) {
+            currentCadence = 0
+            stepWindow.clear()
+        }
         val cadence = if (currentCadence > 0) currentCadence else estimateCadence(location)
         val point = TrackPoint(
             lat = location.latitude,
@@ -334,6 +348,7 @@ class TrackRecordService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_STEP_COUNTER) return
         val total = event.values[0].toLong()
+        lastStepEventNanos = event.timestamp
         if (stepBaseline < 0) {
             stepBaseline = total
             lastTotalSteps = total
@@ -343,6 +358,7 @@ class TrackRecordService : Service(), SensorEventListener {
             // 设备重启后 TYPE_STEP_COUNTER 归零：把已累计的部分折进 offset
             stepOffset += lastTotalSteps - stepBaseline
             stepBaseline = total
+            currentCadence = 0
             stepWindow.clear()
         }
         lastTotalSteps = total

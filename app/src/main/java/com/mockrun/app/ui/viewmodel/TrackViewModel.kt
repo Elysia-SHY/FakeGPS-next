@@ -42,9 +42,14 @@ class TrackViewModel @Inject constructor(
 
     /** 录制与巡航/单点/摇杆互斥——录到的必须是真的定位。 */
     fun start(context: Context, onBlocked: (String) -> Unit) {
-        val mockRunning = stateRepo.currentState.status is SimulationStatus.Running ||
+        val status = stateRepo.currentState.status
+        val mockPrefs = context.getSharedPreferences(TrackRecordState.PREFS_MOCK_SERVICE, Context.MODE_PRIVATE)
+        val mockRunning = status is SimulationStatus.Running ||
+            status is SimulationStatus.Paused ||
             stateRepo.isPointMockActive.value ||
-            stateRepo.isJoystickActive.value
+            stateRepo.isJoystickActive.value ||
+            mockPrefs.getBoolean(TrackRecordState.KEY_IS_SIMULATION_ACTIVE, false) ||
+            mockPrefs.getBoolean(TrackRecordState.KEY_IS_POINT_MOCK_ACTIVE, false)
         if (mockRunning) {
             onBlocked("正在巡航 / 单点 / 摇杆中，先停止模拟再录制")
             return

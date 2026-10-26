@@ -747,8 +747,8 @@ fun RouteSimulationScreen(
                                             CadenceMode.WALK -> 110
                                             CadenceMode.JOG -> 160
                                             CadenceMode.RUN -> 180
-                                            CadenceMode.CUSTOM -> customCadenceInput.toIntOrNull() ?: 165
-                                            CadenceMode.AUTO -> 165
+                                            CadenceMode.CUSTOM -> customCadenceInput.toIntOrNull() ?: sensorState.customCadence
+                                            CadenceMode.AUTO -> sensorState.customCadence
                                         }
                                         simulationViewModel.setCadenceMode(mode, targetCadence, selectedSpeed)
                                     },

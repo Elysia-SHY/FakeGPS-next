@@ -28,7 +28,7 @@ data class SensorMockData(
     val strideLengthMeters: Float = 0.83f,
     val accelZ: Float = 9.8f,
     val cadenceMode: CadenceMode = CadenceMode.AUTO,
-    val customCadence: Int = 165,
+    val customCadence: Int = CadencePrefs.DEFAULT_CUSTOM_SPM,
     val isRootActive: Boolean = false,
     val strideVerdict: StrideVerdict = StrideVerdict.OK
 )
@@ -148,7 +148,7 @@ class SensorMockEngine @Inject constructor(
         )
     }
 
-    fun setCadenceMode(mode: CadenceMode, customValue: Int = 165, currentSpeedKmh: Float = 8f) {
+    fun setCadenceMode(mode: CadenceMode, customValue: Int = _sensorState.value.customCadence, currentSpeedKmh: Float = 8f) {
         val safeCustom = customValue.coerceIn(40, 300)
         lastPersistedMode = mode
         lastPersistedCustom = safeCustom
@@ -186,10 +186,9 @@ class SensorMockEngine @Inject constructor(
         val isEnabled = state.isEnabled
         val cadence = when {
             !isEnabled -> 0
+            speedKmh <= 0.1f || intervalSeconds <= 0.01f -> 0
             overrideSpm != null && overrideSpm > 0 -> overrideSpm
-            speedKmh > 0.1f && intervalSeconds > 0.01f ->
-                effectiveCadence(speedKmh, state.cadenceMode, state.customCadence)
-            else -> 0
+            else -> effectiveCadence(speedKmh, state.cadenceMode, state.customCadence)
         }
 
         if (isEnabled && cadence > 0 && intervalSeconds > 0.01f) {

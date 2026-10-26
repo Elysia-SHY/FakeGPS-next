@@ -106,7 +106,7 @@ class SimulationViewModel @Inject constructor(
         }
     }
 
-    fun setCadenceMode(mode: CadenceMode, customValue: Int = 165, currentSpeedKmh: Float = 8f) {
+    fun setCadenceMode(mode: CadenceMode, customValue: Int = sensorEngine.sensorState.value.customCadence, currentSpeedKmh: Float = 8f) {
         sensorEngine.setCadenceMode(mode, customValue, currentSpeedKmh)
     }
 
