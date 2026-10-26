@@ -82,7 +82,7 @@ class RouteSimulator @Inject constructor(
         val baseSpeedMs = speedKmh * 1000.0 / 3600.0
         // 单圈太短会一 tick 跨两圈以上（40 km/h 时每 tick ≈ 11 m）
         val minLap = max(2.0, 2.0 * max(baseSpeedMs, 0.3) * (UPDATE_INTERVAL_MS / 1000.0))
-        if (lapDistance < minLap) {
+        if (effectiveMode == RouteMode.LOOP && lapDistance < minLap) {
             Diag.w(TAG, "单圈 ${lapDistance} m 小于下限 $minLap m，已跳过本次模拟")
             return@flow
         }
@@ -94,6 +94,11 @@ class RouteSimulator @Inject constructor(
         val start = startDistanceMeters.coerceAtLeast(0.0)
         val lapsPassed = floor(start / lapDistance).toInt()
         var lapIndex = lapsPassed
+        // 折返方向可由累计距离所在圈的奇偶性确定；复活/改速不能总从正向重启。
+        if (effectiveMode == RouteMode.PING_PONG && lapsPassed % 2 == 1) {
+            lapPoints = lapPoints.reversed()
+            segments = buildSegments(lapPoints)
+        }
         var covered = (start - lapsPassed * lapDistance).coerceIn(0.0, lapDistance)
         var totalCovered = start
         var dwellTicks = 0

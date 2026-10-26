@@ -332,6 +332,8 @@ fun MapScreen(
 
     var routeStage by remember { mutableStateOf(RouteStage.SELECTING) }
     var selectedSpeed by remember { mutableFloatStateOf(8f) }
+    // 未保存的手绘路线也需要独立保存运行方式，不能只依赖已保存路线的 mode。
+    var draftRouteMode by remember { mutableStateOf(com.mockrun.app.domain.model.RouteMode.ONE_WAY) }
     var isCadenceEnabled by remember { mutableStateOf(false) }
     var showRouteConfigDialog by remember { mutableStateOf(false) }
 
@@ -1741,7 +1743,8 @@ fun MapScreen(
                         ensurePermissionAndStart {
                             val route = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
                                 name = "规划路线 (${drawnWaypoints.size}点)",
-                                waypoints = drawnWaypoints
+                                waypoints = drawnWaypoints,
+                                mode = draftRouteMode
                             )
                             simulationViewModel.startSimulation(context, route, selectedSpeed)
                             routeStage = RouteStage.RUNNING
@@ -1781,9 +1784,11 @@ fun MapScreen(
             },
             onDismiss = { showRouteConfigDialog = false },
             isLiquidGlass = isLiquidGlass,
-            mode = selectedRoute?.mode ?: com.mockrun.app.domain.model.RouteMode.ONE_WAY,
-            closingGapMeters = selectedRoute?.closingGapMeters ?: 0.0,
+            mode = selectedRoute?.mode ?: draftRouteMode,
+            closingGapMeters = selectedRoute?.closingGapMeters
+                ?: com.mockrun.app.domain.model.Route(name = "规划路线", waypoints = drawnWaypoints).closingGapMeters,
             onModeChange = { newMode ->
+                draftRouteMode = newMode
                 selectedRoute?.let { mapViewModel.updateRouteMode(it, newMode) }
                 simulationViewModel.setRouteMode(context, newMode)
             },
@@ -1823,7 +1828,7 @@ fun MapScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    mapViewModel.saveCurrentRoute(routeNameInput)
+                    mapViewModel.saveCurrentRoute(routeNameInput, draftRouteMode)
                     showSaveDialog = false
                     routeNameInput = ""
                 }) {

@@ -170,11 +170,11 @@ class MapViewModel @Inject constructor(
         _drawnWaypoints.value = route.waypoints
     }
 
-    fun saveCurrentRoute(name: String) {
+    fun saveCurrentRoute(name: String, mode: RouteMode = _selectedRoute.value?.mode ?: RouteMode.ONE_WAY) {
         val points = _drawnWaypoints.value
         if (points.size < 2) return
         viewModelScope.launch {
-            val route = Route(name = name.ifBlank { "未命名路线" }, waypoints = points)
+            val route = Route(name = name.ifBlank { "未命名路线" }, waypoints = points, mode = mode)
             val id = routeRepository.saveRoute(route)
             _selectedRoute.value = route.copy(id = id)
         }
@@ -296,7 +296,11 @@ class MapViewModel @Inject constructor(
     private fun updateSelectedRouteFromDrawn() {
         val points = _drawnWaypoints.value
         if (points.size >= 2) {
-            _selectedRoute.value = Route(name = "自定义绘制路线", waypoints = points)
+            _selectedRoute.value = Route(
+                name = "自定义绘制路线",
+                waypoints = points,
+                mode = _selectedRoute.value?.mode ?: RouteMode.ONE_WAY
+            )
         } else {
             _selectedRoute.value = null
         }
