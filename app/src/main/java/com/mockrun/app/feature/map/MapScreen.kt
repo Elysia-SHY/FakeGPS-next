@@ -344,6 +344,12 @@ fun MapScreen(
     val bookmarkedLocations by mapViewModel.bookmarkedLocations.collectAsState()
     val savedTracks by mapViewModel.savedTracks.collectAsState()
     val selectedRoute by mapViewModel.selectedRoute.collectAsState()
+
+    // 选中已保存路线时同步草稿模式；否则加载后直接保存会把原模式改回单程。
+    LaunchedEffect(selectedRoute?.id, selectedRoute?.mode) {
+        selectedRoute?.let { draftRouteMode = it.mode }
+    }
+
     val searchQuery by mapViewModel.searchQuery.collectAsState()
     val searchResults by mapViewModel.searchResults.collectAsState()
     val isSearching by mapViewModel.isSearching.collectAsState()
@@ -1741,11 +1747,11 @@ fun MapScreen(
                     },
                     onStartSimulation = {
                         ensurePermissionAndStart {
-                            val route = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
+                            val base = mapViewModel.selectedRoute.value ?: com.mockrun.app.domain.model.Route(
                                 name = "规划路线 (${drawnWaypoints.size}点)",
-                                waypoints = drawnWaypoints,
-                                mode = draftRouteMode
+                                waypoints = drawnWaypoints
                             )
+                            val route = base.copy(mode = draftRouteMode)
                             simulationViewModel.startSimulation(context, route, selectedSpeed)
                             routeStage = RouteStage.RUNNING
                             Toast.makeText(context, "路线模拟已开启！", Toast.LENGTH_SHORT).show()
@@ -1784,9 +1790,10 @@ fun MapScreen(
             },
             onDismiss = { showRouteConfigDialog = false },
             isLiquidGlass = isLiquidGlass,
-            mode = selectedRoute?.mode ?: draftRouteMode,
-            closingGapMeters = selectedRoute?.closingGapMeters
-                ?: com.mockrun.app.domain.model.Route(name = "规划路线", waypoints = drawnWaypoints).closingGapMeters,
+            mode = draftRouteMode,
+            closingGapMeters = com.mockrun.app.domain.model.Route(
+                name = "规划路线", waypoints = drawnWaypoints
+            ).closingGapMeters,
             onModeChange = { newMode ->
                 draftRouteMode = newMode
                 selectedRoute?.let { mapViewModel.updateRouteMode(it, newMode) }
