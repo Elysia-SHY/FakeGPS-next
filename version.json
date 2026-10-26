@@ -1,20 +1,20 @@
 {
-  "versionName": "v2.4.2",
-  "versionCode": 58,
+  "versionName": "v2.4.3",
+  "versionCode": 59,
   "releaseDate": "2026-10-26",
   "minSdk": 29,
-  "releaseNotes": "FakeGPS-next 2.4.2：修复「应用内收不到更新推送」。\n\n【这次修的是什么】\n静态清单 version.json 走 jsDelivr 的 @main 分支，边缘缓存 12 小时（s-maxage=43200）。发版后如果网络落到还没刷新的节点（国内最常见：cdn/fastly 不通，最后落到 gcore），就会读到旧清单，判定「已是最新」——即使 GitHub 上已经发了新版。\n现在请求清单时带上「版本号 + 小时」查询串：每小时最多回源一次，最坏陈旧窗口从 12 小时压到 1 小时。\n\n【三个新功能的入口（2.4.0 起）】\n1. 运行方式（单程 / 折返 / 环形）：地图页「路线」→「参数设置」→「运行方式」；路线库卡片「更多」也能改。\n2. 自定义步频：同一个「参数设置」→「步频模式」，选「自定义」后拖 40–300 SPM；配置杀进程后保留。\n3. 轨迹录制：地图页「路线」标签右上角红色圆点按钮（不需要先规划航点）→ 开始录制 → 停止并保存 →「转成路线」。\n\n【仍然保留的修复】\n· 横竖屏切换不再退出录制页。\n· 掉头不再瞬移；改速 / 暂停 / 复活不跳回起点。\n· 数据库 1→2→3 增量迁移，旧路线与收藏完整保留。\n\n【升级提示】\nv2.2.0 / v2.4.0 / v2.4.1 的用户如果当前看不到更新，请到 Release 页面手动下载安装一次；之后版本即可正常收到推送。",
-  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.2",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk",
-  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk",
+  "releaseNotes": "FakeGPS-next 2.4.3：修复「应用内收不到更新推送」（2.4.2 的做法实测无效，这版换成真正有效的）。\n\n【根因】\n更新检查先读 CDN 上的 version.json 静态清单，读到就**不再查 GitHub API**。jsDelivr 的 @main 分支有 12 小时边缘缓存，国内网络下 cdn / fastly 常不通，最后落到 gcore 节点，读回的还是上一版清单 —— 于是判定「已是最新」，而 GitHub 上其实已经发了。\n2.4.2 试过给清单 URL 加查询串，实测**无效**：jsDelivr 按路径做缓存键，加不加 ?v= 都返回同一份旧内容。\n\n【这版怎么修】\n把 raw.githubusercontent.com（5 分钟缓存）与 gh-proxy / ghproxy 镜像排到最前，jsDelivr 三个节点降级为兜底。发版后最多 5 分钟即可检出新版本。\n\n【三个新功能的入口（2.4.0 起，位置没变）】\n1. 运行方式（单程 / 折返 / 环形）：地图页「路线」→「参数设置」→「运行方式」；路线库卡片「更多」也能改。\n2. 自定义步频：「参数设置」→「步频模式」→「自定义」，40–300 SPM；配置杀进程后保留。\n3. 轨迹录制：地图页「路线」标签右上角红色圆点按钮（不需要先规划航点）→ 开始录制 → 停止并保存 →「转成路线」。\n\n【升级提示】\nv2.2.0 / v2.4.0 / v2.4.1 / v2.4.2 的用户这次仍需到 Release 页面手动安装一次（旧包里还是老的检查顺序）；装到 2.4.3 之后即可正常收到推送。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.3",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk",
+  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk",
   "sha256": "7b8087c9ce8934a44ead6396473c62a46968577a890885ea5c2c7f83e28ff897",
   "sizeBytes": 4082862,
   "contact": "2224958076@qq.com",
   "homepage": "https://github.com/Elysia-SHY/FakeGPS-next",
   "mirrorUrls": [
-    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk",
-    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk",
-    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk",
-    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.2/FakeGPS-next-v2.4.2-release.apk"
+    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk",
+    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk",
+    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk",
+    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.3/FakeGPS-next-v2.4.3-release.apk"
   ]
 }

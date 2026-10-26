@@ -122,13 +122,16 @@ object VersionSyncManager {
     internal val STATIC_MANIFEST_URLS: List<String>
         get() {
             val bust = manifestCacheBuster()
+            // 顺序即优先级：raw / gh-proxy 只有 5 分钟缓存，jsDelivr 的 @main 是 12 小时。
+            // 实测 jsDelivr 按**路径**做缓存键，查询串并不能穿透它（带不带 ?v= 都返回同一份旧内容），
+            // 所以只能把它排到最后，当兜底用。
             return listOf(
-                "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
-                "https://fastly.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
-                "https://gcore.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
+                "https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
                 "https://gh-proxy.com/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
                 "https://ghproxy.net/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
-                "https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust"
+                "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
+                "https://fastly.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
+                "https://gcore.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust"
             )
         }
 
