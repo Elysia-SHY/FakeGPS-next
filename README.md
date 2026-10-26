@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-> **当前版本**：`v2.1.2`（`versionCode = 52`）
+> **当前版本**：`v2.4.1`（`versionCode = 57`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，`version.json`、`package.json`、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
 
@@ -163,6 +163,9 @@ graph TD
 - **地图图层双引擎**：内置高德路网（含 Apple Maps 风格的深色夜间滤镜）与 OpenStreetMap 两套底图，自动完成 GCJ-02 与 WGS-84 坐标转换。
 - **多应用分流管理**：首页以抽屉式卡片列表展示分流规则，可自由添加应用并配置专属坐标；未配置的应用保持真实定位。
 - **全路网道路巡航**：支持驾车、骑行、步行三种路网模型，沿真实道路平滑移动，可导入 GPX 路线文件。
+- **三种运行方式**（v2.4 新增）：单程（到终点自动停）/ 折返（原路返回，循环往复）/ 环形（首尾相连绕圈）。入口在地图页「路线」标签的 **参数设置** 对话框；路线库「更多」菜单也能改，切换后随路线保存。
+- **自定义步频**（v2.4 新增）：健步 110 / 慢跑 160 / 跑马 180 三档预设，或 40–300 SPM 自定义；配置杀进程后仍保留。入口同样在 **参数设置** 对话框，路线页底部的步频卡片可调实时值（非 Root 只读预览）。
+- **轨迹录制**（v2.4 新增，真实路线采集）：**入口唯一** —— 地图页「路线」标签右上角的红色圆点按钮，不需要先规划航点。点进去开始录制，手机放口袋走/跑，停止后自动存成轨迹，可收藏、可一键转为巡航路线（闭合轨迹自动设为环形）。录制期间不能同时巡航/单点/摇杆，录到的必须是真实定位。
 - **桌面悬浮摇杆**：具备阻尼回弹与航向锁定，可实时调整配速（步行 5 km/h、跑步 12 km/h、骑行 25 km/h、驾车 60 km/h，以及瞬移）。
 - **收藏与路线库**：地点收藏与航线收藏分列呈现，点按即可把地图与十字准星移到该点或载入该航线。
 - **运行诊断**：关于页可一键查看设备型号、Android API 级别、CPU 架构与模块运行状态。
@@ -175,8 +178,8 @@ graph TD
 
 - **JDK**：OpenJDK 17
 - **Android SDK**：API Level 34 (Android 14)
-- **Gradle**：8.4（仓库内 `gradle/wrapper` 已固定）
-- **Kotlin**：2.0.21 · **AGP**：8.2.2 · **Compose BOM**：2024.10.01
+- **Gradle**：8.9（仓库内 `gradle/wrapper` 已固定）
+- **Kotlin**：2.0.21 · **AGP**：8.5.1 · **Compose BOM**：2024.10.01
 
 ```bash
 # 1. 克隆代码仓库

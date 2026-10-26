@@ -26,6 +26,10 @@ import com.mockrun.app.core.designsystem.IosWarning
 import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.minTouchTarget
+import com.mockrun.app.core.location.CadenceMode
+import com.mockrun.app.core.location.RouteSimulator
+import com.mockrun.app.domain.model.RouteMode
+import kotlin.math.roundToInt
 
 data class SpeedPreset(val label: String, val speed: Float, val icon: ImageVector)
 
@@ -51,7 +55,14 @@ fun RouteConfigDialog(
     onSpeedChange: (Float) -> Unit,
     onCadenceToggle: (Boolean) -> Unit,
     onDismiss: () -> Unit,
-    isLiquidGlass: Boolean = true
+    isLiquidGlass: Boolean = true,
+    // v2.4.1：运行方式与步频模式放进「参数设置」，用户在这里就能看到，不必去路线库翻菜单
+    mode: RouteMode = RouteMode.ONE_WAY,
+    closingGapMeters: Double = 0.0,
+    onModeChange: (RouteMode) -> Unit = {},
+    cadenceMode: CadenceMode = CadenceMode.AUTO,
+    customSpm: Int = 165,
+    onCadenceConfigChange: (CadenceMode, Int) -> Unit = { _, _ -> }
 ) {
     // remember 必须带键。
     //
@@ -62,6 +73,13 @@ fun RouteConfigDialog(
     var speedVal by remember(currentSpeed) { mutableFloatStateOf(currentSpeed) }
     var cadenceVal by remember(isCadenceEnabled, isRootAvailable) {
         mutableStateOf(if (isRootAvailable) isCadenceEnabled else false)
+    }
+
+    // v2.4.1：运行方式与步频模式的本地状态（键与外部值绑定，Root 探测晚到也不会闪回）
+    var modeVal by remember(mode) { mutableStateOf(mode) }
+    var cadenceModeVal by remember(cadenceMode) { mutableStateOf(cadenceMode) }
+    var customVal by remember(customSpm) {
+        mutableFloatStateOf(customSpm.toFloat().coerceIn(40f, 300f))
     }
 
     val presets = listOf(
@@ -171,6 +189,140 @@ fun RouteConfigDialog(
                             activeTrackColor = IosColors.SystemBlue
                         )
                     )
+                }
+
+                // ── 运行方式（v2.4.1：从路线库菜单提到「参数设置」首屏）──
+                Column {
+                    Text("运行方式", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        maxItemsInEachRow = 3
+                    ) {
+                        RouteMode.entries.forEach { m ->
+                            val loopBlocked = m == RouteMode.LOOP &&
+                                closingGapMeters > RouteSimulator.LOOP_MAX_GAP_M
+                            val selected = m == modeVal
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(58.dp)
+                                    .clip(RoundedCornerShape(13.dp))
+                                    .bouncyClickable(enabled = !loopBlocked) {
+                                        modeVal = m
+                                        onModeChange(m)
+                                    },
+                                shape = RoundedCornerShape(13.dp),
+                                color = when {
+                                    selected -> IosColors.SystemBlue
+                                    loopBlocked -> IosColors.TertiarySystemFill.copy(alpha = 0.4f)
+                                    else -> IosColors.TertiarySystemFill
+                                }
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 4.dp),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = m.label,
+                                        style = IosTypography.Caption1,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selected) Color.White else IosColors.Label,
+                                        maxLines = 1
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = if (loopBlocked) "首尾差 ${closingGapMeters.toInt()} m" else when (m) {
+                                            RouteMode.ONE_WAY -> "到头自动停"
+                                            RouteMode.PING_PONG -> "原路折返"
+                                            RouteMode.LOOP -> "首尾相连"
+                                        },
+                                        style = IosTypography.Caption2,
+                                        color = if (selected) Color.White.copy(alpha = 0.85f) else IosColors.SecondaryLabel,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── 步频模式（v2.4.1：地图页也能直接设自定义步频）──
+                Column {
+                    Text("步频模式", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        maxItemsInEachRow = 3
+                    ) {
+                        CadenceMode.entries.forEach { cm ->
+                            val selected = cm == cadenceModeVal
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .bouncyClickable {
+                                        cadenceModeVal = cm
+                                        onCadenceConfigChange(cm, customVal.roundToInt())
+                                    },
+                                shape = RoundedCornerShape(11.dp),
+                                color = if (selected) IosColors.SystemBlue else IosColors.TertiarySystemFill
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = when (cm) {
+                                            CadenceMode.AUTO -> "自适应"
+                                            CadenceMode.WALK -> "健步 110"
+                                            CadenceMode.JOG -> "慢跑 160"
+                                            CadenceMode.RUN -> "跑马 180"
+                                            CadenceMode.CUSTOM -> "自定义"
+                                        },
+                                        style = IosTypography.Caption1,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) Color.White else IosColors.Label,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (cadenceModeVal == CadenceMode.CUSTOM) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("自定义步频", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                            Text(
+                                text = "${customVal.roundToInt()} SPM",
+                                style = IosTypography.Caption1,
+                                fontWeight = FontWeight.Bold,
+                                color = IosColors.SystemBlue
+                            )
+                        }
+                        Slider(
+                            value = customVal,
+                            onValueChange = {
+                                customVal = it
+                                onCadenceConfigChange(CadenceMode.CUSTOM, it.roundToInt())
+                            },
+                            valueRange = 40f..300f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = IosColors.SystemBlue,
+                                activeTrackColor = IosColors.SystemBlue
+                            )
+                        )
+                    }
                 }
 
                 HorizontalDivider(color = IosColors.Separator)

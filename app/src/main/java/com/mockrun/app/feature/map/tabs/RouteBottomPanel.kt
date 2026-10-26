@@ -30,6 +30,7 @@ import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.IosColors
+import com.mockrun.app.core.designsystem.IosDanger
 import com.mockrun.app.core.designsystem.IosPrimaryButton
 import com.mockrun.app.core.designsystem.IosSearchField
 import com.mockrun.app.core.designsystem.IosTypography
@@ -581,21 +582,23 @@ fun RouteBottomPanel(
                             ) {
                                 RouteStageIndicator(stage = stage)
 
-                                Surface(
-                                    modifier = Modifier
-                                        .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { onOpenConfig() },
-                                    color = IosColors.SystemBlue.copy(0.12f),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { onOpenConfig() },
+                                        color = IosColors.SystemBlue.copy(0.12f),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Icon(Icons.Default.Tune, null, tint = IosColors.SystemBlue, modifier = Modifier.size(15.dp))
-                                        Spacer(Modifier.width(5.dp))
-                                        Text("参数设置", fontSize = 12.5.sp, color = IosColors.SystemBlue, fontWeight = FontWeight.SemiBold)
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Tune, null, tint = IosColors.SystemBlue, modifier = Modifier.size(15.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("参数设置", fontSize = 12.5.sp, color = IosColors.SystemBlue, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                        }
                                     }
                                 }
                             }

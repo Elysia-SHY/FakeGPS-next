@@ -58,7 +58,10 @@ fun TrackRecordScreen(
     Box(modifier = Modifier.fillMaxSize().background(IosColors.SystemGroupedBackground)) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .align(Alignment.TopCenter)
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
                 .statusBarsPadding()
         ) {
             Row(
@@ -93,7 +96,8 @@ fun TrackRecordScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                // 底部导航是 AppNavigation 画的浮层，会压住内容；留出安全距离（横屏同样有效）
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
@@ -193,7 +197,11 @@ fun TrackRecordScreen(
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = { trackViewModel.toggleFavorite(track) }) {
-                                    Text(if (track.isFavorite) "取消收藏" else "收藏", style = IosTypography.Caption1)
+                                    Text(
+                                        if (track.isFavorite) "取消收藏" else "收藏",
+                                        style = IosTypography.Caption1,
+                                        maxLines = 1
+                                    )
                                 }
                                 OutlinedButton(onClick = {
                                     trackViewModel.convertToRoute(track) { route ->
@@ -205,10 +213,10 @@ fun TrackRecordScreen(
                                         }
                                     }
                                 }) {
-                                    Text("转为巡航路线", style = IosTypography.Caption1)
+                                    Text("转成路线", style = IosTypography.Caption1, maxLines = 1)
                                 }
                                 OutlinedButton(onClick = { trackViewModel.delete(track.id) }) {
-                                    Text("删除", style = IosTypography.Caption1, color = IosDanger)
+                                    Text("删除", style = IosTypography.Caption1, color = IosDanger, maxLines = 1)
                                 }
                             }
                         }

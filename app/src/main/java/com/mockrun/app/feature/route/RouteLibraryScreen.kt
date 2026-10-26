@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,7 +65,8 @@ fun RouteLibraryScreen(
 
     // 轨迹录制（v2.4.0）：作为本页的叠加层打开，不再动导航图
     val trackViewModel: TrackViewModel = hiltViewModel()
-    var showTrackScreen by remember { mutableStateOf(false) }
+    // rememberSaveable：转屏重建 Activity 后仍停在这一层
+    var showTrackScreen by rememberSaveable { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var routeToRename by remember { mutableStateOf<Route?>(null) }

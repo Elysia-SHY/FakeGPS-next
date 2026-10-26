@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.animation.core.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -41,6 +42,9 @@ import com.mockrun.app.feature.map.tabs.LocationControlPanel
 import com.mockrun.app.feature.map.tabs.RouteBottomPanel
 import com.mockrun.app.feature.map.tabs.RouteConfigDialog
 import com.mockrun.app.feature.map.tabs.RouteStage
+import com.mockrun.app.feature.track.TrackRecordScreen
+import com.mockrun.app.ui.viewmodel.TrackViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.mockrun.app.ui.components.PermissionGuideDialog
 import com.mockrun.app.hook.HookChannelStatus
 import com.mockrun.app.hook.XposedStatusHelper
@@ -369,6 +373,11 @@ fun MapScreen(
     val multiTargetRules by simulationViewModel.multiTargetRules.collectAsState()
     val activeTargetKey by simulationViewModel.activeTargetKey.collectAsState()
     val isRootAvailable by simulationViewModel.isRootAvailable.collectAsState()
+    val sensorState by simulationViewModel.sensorState.collectAsState()
+    // v2.4.1：轨迹录制从「关于 → 路线库」提到路线面板，直接可见
+    val trackViewModel: TrackViewModel = hiltViewModel()
+    // rememberSaveable：横竖屏切换会重建 Activity，用 remember 会把录制页直接关掉
+    var showTrackScreen by rememberSaveable { mutableStateOf(false) }
 
     // ---- 生效通道指示 ----
     // 地图页的「虚拟定位中」只说明应用层在模拟；hook 可能没生效（LSPosed 未激活、作用域没勾）。
@@ -1145,6 +1154,21 @@ fun MapScreen(
                                 )
                             }
 
+                            // 轨迹录制入口（v2.4.1）：录真实 GPS 成路线，**不依赖先规划航点**
+                            if (activeMapTab == MapTab.ROUTE) {
+                                IconButton(
+                                    onClick = { showTrackScreen = true },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FiberManualRecord,
+                                        contentDescription = "轨迹录制",
+                                        tint = IosDanger,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
                             // 「更多」菜单：路线页的沿路规划与 GPX 导入合并到这里
                             if (activeMapTab == MapTab.ROUTE) {
                                 Box {
@@ -1756,7 +1780,30 @@ fun MapScreen(
                 simulationViewModel.setCadenceEnabled(enabled, selectedSpeed)
             },
             onDismiss = { showRouteConfigDialog = false },
-            isLiquidGlass = isLiquidGlass
+            isLiquidGlass = isLiquidGlass,
+            mode = selectedRoute?.mode ?: com.mockrun.app.domain.model.RouteMode.ONE_WAY,
+            closingGapMeters = selectedRoute?.closingGapMeters ?: 0.0,
+            onModeChange = { newMode ->
+                selectedRoute?.let { mapViewModel.updateRouteMode(it, newMode) }
+                simulationViewModel.setRouteMode(context, newMode)
+            },
+            cadenceMode = sensorState.cadenceMode,
+            customSpm = sensorState.customCadence,
+            onCadenceConfigChange = { cm, spm ->
+                simulationViewModel.setCadenceMode(cm, spm, selectedSpeed)
+            }
+        )
+    }
+
+    if (showTrackScreen) {
+        TrackRecordScreen(
+            trackViewModel = trackViewModel,
+            onClose = { showTrackScreen = false },
+            onRouteCreated = { route ->
+                mapViewModel.selectRoute(route)
+                routeStage = RouteStage.READY
+                showTrackScreen = false
+            }
         )
     }
 

@@ -269,6 +269,15 @@ class SimulationViewModel @Inject constructor(
         ContextCompat.startForegroundService(context, intent)
     }
 
+    /** 运行中切换单程 / 折返 / 环形：服务端按绝对距离续跑，不会跳回圈首。 */
+    fun setRouteMode(context: Context, mode: com.mockrun.app.domain.model.RouteMode) {
+        val intent = Intent(context, MockLocationService::class.java).apply {
+            action = MockLocationService.ACTION_SET_MODE
+            putExtra(MockLocationService.EXTRA_ROUTE_MODE, mode.name)
+        }
+        runCatching { ContextCompat.startForegroundService(context, intent) }
+    }
+
     fun seekTo(context: Context, progressPercent: Float) {
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_SEEK
