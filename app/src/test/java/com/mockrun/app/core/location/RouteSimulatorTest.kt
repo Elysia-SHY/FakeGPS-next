@@ -40,6 +40,27 @@ class RouteSimulatorTest {
     }
 
     @Test
+    fun `short one way route completes instead of being skipped`() = runTest {
+        val route = route(RouteMode.ONE_WAY, WayPoint(0.0, 0.0), WayPoint(0.0, 0.000009))
+        val points = simulator.simulateRoute(route, 10f).take(12).toList()
+
+        assertTrue(points.size >= 2)
+        assertTrue(points.last().isCompleted)
+        assertEquals(1f, points.last().progressPercent, 1e-6f)
+    }
+
+    @Test
+    fun `short ping pong route still runs and reverses`() = runTest {
+        val route = route(RouteMode.PING_PONG, WayPoint(0.0, 0.0), WayPoint(0.0, 0.000009))
+        val points = simulator.simulateRoute(route, 10f).take(24).toList()
+
+        assertTrue("至少应采样到折返后的点，实际 ${points.size}", points.size >= 6)
+        assertTrue(points.any { it.bearing in 89f..91f })
+        assertTrue(points.any { it.bearing in 269f..271f })
+        assertTrue(points.zipWithNext().all { (a, b) -> b.distanceTraveled >= a.distanceTraveled })
+    }
+
+    @Test
     fun `loop with large gap falls back to ping pong`() = runTest {
         val route = route(RouteMode.LOOP, WayPoint(0.0, 0.0), WayPoint(0.0, 0.001))
         val points = simulator.simulateRoute(route, 20f).take(60).toList()
