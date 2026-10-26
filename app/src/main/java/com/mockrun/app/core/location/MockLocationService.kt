@@ -251,6 +251,14 @@ class MockLocationService : Service() {
                 }
                 Diag.i(TAG, "Resurrected: restoring simulation at ${distance.toInt()} m, mode=$mode")
                 startSimulation(savedRoute.copy(mode = mode), speed, distance, mode)
+            } else {
+                // 旧 Java 快照无法跨隐式 UID 读取；失败必须收尾，不能 sticky 空转并持有 WakeLock。
+                Diag.w(TAG, "路线快照不可恢复，清理模拟状态并停止空服务")
+                userStopped = true
+                saveSimulationState(active = false)
+                stateRepo.onStopped()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
     }
