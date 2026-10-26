@@ -21,8 +21,18 @@ val currentBuildTime: String = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDe
  * 路径由 workflow 从 `FAKEGPS_KEYSTORE` 注入，口令另见三个同名环境变量。
  */
 val ciKeystoreFile: File? = System.getenv("FAKEGPS_KEYSTORE")
-    ?.let { File(it) }
-    ?.takeIf { it.exists() }
+    ?.takeIf { it.isNotBlank() }
+    ?.let { raw ->
+        // CI 通常给绝对路径；本地按交接文档给 keystore/... 时，AGP 会相对 app/ 解析。
+        // 显式按「仓库根目录 → app 模块」查找，并返回绝对 File，避免 storeFile 再相对化。
+        val rawFile = File(raw)
+        val candidates = if (rawFile.isAbsolute) {
+            listOf(rawFile)
+        } else {
+            listOf(File(rootProject.rootDir, raw), File(project.projectDir, raw))
+        }
+        candidates.map { it.absoluteFile }.firstOrNull { it.isFile }
+    }
 
 android {
     namespace = "com.mockrun.app"
