@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.core.location
+package com.mockrun.app.core.location
 
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.SimulatedPoint
@@ -99,7 +99,8 @@ class SimulationStateRepository @Inject constructor() {
             progressPercent = point.progressPercent,
             distanceTraveledMeters = point.distanceTraveled,
             elapsedTimeMs = cur.pausedElapsedMs + runElapsed,
-            bearing = point.bearing
+            bearing = point.bearing,
+            lapIndex = point.lapIndex
         )
     }
 

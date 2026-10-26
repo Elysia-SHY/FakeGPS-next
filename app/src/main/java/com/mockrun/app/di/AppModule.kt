@@ -1,10 +1,11 @@
-﻿package com.mockrun.app.di
+package com.mockrun.app.di
 
 import android.content.Context
 import androidx.room.Room
 import com.google.gson.Gson
 import com.mockrun.app.core.data.db.RouteDao
 import com.mockrun.app.core.data.db.RouteDatabase
+import com.mockrun.app.core.data.db.TrackDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,11 +30,20 @@ object AppModule {
             context,
             RouteDatabase::class.java,
             "mockrun_routes.db"
-        ).fallbackToDestructiveMigration().build()
+        )
+            .addMigrations(RouteDatabase.MIGRATION_1_2, RouteDatabase.MIGRATION_2_3)
+            // 只兜「装回旧版本」这一种情况；升级路径必须走 Migration，否则启动即崩
+            .fallbackToDestructiveMigrationOnDowngrade()
+            .build()
     }
 
     @Provides
     fun provideRouteDao(database: RouteDatabase): RouteDao {
         return database.routeDao()
+    }
+
+    @Provides
+    fun provideTrackDao(database: RouteDatabase): TrackDao {
+        return database.trackDao()
     }
 }

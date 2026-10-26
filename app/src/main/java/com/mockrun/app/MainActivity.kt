@@ -76,6 +76,9 @@ class MainActivity : ComponentActivity() {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // 轨迹录制的计步传感器：API 29+ 注册 TYPE_STEP_COUNTER 需要 ACTIVITY_RECOGNITION
+        permissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+
         val missing = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }

@@ -119,19 +119,17 @@ class VersionSyncManifestParseTest {
         assertTrue("当前版本解析应为 UpToDate", status is VersionSyncStatus.UpToDate)
 
         val info = (status as VersionSyncStatus.UpToDate).info
-        assertEquals("v2.1.2", info.tagName)
-        assertEquals(52, info.remoteVersionCode)
-        assertEquals(
-            "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.1.2",
-            info.releaseHtmlUrl
-        )
-        // 2026-10-16 发版时按 CHANGELOG 把 version.json 的下载地址从
-        // `cdn.jsdelivr.net/gh/...@tag/...` 改成了 GitHub Release 资产地址
-        // （`releases/download/{tag}/{file}.apk`），这里同步断言新的地址形态。
-        // 旧断言停留在 jsDelivr 形式，自那次发版起一直是红的。
-        assertEquals(
-            "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.1.2/FakeGPS-next-v2.1.2-release.apk",
-            info.fallbackDownloadUrls.first()
+        // 断言清单与自身一致，而不是写死某个版本号：
+        // 这里原来硬编码 v2.1.2 / 52，每次发版都会把它变成一条假红。
+        val manifest = com.google.gson.JsonParser.parseString(content).asJsonObject
+        val expectedTag = manifest.get("versionName").asString
+        assertEquals("清单的 tag 必须与 versionName 一致", expectedTag, info.tagName)
+        assertEquals(manifest.get("versionCode").asInt, info.remoteVersionCode)
+        assertEquals(manifest.get("releaseUrl").asString, info.releaseHtmlUrl)
+        // 下载地址必须是 GitHub Release 资产形态（releases/download/{tag}/{file}.apk）
+        assertTrue(
+            "下载地址必须是 GitHub Release 资产形态",
+            info.fallbackDownloadUrls.any { it.contains("/releases/download/$expectedTag/") }
         )
         assertTrue(
             "必须保留多镜像回落列表（下载容灾）",

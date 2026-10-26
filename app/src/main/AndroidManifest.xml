@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 轨迹录制：API 29+ 注册 TYPE_STEP_COUNTER 必需 -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -108,6 +110,15 @@
         <!-- Floating Joystick Foreground Service -->
         <service
             android:name=".core.location.FloatingJoystickService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Track recording foreground service (v2.4.0)：stopWithTask=false 且 onTaskRemoved
+             只落盘不停业务，划掉任务也不会丢已采点。 -->
+        <service
+            android:name=".core.location.TrackRecordService"
             android:enabled="true"
             android:exported="false"
             android:stopWithTask="false"

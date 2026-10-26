@@ -1,6 +1,7 @@
 package com.mockrun.app.core.location
 
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.domain.model.SimulatedPoint
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.util.Diag
@@ -15,11 +16,16 @@ import kotlin.math.*
  * Core interpolation engine. Converts a [Route] + speed into a cold [Flow] of [SimulatedPoint].
  *
  * Algorithm:
- * 1. Build cumulative-distance segments from waypoints (Haversine).
- * 2. Advance [distancePerInterval] meters each tick (default 1 s).
+ * 1. Build cumulative-distance segments from waypoints (Haversine); 环形模式先补上闭环段。
+ * 2. Advance distance each tick (default 1 s), 以「绝对距离」记进度，跨轮不清零。
  * 3. Linearly interpolate lat/lon/alt between the surrounding segment endpoints.
  * 4. Add Box-Muller Gaussian noise (~0.3 m sigma) to mimic real GPS jitter.
- * 5. Vary speed ±5 % each tick for realism.
+ * 5. Vary speed with an Ornstein-Uhlenbeck pacing wave + micro jitter.
+ *
+ * 三种运行方式：
+ * - [RouteMode.ONE_WAY]   走到终点停车并发射 `isCompleted`；
+ * - [RouteMode.PING_PONG] 到端点原地掉头（2 tick 停顿 + 显式减速 ramp），永不自动结束；
+ * - [RouteMode.LOOP]      首尾闭合绕圈，接缝处连续、不减速、不停顿。
  */
 @Singleton
 class RouteSimulator @Inject constructor(
@@ -31,93 +37,200 @@ class RouteSimulator @Inject constructor(
         const val UPDATE_INTERVAL_MS = 1000L   // position update cadence
         const val EARTH_RADIUS_M = 6371000.0
         const val GPS_NOISE_SIGMA_M = 0.3      // ~0.3 m standard deviation
+
+        /** 环形模式允许的最大首尾缺口；超过即降级为折返，避免每圈「瞬移回起点」。 */
+        const val LOOP_MAX_GAP_M = 300.0
+        /** 首尾距离小于这个值就认为已经闭合，不再补段。 */
+        private const val LOOP_CLOSE_EPS_M = 0.3
+        /** 掉头停顿的 tick 数（1 s / tick）。 */
+        private const val DWELL_TICKS = 2
+        private const val DWELL_SPEED_MS = 0.12f
+        /** 停顿期间把噪声压小，避免原地回环自交。 */
+        private const val DWELL_SIGMA_M = 0.05
     }
 
+    /**
+     * @param startDistanceMeters 从路线第几米开始（绝对距离，跨轮累计；0 表示起点）
+     * @param mode 运行方式，默认取路线上保存的值
+     */
     fun simulateRoute(
         route: Route,
         speedKmh: Float,
-        startProgress: Float = 0f
+        startDistanceMeters: Double = 0.0,
+        mode: RouteMode = route.mode
     ): Flow<SimulatedPoint> = flow {
         // 不用 require()：该异常会在 MockLocationService.serviceScope.launch 内抛出，
         // 而那个作用域没有 CoroutineExceptionHandler，未捕获异常会直接崩掉进程。
-        // 调用方（UI 层）虽然已加了按钮可用性判断，但模拟也可能由
-        // ADB 广播、路线删除竞态等路径触发，这里必须自己兜住 ——
-        // 返回空 flow 让模拟静默结束，比崩溃好。
         if (route.waypoints.size < 2) {
             Diag.w(TAG, "simulateRoute 收到 ${route.waypoints.size} 个航点（需 >= 2），已跳过本次模拟")
             return@flow
         }
 
-        val segments = buildSegments(route.waypoints)
-        val totalDistance = segments.last().endCumulative
-        if (totalDistance <= 0.0) return@flow
+        val gap = haversine(route.waypoints.last(), route.waypoints.first())
+        val effectiveMode = if (mode == RouteMode.LOOP && gap > LOOP_MAX_GAP_M) {
+            Diag.w(TAG, "首尾缺口 ${gap.toInt()} m 超过 ${LOOP_MAX_GAP_M.toInt()} m，环形降级为折返")
+            RouteMode.PING_PONG
+        } else {
+            mode
+        }
+
+        var lapPoints = buildLapWaypoints(route.waypoints, effectiveMode)
+        var segments = buildSegments(lapPoints)
+        var lapDistance = segments.lastOrNull()?.endCumulative ?: 0.0
+        if (lapDistance <= 0.0) return@flow
 
         val baseSpeedMs = speedKmh * 1000.0 / 3600.0
-        var covered = totalDistance * startProgress.toDouble()
+        // 单圈太短会一 tick 跨两圈以上（40 km/h 时每 tick ≈ 11 m）
+        val minLap = max(2.0, 2.0 * max(baseSpeedMs, 0.3) * (UPDATE_INTERVAL_MS / 1000.0))
+        if (lapDistance < minLap) {
+            Diag.w(TAG, "单圈 ${lapDistance} m 小于下限 $minLap m，已跳过本次模拟")
+            return@flow
+        }
+
         val initialAlt = route.waypoints.firstOrNull()?.altitude ?: 24.0
         kinematicsEngine.resetElevation(initialAlt)
         kinematicsEngine.resetSpeedDynamics()
 
-        while (covered < totalDistance) {
+        val start = startDistanceMeters.coerceAtLeast(0.0)
+        val lapsPassed = floor(start / lapDistance).toInt()
+        var lapIndex = lapsPassed
+        var covered = (start - lapsPassed * lapDistance).coerceIn(0.0, lapDistance)
+        var totalCovered = start
+        var dwellTicks = 0
+
+        var lastLat = lapPoints.first().latitude
+        var lastLon = lapPoints.first().longitude
+        var lastAlt = lapPoints.first().altitude
+        var lastBearing = 0f
+
+        // 单程且已经跑过终点：直接收尾，别进去空转
+        if (effectiveMode == RouteMode.ONE_WAY && start >= lapDistance) {
+            val last = route.waypoints.last()
+            emit(
+                SimulatedPoint(
+                    latitude = last.latitude, longitude = last.longitude, altitude = last.altitude,
+                    bearing = 0f, speed = 0f, progressPercent = 1f,
+                    distanceTraveled = lapDistance, isCompleted = true, lapIndex = lapIndex
+                )
+            )
+            return@flow
+        }
+
+        while (true) {
+            if (dwellTicks > 0) {
+                // 掉头停顿：位置不动、速度接近 0。不能走 nextDynamicSpeed()，它出口有 coerceAtLeast(0.3)
+                emit(
+                    SimulatedPoint(
+                        latitude = lastLat, longitude = lastLon, altitude = lastAlt,
+                        bearing = lastBearing, speed = DWELL_SPEED_MS,
+                        progressPercent = 1f, distanceTraveled = totalCovered,
+                        isCompleted = false, lapIndex = lapIndex
+                    )
+                )
+                dwellTicks--
+                delay(UPDATE_INTERVAL_MS)
+                continue
+            }
+
             val pt = interpolateAt(segments, covered)
 
+            // 端点显式减速 ramp：共线三点算不出曲率（外接圆退化 10000 m），掉头只能显式压速
+            val rampDist = max(3.0, baseSpeedMs * 2.0)
+            val remaining = lapDistance - covered
+            val cruiseMs =
+                if (effectiveMode != RouteMode.LOOP && remaining < rampDist) {
+                    max(KinematicsEngine.MIN_CORNER_SPEED_MS, baseSpeedMs * (remaining / rampDist))
+                } else {
+                    baseSpeedMs
+                }
+
             // Lookahead curvature evaluation for physical corner deceleration
-            val lookahead1 = (covered + max(5.0, baseSpeedMs * 1.5)).coerceAtMost(totalDistance)
-            val lookahead2 = (covered + max(12.0, baseSpeedMs * 3.0)).coerceAtMost(totalDistance)
-            val ptNext = interpolateAt(segments, lookahead1)
-            val ptFar = interpolateAt(segments, lookahead2)
+            val laNear = lookaheadDistance(covered + max(5.0, baseSpeedMs * 1.5), lapDistance, effectiveMode)
+            val laFar = lookaheadDistance(covered + max(12.0, baseSpeedMs * 3.0), lapDistance, effectiveMode)
+            val ptNext = interpolateAt(segments, laNear)
+            val ptFar = interpolateAt(segments, laFar)
 
             val radius = kinematicsEngine.calculateCircumradius(
                 WayPoint(pt.lat, pt.lon),
                 WayPoint(ptNext.lat, ptNext.lon),
                 WayPoint(ptFar.lat, ptFar.lon)
             )
-            val safeSpeedMs = kinematicsEngine.computeCurvatureConstrainedSpeed(baseSpeedMs, radius)
-
-            // Dynamic realistic speed combining macro pacing wave (±12%) and micro stride jitter (±3%)
+            val safeSpeedMs = kinematicsEngine.computeCurvatureConstrainedSpeed(cruiseMs, radius)
             val currentSpeedMs = kinematicsEngine.nextDynamicSpeed(safeSpeedMs)
-            // 每 tick 距离必须有下限。
-            // nextDynamicSpeed 对 baseSpeedMs <= 0.1 直接返回 0.0（即速度 ≤ 0.36 km/h），
-            // 那样 distThisTick = 0，covered 永不推进，外层 while 永不退出：
-            // 每秒发射一个完全相同的点，isCompleted 永不触发，前台服务永不结束，
-            // 24 小时 PARTIAL_WAKE_LOCK 一直持有。
-            // 触发路径是 AdbCommandReceiver 文档里写明的
-            // `am broadcast -a com.mockrun.app.ACTION_SET_SPEED --ef extra_speed 0`。
-            val distThisTick = (currentSpeedMs * (UPDATE_INTERVAL_MS / 1000.0)).coerceAtLeast(0.3)
 
+            // 每 tick 距离必须有下限：取消它会导致 covered 永不推进、while 死循环、24h WakeLock 不释放
+            val distThisTick = (currentSpeedMs * (UPDATE_INTERVAL_MS / 1000.0)).coerceAtLeast(0.3)
             val dynAlt = kinematicsEngine.nextElevation(baseAltitude = pt.alt, deltaDistanceMeters = distThisTick)
 
-            val noise = gaussianNoise2D()
-
-            // Convert meter-level noise to degree offsets
+            val noise = gaussianNoise2D(if (dwellTicks > 0) DWELL_SIGMA_M else GPS_NOISE_SIGMA_M)
             val noiseLat = noise.first / EARTH_RADIUS_M * (180.0 / PI)
             val noiseLon = noise.second / (EARTH_RADIUS_M * cos(Math.toRadians(pt.lat))) * (180.0 / PI)
 
-            emit(SimulatedPoint(
-                latitude  = pt.lat + noiseLat,
-                longitude = pt.lon + noiseLon,
-                altitude  = dynAlt,
-                bearing   = pt.bearing,
-                speed     = currentSpeedMs.toFloat(),
-                progressPercent = (covered / totalDistance).toFloat(),
-                distanceTraveled = covered
-            ))
+            lastLat = pt.lat + noiseLat
+            lastLon = pt.lon + noiseLon
+            lastAlt = dynAlt
+            lastBearing = pt.bearing
+
+            emit(
+                SimulatedPoint(
+                    latitude = lastLat,
+                    longitude = lastLon,
+                    altitude = dynAlt,
+                    bearing = pt.bearing,
+                    speed = currentSpeedMs.toFloat(),
+                    progressPercent = (covered / lapDistance).toFloat(),
+                    distanceTraveled = totalCovered,
+                    isCompleted = false,
+                    lapIndex = lapIndex
+                )
+            )
 
             delay(UPDATE_INTERVAL_MS)
             covered += distThisTick
-        }
+            totalCovered += distThisTick
 
-        // Final point exactly at destination
-        val last = route.waypoints.last()
-        emit(SimulatedPoint(
-            latitude = last.latitude, longitude = last.longitude, altitude = last.altitude,
-            bearing = 0f, speed = 0f,
-            progressPercent = 1f, distanceTraveled = totalDistance,
-            isCompleted = true
-        ))
+            // 必须是 while：高速下一 tick 可能跨过整圈
+            while (covered >= lapDistance) {
+                when (effectiveMode) {
+                    RouteMode.ONE_WAY -> {
+                        val last = route.waypoints.last()
+                        emit(
+                            SimulatedPoint(
+                                latitude = last.latitude, longitude = last.longitude, altitude = last.altitude,
+                                bearing = 0f, speed = 0f, progressPercent = 1f,
+                                distanceTraveled = totalCovered, isCompleted = true, lapIndex = lapIndex
+                            )
+                        )
+                        return@flow
+                    }
+                    RouteMode.PING_PONG -> {
+                        lapPoints = lapPoints.reversed()
+                        segments = buildSegments(lapPoints)
+                        lapIndex++
+                        covered -= lapDistance
+                        dwellTicks = DWELL_TICKS
+                    }
+                    RouteMode.LOOP -> {
+                        lapIndex++
+                        covered -= lapDistance
+                    }
+                }
+            }
+        }
     }
 
     // ---- Private helpers ----
+
+    /** 环形模式补上闭合段；折返/单程直接用原始航点。 */
+    private fun buildLapWaypoints(wps: List<WayPoint>, mode: RouteMode): List<WayPoint> {
+        if (mode != RouteMode.LOOP || wps.size < 2) return wps
+        val gap = haversine(wps.last(), wps.first())
+        return if (gap <= LOOP_CLOSE_EPS_M) wps else wps + wps.first()
+    }
+
+    /** 环形模式对圈长取模，让 lookahead 落进下一圈；其余模式夹到终点。 */
+    private fun lookaheadDistance(raw: Double, lapDistance: Double, mode: RouteMode): Double =
+        if (mode == RouteMode.LOOP) raw % lapDistance else raw.coerceAtMost(lapDistance)
 
     private data class Segment(
         val start: WayPoint, val end: WayPoint,
@@ -167,10 +280,10 @@ class RouteSimulator @Inject constructor(
     }
 
     /** Box-Muller transform for 2-D Gaussian noise (returns meters). */
-    private fun gaussianNoise2D(): Pair<Double, Double> {
+    private fun gaussianNoise2D(sigma: Double = GPS_NOISE_SIGMA_M): Pair<Double, Double> {
         val u1 = kotlin.random.Random.nextDouble().coerceAtLeast(1e-10)
         val u2 = kotlin.random.Random.nextDouble()
-        val mag = GPS_NOISE_SIGMA_M * sqrt(-2.0 * ln(u1))
+        val mag = sigma * sqrt(-2.0 * ln(u1))
         val theta = 2.0 * PI * u2
         return (mag * cos(theta)) to (mag * sin(theta))
     }

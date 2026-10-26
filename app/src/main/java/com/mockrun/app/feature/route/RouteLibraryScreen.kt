@@ -31,6 +31,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.BuildConfig
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
+import com.mockrun.app.core.location.RouteSimulator
+import com.mockrun.app.feature.track.TrackRecordScreen
+import com.mockrun.app.ui.viewmodel.TrackViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.util.Diag
@@ -56,6 +61,10 @@ fun RouteLibraryScreen(
     val context = LocalContext.current
     val savedRoutes by mapViewModel.savedRoutes.collectAsState()
     val selectedRoute by mapViewModel.selectedRoute.collectAsState()
+
+    // 轨迹录制（v2.4.0）：作为本页的叠加层打开，不再动导航图
+    val trackViewModel: TrackViewModel = hiltViewModel()
+    var showTrackScreen by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var routeToRename by remember { mutableStateOf<Route?>(null) }
@@ -184,6 +193,17 @@ fun RouteLibraryScreen(
                     modifier = Modifier.size(22.dp)
                 )
             }
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (showTrackScreen) "关闭轨迹库" else "轨迹录制",
+                style = IosTypography.Footnote,
+                fontWeight = FontWeight.SemiBold,
+                color = IosColors.SystemBlue,
+                modifier = Modifier
+                    .minTouchTarget()
+                    .bouncyClickable { showTrackScreen = !showTrackScreen }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
         }
 
         // =====================================================================
@@ -309,6 +329,36 @@ fun RouteLibraryScreen(
                                     Spacer(Modifier.width(8.dp))
                                     IosStatusBadge(text = "当前载入", tone = IosBadgeTone.RUNNING)
                                 }
+                                if (route.mode != RouteMode.ONE_WAY) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = IosColors.SystemBlue.copy(alpha = 0.14f)
+                                    ) {
+                                        Text(
+                                            text = route.mode.label,
+                                            style = IosTypography.Caption2,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = IosColors.SystemBlue,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                                if (route.sourceTrackId != null) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = IosColors.TertiarySystemFill
+                                    ) {
+                                        Text(
+                                            text = "轨迹",
+                                            style = IosTypography.Caption2,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = IosColors.SecondaryLabel,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(Modifier.height(10.dp))
@@ -419,6 +469,32 @@ fun RouteLibraryScreen(
                                                 shareRouteAsGpx(route)
                                             }
                                         )
+                                        RouteMode.entries.filter { it != route.mode }.forEach { targetMode ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        "运行方式改为「${targetMode.label}」",
+                                                        style = IosTypography.Subheadline,
+                                                        color = IosColors.Label
+                                                    )
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                                                },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    if (targetMode == RouteMode.LOOP && route.closingGapMeters > RouteSimulator.LOOP_MAX_GAP_M) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "首尾相距 ${route.closingGapMeters.toInt()} m，超过 ${RouteSimulator.LOOP_MAX_GAP_M.toInt()} m，无法成环",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                    } else {
+                                                        mapViewModel.updateRouteMode(route, targetMode)
+                                                    }
+                                                }
+                                            )
+                                        }
                                         DropdownMenuItem(
                                             text = { Text("删除路线", style = IosTypography.Subheadline, color = IosDanger) },
                                             leadingIcon = {
@@ -545,6 +621,19 @@ fun RouteLibraryScreen(
             },
             containerColor = IosColors.SecondaryGroupedBackground,
             shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // 轨迹录制叠加层：与路线库同屏打开，关闭后回到列表
+    if (showTrackScreen) {
+        TrackRecordScreen(
+            trackViewModel = trackViewModel,
+            onClose = { showTrackScreen = false },
+            onRouteCreated = { route ->
+                mapViewModel.selectRoute(route)
+                showTrackScreen = false
+                onRouteSelected()
+            }
         )
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mockrun.app.core.data.parser.GpxParser
 import com.mockrun.app.core.data.repository.RouteRepository
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -222,6 +223,19 @@ class MapViewModel @Inject constructor(
             if (_selectedRoute.value?.id == route.id) {
                 _selectedRoute.value = updated
             }
+        }
+    }
+
+    /** 切换路线运行方式（单程 / 折返 / 环形）。 */
+    fun updateRouteMode(route: Route, mode: RouteMode) {
+        if (route.mode == mode) return
+        viewModelScope.launch {
+            val updated = route.copy(mode = mode)
+            routeRepository.updateRoute(updated)
+            if (_selectedRoute.value?.id == route.id) {
+                _selectedRoute.value = updated
+            }
+            Diag.i(TAG, "route '${route.name}' mode -> $mode")
         }
     }
 

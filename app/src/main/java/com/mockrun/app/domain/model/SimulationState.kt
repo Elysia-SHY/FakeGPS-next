@@ -1,4 +1,4 @@
-﻿package com.mockrun.app.domain.model
+package com.mockrun.app.domain.model
 
 sealed class SimulationStatus {
     object Idle : SimulationStatus()
@@ -22,7 +22,9 @@ data class SimulationState(
     val bearing: Float = 0f,
     val route: Route? = null,
     val startTimeMs: Long? = null,
-    val pausedElapsedMs: Long = 0L
+    val pausedElapsedMs: Long = 0L,
+    /** 折返/环形模式下的当前轮次（从 0 开始）；单程模式恒为 0。 */
+    val lapIndex: Int = 0
 ) {
     val formattedElapsedTime: String
         get() {

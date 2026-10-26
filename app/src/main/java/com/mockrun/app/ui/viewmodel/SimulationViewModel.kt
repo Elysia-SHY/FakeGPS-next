@@ -90,6 +90,8 @@ class SimulationViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             _isRootAvailable.value = rootBridge.isRootAvailable()
+            // root 状态已知后再应用「上次的开关意图」，避免把 false 当成用户选择落盘
+            sensorEngine.applyPersistedIntent()
         }
     }
 
@@ -99,12 +101,18 @@ class SimulationViewModel @Inject constructor(
         viewModelScope.launch {
             val rootOk = rootBridge.isRootAvailable()
             _isRootAvailable.value = rootOk
-            sensorEngine.setCadenceEnabled(enabled && rootOk, currentSpeedKmh)
+            // 只传用户意图，root 门控在引擎里做（否则冷启动会把 enabled 落盘成 false）
+            sensorEngine.setCadenceEnabled(enabled, currentSpeedKmh)
         }
     }
 
     fun setCadenceMode(mode: CadenceMode, customValue: Int = 165, currentSpeedKmh: Float = 8f) {
         sensorEngine.setCadenceMode(mode, customValue, currentSpeedKmh)
+    }
+
+    /** 运行中直接改自定义步频，下一个 tick 生效。 */
+    fun setCustomCadence(spm: Int, currentSpeedKmh: Float = 8f) {
+        sensorEngine.setCustomCadence(spm, currentSpeedKmh)
     }
 
     fun resetSteps() {

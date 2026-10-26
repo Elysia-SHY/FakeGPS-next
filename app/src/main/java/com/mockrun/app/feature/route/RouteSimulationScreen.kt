@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.BuildConfig
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RootSuBridge
@@ -64,7 +65,12 @@ fun RouteSimulationScreen(
 
     var selectedSpeed by remember { mutableFloatStateOf(8f) }
     var customSpeedInput by remember { mutableStateOf("8") }
-    var customCadenceInput by remember { mutableStateOf("165") }
+    var customCadenceInput by remember {
+        mutableStateOf(
+            sensorEngine.sensorState.value.customCadence
+                .takeIf { it > 0 }?.toString() ?: "165"
+        )
+    }
     var showRoutePickerDialog by remember { mutableStateOf(false) }
     var isRootActive by remember { mutableStateOf<Boolean?>(null) }
 
@@ -329,6 +335,11 @@ fun RouteSimulationScreen(
                     MetricItem("已用时间", simState.formattedElapsedTime)
                     MetricItem("已跑里程", "${"%.2f".format(simState.distanceTraveledMeters / 1000.0)} km")
                     MetricItem("当前配速", "${"%.1f".format(simState.speedKmh)} km/h")
+                    MetricItem(
+                        "轮次",
+                        if ((simState.route?.mode ?: RouteMode.ONE_WAY) == RouteMode.ONE_WAY) "--"
+                        else "${simState.lapIndex + 1}"
+                    )
                 }
 
                 Spacer(Modifier.height(14.dp))
@@ -339,7 +350,11 @@ fun RouteSimulationScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("路线巡航进度", style = IosTypography.Footnote, color = IosColors.SecondaryLabel)
+                    Text(
+                        text = if ((simState.route?.mode ?: RouteMode.ONE_WAY) == RouteMode.ONE_WAY) "路线巡航进度" else "本轮进度",
+                        style = IosTypography.Footnote,
+                        color = IosColors.SecondaryLabel
+                    )
                     Text(
                         text = "${(simState.progressPercent * 100).toInt()}%",
                         style = IosTypography.Subheadline,
@@ -613,10 +628,13 @@ fun RouteSimulationScreen(
         }
 
         // =====================================================================
-        // 5. Cadence & Step Simulation (iOS Inset Group Card, Root Required)
+        // 5. Cadence & Step Simulation (iOS Inset Group Card)
+        //    v2.4.0：非 Root 也展示（灰度 + 「仅预览」），避免「开关亮着但引擎没注入」的谎报
         // =====================================================================
-        if (isRootActive == true) {
-            IosSectionHeader("运动步频与计步仿真 (Root 专享)")
+        run {
+            IosSectionHeader(
+                if (isRootActive == true) "运动步频与计步仿真" else "运动步频与计步仿真（仅预览）"
+            )
 
             IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -637,6 +655,7 @@ fun RouteSimulationScreen(
                     }
                     Switch(
                         checked = sensorState.isEnabled,
+                        enabled = isRootActive == true,
                         onCheckedChange = { simulationViewModel.setCadenceEnabled(it, selectedSpeed) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,

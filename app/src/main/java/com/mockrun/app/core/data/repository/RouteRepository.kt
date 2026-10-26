@@ -1,10 +1,11 @@
-﻿package com.mockrun.app.core.data.repository
+package com.mockrun.app.core.data.repository
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mockrun.app.core.data.db.RouteDao
 import com.mockrun.app.core.data.db.RouteEntity
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -37,13 +38,22 @@ class RouteRepository @Inject constructor(
             parsed ?: emptyList()
         }.logFailure("RouteRepository", "parse waypoints for route '$name'", Diag.Level.DEBUG)
             .getOrDefault(emptyList())
-        return Route(id = id, name = name, waypoints = wps, createdAt = createdAt)
+        return Route(
+            id = id,
+            name = name,
+            waypoints = wps,
+            createdAt = createdAt,
+            mode = RouteMode.fromName(mode),
+            sourceTrackId = sourceTrackId
+        )
     }
 
     private fun Route.toEntity() = RouteEntity(
         id = id, name = name,
         waypointsJson = gson.toJson(waypoints),
-        createdAt = createdAt
+        createdAt = createdAt,
+        mode = mode.name,
+        sourceTrackId = sourceTrackId
     )
 
     private companion object {

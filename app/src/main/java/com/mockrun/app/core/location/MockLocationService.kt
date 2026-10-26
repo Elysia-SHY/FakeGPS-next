@@ -11,7 +11,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.mockrun.app.MainActivity
 import com.mockrun.app.R
+import com.google.gson.Gson
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.domain.model.SimulatedPoint
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -19,6 +21,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import javax.inject.Inject
+import kotlin.math.abs
 
 /**
  * Foreground Service responsible for injecting mock GPS coordinates into the Android OS.
@@ -40,7 +43,12 @@ class MockLocationService : Service() {
         const val ACTION_RESUME = "com.mockrun.app.ACTION_RESUME"
         const val ACTION_STOP = "com.mockrun.app.ACTION_STOP"
         const val ACTION_SET_SPEED = "com.mockrun.app.ACTION_SET_SPEED"
+        /** 旧接口：按进度 0..1 定位。保留只为向后兼容，新代码用 [ACTION_SEEK_DISTANCE]。 */
         const val ACTION_SEEK = "com.mockrun.app.ACTION_SEEK"
+        /** v2.3.0 新增：切换运行方式（单程 / 折返 / 环形）。 */
+        const val ACTION_SET_MODE = "com.mockrun.app.ACTION_SET_MODE"
+        /** v2.3.0 新增：按绝对距离（米）定位，循环模式下用它才不会跳回第一轮。 */
+        const val ACTION_SEEK_DISTANCE = "com.mockrun.app.ACTION_SEEK_DISTANCE"
 
         // Single-Point Virtual Location Actions
         const val ACTION_START_POINT_MOCK = "com.mockrun.app.ACTION_START_POINT_MOCK"
@@ -51,6 +59,8 @@ class MockLocationService : Service() {
         const val EXTRA_ROUTE = "extra_route"
         const val EXTRA_SPEED = "extra_speed"
         const val EXTRA_SEEK_PROGRESS = "extra_seek_progress"
+        const val EXTRA_ROUTE_MODE = "extra_route_mode"
+        const val EXTRA_SEEK_DISTANCE_M = "extra_seek_distance_m"
 
         const val PROVIDER_NAME = LocationManager.GPS_PROVIDER
 
@@ -63,7 +73,11 @@ class MockLocationService : Service() {
         private const val KEY_IS_SIMULATION_ACTIVE = "key_is_sim_active"
         private const val KEY_SIM_SPEED = "key_sim_speed"
         private const val KEY_SIM_PROGRESS = "key_sim_progress"
+        private const val KEY_SIM_DISTANCE_M = "key_sim_distance_m"
+        private const val KEY_SIM_MODE = "key_sim_mode"
         private const val KEY_SAVED_ROUTE_B64 = "key_saved_route_b64"
+        /** 路线快照格式前缀：Gson JSON（v2 起）。旧的无前缀 Base64 是 v2.2.0 的 Java 序列化，读不回来了。 */
+        private const val ROUTE_SNAPSHOT_V2_PREFIX = "v2:"
     }
 
     @Inject lateinit var simulator: RouteSimulator
@@ -82,8 +96,15 @@ class MockLocationService : Service() {
     private var currentRoute: Route? = null
     private var currentSpeedKmh: Float = 8f
     private var currentProgress: Float = 0f
+    /** 绝对续跑位置（米，跨轮累计）。changeSpeed / seek / 复活全部按它续跑。 */
+    private var currentDistanceMeters: Double = 0.0
+    private var currentMode: RouteMode = RouteMode.ONE_WAY
     private var currentSessionId: Long = 0L
     private var userStopped: Boolean = false
+
+    // 通知节流：循环模式永不结束，每秒 notify 会整夜点亮息屏并耗电
+    private var lastNotifyAt: Long = 0L
+    private var lastNotifiedPercent: Float = -1f
 
     override fun onCreate() {
         super.onCreate()
@@ -126,7 +147,7 @@ class MockLocationService : Service() {
                     } else {
                         startForeground(NOTIFICATION_ID, notif)
                     }
-                    startSimulation(route, speed, 0f)
+                    startSimulation(route, speed, 0.0, modeOf(intent, route))
                 }
             }
             ACTION_PAUSE -> pauseSimulation()
@@ -136,9 +157,18 @@ class MockLocationService : Service() {
                 val speed = intent.getFloatExtra(EXTRA_SPEED, currentSpeedKmh)
                 changeSpeed(speed)
             }
+            ACTION_SET_MODE -> {
+                val mode = RouteMode.fromName(intent.getStringExtra(EXTRA_ROUTE_MODE))
+                setRouteMode(mode)
+            }
+            ACTION_SEEK_DISTANCE -> {
+                val distance = intent.getDoubleExtra(EXTRA_SEEK_DISTANCE_M, currentDistanceMeters)
+                seekToDistance(distance)
+            }
             ACTION_SEEK -> {
+                // 旧接口：进度 0..1，折算成距离后统一走距离续跑
                 val progress = intent.getFloatExtra(EXTRA_SEEK_PROGRESS, 0f)
-                seekTo(progress)
+                seekToDistance(progressToDistance(progress))
             }
             ACTION_START_POINT_MOCK -> {
                 val lat = intent.getDoubleExtra(EXTRA_LATITUDE, 39.9042)
@@ -195,9 +225,22 @@ class MockLocationService : Service() {
             val savedRoute = routeB64?.let { deserializeRoute(it) } ?: currentRoute
             if (savedRoute != null) {
                 val speed = sp.getFloat(KEY_SIM_SPEED, currentSpeedKmh)
-                val progress = sp.getFloat(KEY_SIM_PROGRESS, currentProgress)
-                Diag.i(TAG, "Resurrected: successfully restoring simulation at $progress")
-                startSimulation(savedRoute, speed, progress)
+                val mode = RouteMode.fromName(sp.getString(KEY_SIM_MODE, savedRoute.mode.name))
+                // 新格式按米续跑；只有旧版本写入的库才退回百分比折算（读一次就删，避免语义串台）
+                val legacyProgress = if (sp.contains(KEY_SIM_PROGRESS)) {
+                    sp.getFloat(KEY_SIM_PROGRESS, 0f).also {
+                        sp.edit().remove(KEY_SIM_PROGRESS).apply()
+                    }
+                } else {
+                    null
+                }
+                val distance = if (sp.contains(KEY_SIM_DISTANCE_M)) {
+                    sp.getFloat(KEY_SIM_DISTANCE_M, 0f).toDouble()
+                } else {
+                    savedRoute.totalDistanceMeters * (legacyProgress ?: 0f)
+                }
+                Diag.i(TAG, "Resurrected: restoring simulation at ${distance.toInt()} m, mode=$mode")
+                startSimulation(savedRoute.copy(mode = mode), speed, distance, mode)
             }
         }
     }
@@ -213,38 +256,56 @@ class MockLocationService : Service() {
         }
     }
 
-    private fun saveSimulationState(active: Boolean, route: Route? = null, speed: Float = 8f, progress: Float = 0f) {
+    private fun saveSimulationState(
+        active: Boolean,
+        route: Route? = null,
+        speed: Float = 8f,
+        distanceMeters: Double = 0.0,
+        mode: RouteMode = RouteMode.ONE_WAY
+    ) {
         getSharedPreferences(PREFS_MOCK_SERVICE, Context.MODE_PRIVATE).edit().apply {
             putBoolean(KEY_IS_SIMULATION_ACTIVE, active)
             if (active) {
                 putFloat(KEY_SIM_SPEED, speed)
-                putFloat(KEY_SIM_PROGRESS, progress)
+                putFloat(KEY_SIM_DISTANCE_M, distanceMeters.toFloat())
+                putString(KEY_SIM_MODE, mode.name)
                 route?.let { putString(KEY_SAVED_ROUTE_B64, serializeRoute(it)) }
             } else {
                 remove(KEY_SAVED_ROUTE_B64)
+                remove(KEY_SIM_DISTANCE_M)
+                remove(KEY_SIM_MODE)
             }
             apply()
         }
     }
 
-    private fun saveSimulationProgress(progress: Float, speed: Float) {
+    private fun saveSimulationProgress(distanceMeters: Double, speed: Float, progressPercent: Float) {
         getSharedPreferences(PREFS_MOCK_SERVICE, Context.MODE_PRIVATE).edit().apply {
-            putFloat(KEY_SIM_PROGRESS, progress)
+            putFloat(KEY_SIM_DISTANCE_M, distanceMeters.toFloat())
+            putFloat(KEY_SIM_PROGRESS, progressPercent)   // 仅用于 UI 恢复显示，不再参与续跑
             putFloat(KEY_SIM_SPEED, speed)
             apply()
         }
     }
 
+    /**
+     * 路线快照：Gson JSON + `v2:` 前缀。
+     *
+     * 不能再用 Java 序列化：`Route` 加了 `mode` 字段后隐式 serialVersionUID 变化，
+     * 旧快照反序列化必抛 `InvalidClassException`，被 runCatching 吞成 null，
+     * 表现就是「服务被杀后复活，路线没了」。
+     */
     private fun serializeRoute(route: Route): String = runCatching {
-        val baos = java.io.ByteArrayOutputStream()
-        java.io.ObjectOutputStream(baos).use { it.writeObject(route) }
-        android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.DEFAULT)
+        ROUTE_SNAPSHOT_V2_PREFIX + Gson().toJson(route)
     }.logFailure(TAG, "serializeRoute", Diag.Level.DEBUG).getOrDefault("")
 
     private fun deserializeRoute(str: String): Route? = runCatching {
-        val bytes = android.util.Base64.decode(str, android.util.Base64.DEFAULT)
-        val bais = java.io.ByteArrayInputStream(bytes)
-        java.io.ObjectInputStream(bais).use { it.readObject() as Route }
+        when {
+            str.startsWith(ROUTE_SNAPSHOT_V2_PREFIX) ->
+                Gson().fromJson(str.removePrefix(ROUTE_SNAPSHOT_V2_PREFIX), Route::class.java)
+            // v2.2.0 的旧 Base64 快照：UID 已变，读不回来，只能返回 null 走兜底路线
+            else -> null
+        }
     }.logFailure(TAG, "deserializeRoute", Diag.Level.DEBUG).getOrNull()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -272,7 +333,12 @@ class MockLocationService : Service() {
 
     // ---- Simulation Control ----
 
-    private fun startSimulation(route: Route, speedKmh: Float, startProgress: Float) {
+    private fun startSimulation(
+        route: Route,
+        speedKmh: Float,
+        startDistanceMeters: Double,
+        mode: RouteMode = route.mode
+    ) {
         userStopped = false
         val sessionId = ++currentSessionId
 
@@ -281,9 +347,11 @@ class MockLocationService : Service() {
         savePointMockState(active = false)
         stateRepo.setPointMock(false)
 
-        currentRoute = route
+        val simRoute = route.copy(mode = mode)
+        currentRoute = simRoute
         currentSpeedKmh = speedKmh
-        currentProgress = startProgress
+        currentMode = mode
+        currentDistanceMeters = startDistanceMeters.coerceAtLeast(0.0)
 
         if (!mockEngine.isRegistered() && !mockEngine.register()) {
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
@@ -291,27 +359,45 @@ class MockLocationService : Service() {
             return
         }
 
-        saveSimulationState(active = true, route = route, speed = speedKmh, progress = startProgress)
-        stateRepo.onSimulationStarted(route, speedKmh)
+        saveSimulationState(
+            active = true, route = simRoute, speed = speedKmh,
+            distanceMeters = currentDistanceMeters, mode = mode
+        )
+        stateRepo.onSimulationStarted(simRoute, speedKmh)
         com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(true)
 
-        launchSimulationLoop(sessionId, route, speedKmh, startProgress)
+        launchSimulationLoop(sessionId, simRoute, speedKmh, currentDistanceMeters, mode)
     }
 
-    private fun launchSimulationLoop(sessionId: Long, route: Route, speedKmh: Float, startProgress: Float) {
+    private fun launchSimulationLoop(
+        sessionId: Long,
+        route: Route,
+        speedKmh: Float,
+        startDistanceMeters: Double,
+        mode: RouteMode
+    ) {
         simulationJob?.cancel()
         simulationJob = serviceScope.launch {
-            simulator.simulateRoute(route, speedKmh, startProgress).collectLatest { point ->
+            var completed = false
+            simulator.simulateRoute(route, speedKmh, startDistanceMeters, mode).collectLatest { point ->
                 if (sessionId != currentSessionId || !isActive) return@collectLatest
                 injectLocation(point)
                 currentProgress = point.progressPercent
+                currentDistanceMeters = point.distanceTraveled
                 stateRepo.onLocationUpdate(point)
                 val dynamicSpeedKmh = point.speed * 3.6f
                 sensorEngine.updateTick(dynamicSpeedKmh, 1.0f)
-                saveSimulationProgress(progress = currentProgress, speed = dynamicSpeedKmh)
-                updateNotification("进度: ${(point.progressPercent * 100).toInt()}% | ${(point.distanceTraveled / 1000.0).format(2)} km")
+                saveSimulationProgress(
+                    distanceMeters = point.distanceTraveled,
+                    speed = dynamicSpeedKmh,
+                    progressPercent = point.progressPercent
+                )
+                if (shouldRefreshNotification(point.progressPercent)) {
+                    updateNotification(notificationText(mode, point))
+                }
 
                 if (point.isCompleted) {
+                    completed = true
                     userStopped = true
                     saveSimulationState(active = false)
                     sensorEngine.updateTick(0f, 0f)
@@ -320,6 +406,34 @@ class MockLocationService : Service() {
                     stopSelf()
                 }
             }
+            // 兜底：flow 正常结束却没发 isCompleted（路线不足两点、路线被删、ADB 推了空路线），
+            // 不收拾的话前台服务与 24h WakeLock 会一直挂着。
+            if (!completed && !userStopped && sessionId == currentSessionId) {
+                Diag.w(TAG, "simulateRoute 已结束但没收到 isCompleted，主动收尾")
+                stopSimulation()
+            }
+        }
+    }
+
+    /** 通知节流：循环模式永不结束，每秒 notify 会整夜点亮息屏。 */
+    private fun shouldRefreshNotification(progressPercent: Float): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val percentJumped = abs(progressPercent - lastNotifiedPercent) >= 0.01f
+        if (percentJumped || now - lastNotifyAt >= 5_000L) {
+            lastNotifyAt = now
+            lastNotifiedPercent = progressPercent
+            return true
+        }
+        return false
+    }
+
+    private fun notificationText(mode: RouteMode, point: SimulatedPoint): String {
+        val km = point.distanceTraveled / 1000.0
+        return if (mode == RouteMode.ONE_WAY) {
+            "进度: ${(point.progressPercent * 100).toInt()}% | ${km.format(2)} km"
+        } else {
+            val speed = point.speed * 3.6f
+            "第 ${point.lapIndex + 1} 轮 · 累计 ${km.format(2)} km · ${speed.toDouble().format(1)} km/h"
         }
     }
 
@@ -335,7 +449,7 @@ class MockLocationService : Service() {
         val route = currentRoute ?: return
         val sessionId = ++currentSessionId
         stateRepo.onSimulationStarted(route, currentSpeedKmh)
-        launchSimulationLoop(sessionId, route, currentSpeedKmh, currentProgress)
+        launchSimulationLoop(sessionId, route, currentSpeedKmh, currentDistanceMeters, currentMode)
     }
 
     private fun stopSimulation() {
@@ -361,14 +475,46 @@ class MockLocationService : Service() {
         stateRepo.setSpeed(newSpeedKmh)
         val route = currentRoute ?: return
         val sessionId = ++currentSessionId
-        launchSimulationLoop(sessionId, route, newSpeedKmh, currentProgress)
+        launchSimulationLoop(sessionId, route, newSpeedKmh, currentDistanceMeters, currentMode)
     }
 
-    private fun seekTo(progress: Float) {
+    /** 按绝对距离续跑；进度条与旧广播都折算到米之后走这里。 */
+    private fun seekToDistance(distanceMeters: Double) {
         val route = currentRoute ?: return
-        currentProgress = progress.coerceIn(0f, 1f)
+        currentDistanceMeters = distanceMeters.coerceAtLeast(0.0)
         val sessionId = ++currentSessionId
-        launchSimulationLoop(sessionId, route, currentSpeedKmh, currentProgress)
+        launchSimulationLoop(sessionId, route, currentSpeedKmh, currentDistanceMeters, currentMode)
+    }
+
+    private fun setRouteMode(mode: RouteMode) {
+        val route = currentRoute
+        currentMode = mode
+        if (route == null) {
+            Diag.i(TAG, "运行方式切换为 $mode（当前无路线，仅记录）")
+            return
+        }
+        val updated = route.copy(mode = mode)
+        currentRoute = updated
+        Diag.i(TAG, "运行方式切换为 $mode")
+        saveSimulationState(
+            active = true, route = updated, speed = currentSpeedKmh,
+            distanceMeters = currentDistanceMeters, mode = mode
+        )
+        if (simulationJob?.isActive == true) {
+            val sessionId = ++currentSessionId
+            launchSimulationLoop(sessionId, updated, currentSpeedKmh, currentDistanceMeters, mode)
+        }
+    }
+
+    /** 兼容旧的「进度 0..1」入参：折算成绝对距离。 */
+    private fun progressToDistance(progress: Float): Double {
+        val route = currentRoute ?: return currentDistanceMeters
+        return route.totalDistanceMeters * progress.coerceIn(0f, 1f)
+    }
+
+    private fun modeOf(intent: Intent, route: Route): RouteMode {
+        val raw = intent.getStringExtra(EXTRA_ROUTE_MODE)
+        return if (raw != null) RouteMode.fromName(raw) else route.mode
     }
 
     private fun startPointMock(lat: Double, lon: Double) {
