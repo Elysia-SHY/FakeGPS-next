@@ -102,38 +102,15 @@ object VersionSyncManager {
     /** 联系邮箱 */
     const val CONTACT_EMAIL = "2224958076@qq.com"
 
-    /**
-     * 静态 OTA 清单多节点列表（与仓库根目录 version.json 同源）。
-     *
-     * ### 为什么带查询串
-     *
-     * jsDelivr 的 `@main` 分支资源默认 `s-maxage=43200`（12 小时）。发版后如果用户的网络
-     * 落到某个还没刷新的边缘节点（国内最常见的是 cdn / fastly 不通、最后落到 gcore），
-     * 就会读到**旧清单**，表现为「应用内收不到更新推送」，而 GitHub 上其实已经发了新版。
-     *
-     * 这里按「版本号 + 小时」拼一个查询串：既是新的 CDN 缓存键，又不会改变文件内容。
-     * 代价是每小时最多回源一次，最坏陈旧窗口从 12 小时压到 1 小时。
-     */
-    private fun manifestCacheBuster(): String {
-        val hourBucket = System.currentTimeMillis() / 3_600_000L
-        return "?v=${BuildConfig.VERSION_CODE}-$hourBucket"
-    }
-
-    internal val STATIC_MANIFEST_URLS: List<String>
-        get() {
-            val bust = manifestCacheBuster()
-            // 顺序即优先级：raw / gh-proxy 只有 5 分钟缓存，jsDelivr 的 @main 是 12 小时。
-            // 实测 jsDelivr 按**路径**做缓存键，查询串并不能穿透它（带不带 ?v= 都返回同一份旧内容），
-            // 所以只能把它排到最后，当兜底用。
-            return listOf(
-                "https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
-                "https://gh-proxy.com/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
-                "https://ghproxy.net/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json$bust",
-                "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
-                "https://fastly.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust",
-                "https://gcore.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json$bust"
-            )
-        }
+    /** 静态 OTA 清单多节点列表（与仓库根目录 version.json 同源） */
+    internal val STATIC_MANIFEST_URLS = listOf(
+        "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json",
+        "https://fastly.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json",
+        "https://gcore.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@main/version.json",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json",
+        "https://ghproxy.net/https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json",
+        "https://raw.githubusercontent.com/$GITHUB_OWNER/$GITHUB_REPO/main/version.json"
+    )
 
     private const val GITHUB_RELEASE_API =
         "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
