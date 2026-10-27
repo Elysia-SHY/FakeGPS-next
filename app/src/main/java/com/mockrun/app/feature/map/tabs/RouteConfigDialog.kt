@@ -335,16 +335,16 @@ fun RouteConfigDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isRootAvailable) "拟真步频与传感器模拟" else "拟真步频与传感器模拟 (Root 专享)",
+                            text = "步频与计步估算（仅预览）",
                             style = IosTypography.Subheadline,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isRootAvailable) IosColors.Label else IosColors.SecondaryLabel
+                            color = IosColors.Label
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = if (isRootAvailable) "自动生成步数、加速度与传感器震荡" else "需 Root 注入环境支持（当前设备未获得 Root）",
+                            text = "按速度估算步数、加速度；不会写入系统传感器",
                             style = IosTypography.Caption1,
-                            color = if (isRootAvailable) IosColors.SecondaryLabel else IosWarning
+                            color = IosColors.SecondaryLabel
                         )
                     }
                     Box(
@@ -352,13 +352,11 @@ fun RouteConfigDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Switch(
-                            checked = if (isRootAvailable) cadenceVal else false,
-                            enabled = isRootAvailable,
+                            checked = cadenceVal,
+                            enabled = true,
                             onCheckedChange = {
-                                if (isRootAvailable) {
-                                    cadenceVal = it
-                                    onCadenceToggle(it)
-                                }
+                                cadenceVal = it
+                                onCadenceToggle(it)
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,

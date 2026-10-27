@@ -132,7 +132,8 @@ class SensorMockEngine @Inject constructor(
         CadencePrefs.saveIntent(context, enabled, _sensorState.value.cadenceMode, _sensorState.value.customCadence)
 
         val rootOk = rootBridge.isRootConfirmed()
-        val actuallyEnabled = enabled && rootOk
+        // 当前只做界面估算，不依赖 Root；保留 isRootActive 供诊断显示。
+        val actuallyEnabled = enabled
         val cadence = if (actuallyEnabled) {
             effectiveCadence(currentSpeedKmh, _sensorState.value.cadenceMode, _sensorState.value.customCadence)
         } else {

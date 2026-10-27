@@ -81,14 +81,15 @@ object FingerprintCoordinator {
      * @return 是否导出成功
      */
     fun activate(context: Context, id: String): Boolean {
-        val json = FingerprintStore.exportJson(context, id)
+        val safeId = FingerprintStore.sanitizeId(id)
+        val json = FingerprintStore.exportJson(context, safeId)
         if (json.isNullOrEmpty()) {
             Diag.w(TAG, "activate('$id') failed: fingerprint not found")
             return false
         }
 
-        val exported = exportToTmp(json, id)
-        publishId(context, id)
+        val exported = exportToTmp(json, safeId)
+        publishId(context, safeId)
 
         if (!exported) {
             Diag.w(
@@ -116,7 +117,8 @@ object FingerprintCoordinator {
      * （那是 shell_data_file，且 app 的 SELinux 域无写权限）。
      */
     private fun exportToTmp(json: String, id: String): Boolean {
-        val path = "/data/local/tmp/fakegps_fp_$id.json"
+        val safeId = FingerprintStore.sanitizeId(id)
+        val path = "/data/local/tmp/fakegps_fp_$safeId.json"
         // 单引号内的 JSON 不含单引号（Gson 默认不转义为 \u0027 但字段值里没有撇号），
         // 仍然做一次替换以防万一。
         val safe = json.replace("'", "'\\''")

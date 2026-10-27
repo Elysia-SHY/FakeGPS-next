@@ -143,7 +143,12 @@ object HookStateBridge {
         }
     }
 
-    private val asyncScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    // 串行化所有 su 发布：update(true)/update(false)/route 切换若并发执行，
+    // 清坐标命令可能晚于新的 active 命令落地，最终状态与内存态相反。
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val asyncScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1) + kotlinx.coroutines.SupervisorJob()
+    )
 
     fun update(
         context: Context?,
@@ -183,15 +188,21 @@ object HookStateBridge {
             // 1. SharedPreferences update (Immediate)
             runCatching {
                 val sp = ctx.getSharedPreferences("hook_config", Context.MODE_PRIVATE)
-                sp.edit()
+                val editor = sp.edit()
                     .putBoolean("is_active", active)
-                    .putString("latitude", lat.toString())
-                    .putString("longitude", lon.toString())
                     .putFloat("bearing", bear)
                     .putFloat("speed", spd)
                     .putLong("timestamp", updateTimestamp)
                     .putLong("elapsed", elapsed)
-                    .apply()
+                if (active) {
+                    editor.putString("latitude", lat.toString())
+                        .putString("longitude", lon.toString())
+                } else {
+                    // inactive 不保留坐标：setprop/Settings.Global/私有 XML 都可能被读取。
+                    editor.remove("latitude")
+                        .remove("longitude")
+                }
+                editor.apply()
 
                 val prefsFile = java.io.File(ctx.applicationInfo.dataDir, "shared_prefs/hook_config.xml")
                 if (prefsFile.exists()) {
@@ -210,7 +221,7 @@ object HookStateBridge {
                     android.provider.Settings.Global.putString(
                         ctx.contentResolver,
                         "fake_gps_config",
-                        """{"isActive":false,"latitude":$lat,"longitude":$lon,"time":$updateTimestamp}"""
+                        """{"isActive":false,"time":$updateTimestamp}"""
                     )
                 }
             }.logFailure(TAG, "channel 2: write Settings.Global fake_gps_config", Diag.Level.DEBUG)
@@ -269,8 +280,9 @@ object HookStateBridge {
                                 // SELinux 拒绝（u:r:system_server:s0 读 app_data_file）。
                                 append("chmod 644 /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings put global fake_gps_config '$jsonStr' 2>/dev/null; ")
-                                append("chmod 755 $pkgDir 2>/dev/null; ")
-                                append("chmod 755 $pkgDir/shared_prefs 2>/dev/null; ")
+                                // 只给 traverse 权限，不开放目录列举；文件才 0644。
+                                append("chmod 711 $pkgDir 2>/dev/null; ")
+                                append("chmod 771 $pkgDir/shared_prefs 2>/dev/null; ")
                                 // Owner is this app (it is the one writing the prefs), so 0644 still
                                 // lets it write while keeping other apps read-only.
                                 append("chmod 644 $pkgDir/shared_prefs/hook_config.xml 2>/dev/null")
@@ -294,7 +306,6 @@ object HookStateBridge {
                                 append("rm -f /data/system/fake_gps_hook.json 2>/dev/null; ")
                                 append("rm -f /data/local/tmp/fake_gps_hook.json 2>/dev/null; ")
                                 append("settings delete global fake_gps_config 2>/dev/null; ")
-                                append("settings put global fake_gps_config '{\"isActive\":false,\"latitude\":$lat,\"longitude\":$lon}' 2>/dev/null; ")
                                 append("settings put secure location_mode 3 2>/dev/null; ")
                                 append("settings put global wifi_scan_always_enabled 1 2>/dev/null; ")
                                 append("settings put global ble_scan_always_enabled 1 2>/dev/null; ")
@@ -416,7 +427,10 @@ class HookConfigProvider : ContentProvider() {
             }
             "isHookActive" -> {
                 Bundle().apply {
-                    putBoolean("is_active", HookStateBridge.isSystemHookAlive() || XposedStatusHelper.isModuleActive())
+                    putBoolean(
+                        "is_active",
+                        HookStateBridge.isSystemHookAlive() || XposedStatusHelper.isModuleActive()
+                    )
                 }
             }
             "ping" -> {

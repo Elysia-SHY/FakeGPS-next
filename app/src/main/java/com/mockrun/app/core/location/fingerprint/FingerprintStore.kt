@@ -22,6 +22,18 @@ object FingerprintStore {
     private fun dir(ctx: Context): File = File(ctx.filesDir, DIR).apply { mkdirs() }
 
     /**
+     * 指纹 id 只允许安全字符。它会进入文件名和 `su -c` 命令，不能信任 UI 输入。
+     * 保留中文以外的常见标识符；非法字符统一替换为 `_`，并限制长度。
+     */
+    fun sanitizeId(raw: String): String {
+        val safe = raw.trim()
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.', '_')
+            .take(64)
+        return safe.ifBlank { "fingerprint" }
+    }
+
+    /**
      * 原子写入指纹包。
      *
      * 先写 `$id.json.tmp` 再 `renameTo` 覆盖：`renameTo` 在同一文件系统内是原子的，
@@ -32,8 +44,9 @@ object FingerprintStore {
      *         否则会出现「保存失败仍提示已采集成功」。
      */
     fun save(ctx: Context, id: String, fp: EnvironmentFingerprint): Boolean {
-        val target = File(dir(ctx), "$id.json")
-        val tmp = File(dir(ctx), "$id.json.tmp")
+        val safeId = sanitizeId(id)
+        val target = File(dir(ctx), "$safeId.json")
+        val tmp = File(dir(ctx), "$safeId.json.tmp")
         return runCatching {
             tmp.writeText(gson.toJson(fp))
             if (tmp.renameTo(target)) {
@@ -57,7 +70,7 @@ object FingerprintStore {
      * 缺字段读出来是 null —— normalize 把 null 统一成「未知」，绝不当成 0。
      */
     fun load(ctx: Context, id: String): EnvironmentFingerprint? = runCatching {
-        val f = File(dir(ctx), "$id.json")
+        val f = File(dir(ctx), "${sanitizeId(id)}.json")
         if (!f.exists()) return@runCatching null
         val parsed = gson.fromJson(f.readText(), EnvironmentFingerprint::class.java) ?: return@runCatching null
         normalize(parsed)
@@ -70,7 +83,7 @@ object FingerprintStore {
             ?: emptyList()
 
     fun delete(ctx: Context, id: String) {
-        runCatching { File(dir(ctx), "$id.json").delete() }
+        runCatching { File(dir(ctx), "${sanitizeId(id)}.json").delete() }
             .logFailure(TAG, "delete fingerprint $id", Diag.Level.DEBUG)
     }
 

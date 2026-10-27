@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 默认只注入系统框架。目标应用是否加入 scope 由用户显式选择：
+         默认勾选微信/QQ/地图会让这些进程加载反作弊可见的 Xposed 类，和 README 的承诺冲突。 -->
     <string-array name="xposed_scope">
         <item>android</item>
-        <item>com.chaoxing.mobile</item>
-        <item>com.autonavi.minimap</item>
-        <item>com.baidu.BaiduMap</item>
-        <item>com.tencent.map</item>
-        <item>com.tencent.mm</item>
-        <item>com.tencent.mobileqq</item>
-        <item>com.alibaba.android.rimet</item>
     </string-array>
 </resources>

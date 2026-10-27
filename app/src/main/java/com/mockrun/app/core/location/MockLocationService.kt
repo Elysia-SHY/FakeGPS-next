@@ -373,7 +373,18 @@ class MockLocationService : Service() {
         lastNotifyAt = 0L
         lastNotifiedPercent = -1f
 
+        // 先发布 active 配置，再决定是否注册 test provider：
+        // 冷启动时 register() 读到的 isHookActive 必须已经是 true，否则会先给系统打上 mock 标记。
+        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(true)
+        simRoute.waypoints.firstOrNull()?.let { start ->
+            com.mockrun.app.hook.HookStateBridge.update(
+                this, true, start.latitude, start.longitude,
+                alt = 20.0, spd = speedKmh
+            )
+        }
         if (!mockEngine.isRegistered() && !mockEngine.register()) {
+            com.mockrun.app.hook.HookStateBridge.update(this, false)
+            com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
             stopSelf()
             return
@@ -384,7 +395,6 @@ class MockLocationService : Service() {
             distanceMeters = currentDistanceMeters, mode = mode
         )
         stateRepo.onSimulationStarted(simRoute, speedKmh)
-        com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(true)
 
         launchSimulationLoop(sessionId, simRoute, speedKmh, currentDistanceMeters, mode)
     }
@@ -557,7 +567,10 @@ class MockLocationService : Service() {
         com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
         pointMockJob?.cancel()
 
+        // 同 route：先发布 active 配置，再注册 Provider。
+        com.mockrun.app.hook.HookStateBridge.update(this, true, lat, lon)
         if (!mockEngine.isRegistered() && !mockEngine.register()) {
+            com.mockrun.app.hook.HookStateBridge.update(this, false, lat, lon)
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
             stopSelf()
             return
@@ -566,7 +579,6 @@ class MockLocationService : Service() {
         savePointMockState(active = true, lat = lat, lon = lon)
         stateRepo.setPointMock(true, com.mockrun.app.domain.model.WayPoint(lat, lon))
         stateRepo.updateJoystickLocation(lat, lon)
-        com.mockrun.app.hook.HookStateBridge.update(this, true, lat, lon)
         val notif = buildNotification("单点虚拟定位已生效: ${"%.4f".format(lat)}, ${"%.4f".format(lon)}")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)

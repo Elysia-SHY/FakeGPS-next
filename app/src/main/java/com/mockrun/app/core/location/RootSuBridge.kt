@@ -78,10 +78,6 @@ class RootSuBridge @Inject constructor() {
         }
     }
 
-    suspend fun injectSensorStep(@Suppress("UNUSED_PARAMETER") stepIncrement: Int): Boolean {
-        return executeCommand("cmd sensor_privacy disable 0 2 2>/dev/null; input keyevent 0")
-    }
-
     /**
      * 授予本应用「模拟位置信息应用」权限（android:mock_location app-op），并顺带开启全局
      * 「开发者选项」开关（部分 OEM 如 ColorOS / MIUI 在 addTestProvider 时除校验 app-op 外
