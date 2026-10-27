@@ -7,6 +7,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
+import com.google.gson.JsonArray
+import com.google.gson.JsonParser
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.*
@@ -368,7 +370,20 @@ class HookConfigProvider : ContentProvider() {
         // 的 ContentProvider 通道必然失效（该 uid 不在白名单里），于是"必须把应用也加进 LSPosed
         // 作用域才能生效"。真正敏感的是实时伪造坐标（getLocation），那一个仍然门禁。
         if (method == "getMultiTargetRules") {
-            return Bundle().apply { putString("json", readMultiTargetRulesJson()) }
+            val fullJson = readMultiTargetRulesJson()
+            // system_server/root/shell/self 需要全量；普通目标应用只应看到自己的规则。
+            // 否则任意无权限应用都能枚举用户在伪造哪些应用以及精确坐标。
+            val visibleJson = if (isTrustedCaller()) {
+                fullJson
+            } else {
+                val uid = Binder.getCallingUid()
+                val packages = runCatching {
+                    context?.packageManager?.getPackagesForUid(uid)?.toSet().orEmpty()
+                }.getOrDefault(emptySet())
+                // Android UID 布局：userId * 100000 + appId；工作资料 uid 也能正确归户。
+                filterMultiTargetRules(fullJson, packages, uid / 100_000)
+            }
+            return Bundle().apply { putString("json", visibleJson) }
         }
         if (!isTrustedCaller()) {
             Diag.w(TAG, "refused call '$method' from untrusted uid ${Binder.getCallingUid()}")
@@ -461,6 +476,23 @@ class HookConfigProvider : ContentProvider() {
             uid == android.os.Process.SYSTEM_UID ||
             uid == android.os.Process.ROOT_UID ||
             uid == android.os.Process.SHELL_UID
+    }
+
+    /**
+     * 只保留调用方自己的分流规则。纯函数，便于单测；JSON 损坏时返回空数组，
+     * 不把整包规则泄露给普通应用。
+     */
+    internal fun filterMultiTargetRules(json: String, packages: Set<String>, userId: Int): String {
+        if (json.isBlank() || packages.isEmpty()) return "[]"
+        val array = runCatching { JsonParser.parseString(json).asJsonArray }.getOrNull() ?: return "[]"
+        val out = JsonArray()
+        for (element in array) {
+            val obj = runCatching { element.asJsonObject }.getOrNull() ?: continue
+            val pkg = runCatching { obj.get("packageName")?.asString }.getOrNull()
+            val ruleUser = runCatching { obj.get("userId")?.asInt ?: 0 }.getOrDefault(0)
+            if (pkg in packages && ruleUser == userId) out.add(obj)
+        }
+        return out.toString()
     }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? = null
