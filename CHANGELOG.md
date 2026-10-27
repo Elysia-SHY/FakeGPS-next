@@ -8,6 +8,32 @@
 
 ---
 
+## [2.4.4] - 2026-10-27
+
+> 跳过已撤回的 2.4.2 / 2.4.3，发布 2.4.4；签名不变，可直接覆盖 2.4.1。
+
+### 新增 (Added)
+
+- **步频/计步真实注入**：Root 侧发布 `sensor_active/steps/cadence/accel/time`，LSPosed 在**显式加入作用域的目标应用**内包装 `SensorEventListener`；`TYPE_STEP_COUNTER` 无硬件事件时由 1 Hz ticker 合成，加速度/线性加速度/重力同步替换。目标应用需在 LSPosed scope 中勾选，未勾选仍读硬件。
+- **5 秒租约**：传感器状态超过 5 秒未刷新自动失效，避免 App 崩溃后残留旧步数。
+
+### 变更 (Changed)
+
+- 默认 LSPosed scope 只保留 `android`，不再默认注入微信/QQ/钉钉/地图等 7 个第三方应用。
+- 步频/计步 UI 从“仅界面估算”恢复为“目标应用仿真”，并明确提示需要在 LSPosed 中勾选目标应用。
+- 停止模拟时不再把坐标写入 `Settings.Global` / 私有 prefs。
+- Root hook 数据目录权限从 `755` 收紧为 `711/771`。
+
+### 修复 (Fixed)
+
+- **GPX 导入崩溃**：调用方提前关闭流导致 `XmlPullParserException: Stream Closed`。
+- **分流规则 Provider 越权**：`getMultiTargetRules` 对任意应用返回全量包名与坐标；现在按调用方 UID/用户裁剪。
+- **Android 17 Binder 异常**：system_server 同步回调 App Provider 触发 `Outgoing transactions ... FLAG_ONEWAY`；system_server 改走文件/属性通道。
+- **指纹 id 注入/路径穿越**：UI 输入现在经过白名单与长度限制。
+- **相对 keystore 路径**：本地 `FAKEGPS_KEYSTORE` 相对路径现在从仓库根目录解析。
+
+---
+
 ## [2.4.1] - 2026-10-26
 
 > 修复转屏退出录制页；轨迹录制入口收敛为唯一入口；全仓版本号与文案统一。
