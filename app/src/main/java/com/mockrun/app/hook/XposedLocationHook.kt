@@ -2374,7 +2374,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }
 
         // Channel 3: HookConfigProvider via ContentResolver
-        if (jsonText.isNullOrEmpty()) {
+        // Android 17 的 system_server 不允许对 App 发起同步 Binder（会抛
+        // "Outgoing transactions from this process must be FLAG_ONEWAY"）；system_server
+        // 改走文件/属性/Settings，客户端进程仍走 Provider。
+        if (jsonText.isNullOrEmpty() && currentProcessPackage != "android") {
             jsonText = runCatching {
                 val ctx = getAnyContext()
                 if (ctx != null) {
@@ -2675,7 +2678,8 @@ class XposedLocationHook : IXposedHookLoadPackage {
         }
 
         // 6. Channel 6: ContentProvider IPC fallback via getAnyContext()
-        runCatching {
+        // system_server 在 Android 17 禁止同步 Binder 到 App；跳过，避免每 tick 抛异常。
+        if (currentProcessPackage != "android") runCatching {
             val ctx = getAnyContext() ?: return@runCatching
             val uri = Uri.parse("content://com.mockrun.app.hook.provider")
             val bundle = ctx.contentResolver.call(uri, "getLocation", null, null)
