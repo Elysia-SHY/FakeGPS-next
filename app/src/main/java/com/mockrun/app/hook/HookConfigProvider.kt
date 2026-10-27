@@ -76,6 +76,31 @@ object HookStateBridge {
         multiTargetRulesJson = json
     }
 
+    @Volatile
+    private var lastSensorPublishAt: Long = 0L
+
+    /**
+     * 把步频/步数/加速度发布给 LSPosed 目标应用侧。
+     *
+     * 目标应用进程里的 hook 通过 SystemProperties 读取；这是唯一不需要跨进程 Binder
+     * 的通道。仅 Root 可用时发布，非 Root 保持 inactive。
+     */
+    fun publishSensorState(active: Boolean, steps: Long, cadence: Int, accelZ: Float) {
+        val now = System.currentTimeMillis()
+        if (active && now - lastSensorPublishAt < 700L) return
+        lastSensorPublishAt = now
+        asyncScope.launch {
+            val cmd = buildString {
+                append("setprop debug.fakegps.sensor_active ${if (active) 1 else 0}; ")
+                append("setprop debug.fakegps.sensor_steps $steps; ")
+                append("setprop debug.fakegps.sensor_cadence $cadence; ")
+                append("setprop debug.fakegps.sensor_accel $accelZ; ")
+                append("setprop debug.fakegps.sensor_time $now")
+            }
+            runSu(cmd)
+        }
+    }
+
     fun recordSystemHookHeartbeat() {
         lastSystemHookHeartbeat = System.currentTimeMillis()
     }

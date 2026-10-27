@@ -335,16 +335,20 @@ fun RouteConfigDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "步频与计步估算（仅预览）",
+                            text = "步频与计步仿真",
                             style = IosTypography.Subheadline,
                             fontWeight = FontWeight.SemiBold,
-                            color = IosColors.Label
+                            color = if (isRootAvailable) IosColors.Label else IosColors.SecondaryLabel
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "按速度估算步数、加速度；不会写入系统传感器",
+                            text = if (isRootAvailable) {
+                                "注入 LSPosed 作用域中勾选的目标应用"
+                            } else {
+                                "需 Root 授权后生成步数、加速度"
+                            },
                             style = IosTypography.Caption1,
-                            color = IosColors.SecondaryLabel
+                            color = if (isRootAvailable) IosColors.SecondaryLabel else IosWarning
                         )
                     }
                     Box(
@@ -352,11 +356,13 @@ fun RouteConfigDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Switch(
-                            checked = cadenceVal,
-                            enabled = true,
+                            checked = if (isRootAvailable) cadenceVal else false,
+                            enabled = isRootAvailable,
                             onCheckedChange = {
-                                cadenceVal = it
-                                onCadenceToggle(it)
+                                if (isRootAvailable) {
+                                    cadenceVal = it
+                                    onCadenceToggle(it)
+                                }
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,

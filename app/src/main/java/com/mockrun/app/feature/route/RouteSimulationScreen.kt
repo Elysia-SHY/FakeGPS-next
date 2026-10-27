@@ -624,7 +624,7 @@ fun RouteSimulationScreen(
         //    v2.4.0：非 Root 也展示（灰度 + 「仅预览」），避免「开关亮着但引擎没注入」的谎报
         // =====================================================================
         run {
-            IosSectionHeader("运动步频与计步估算（仅预览）")
+            IosSectionHeader("运动步频与计步仿真")
 
             IosInsetGroupCard(isLiquidGlass = false) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -635,17 +635,17 @@ fun RouteSimulationScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("启用步频与计步估算", style = IosTypography.Headline, color = IosColors.Label)
+                        Text("启用步频与计步仿真", style = IosTypography.Headline, color = IosColors.Label)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "按路线速度估算步频、步数与加速度，仅在本页显示；不会写入系统传感器",
+                            "按路线速度生成步频、步数与加速度，注入 LSPosed 作用域中勾选的目标应用；未勾选的应用收不到",
                             style = IosTypography.Caption1,
                             color = IosColors.SecondaryLabel
                         )
                     }
                     Switch(
                         checked = sensorState.isEnabled,
-                        enabled = true,
+                        enabled = isRootActive == true,
                         onCheckedChange = { simulationViewModel.setCadenceEnabled(it, selectedSpeed) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
@@ -678,19 +678,19 @@ fun RouteSimulationScreen(
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         MetricItem(
-                            "实时步频（估算）",
+                            "实时步频",
                             if (!sensorState.isEnabled) "-- SPM"
                             else if (simState.status is SimulationStatus.Running) "${sensorState.cadenceStepsPerMin} SPM"
                             else "$effectiveCadence SPM"
                         )
-                        MetricItem("累计步数（估算）", "${sensorState.stepCount} 步")
+                        MetricItem("累计步数", "${sensorState.stepCount} 步")
                         MetricItem(
                             "预估步幅",
                             if (!sensorState.isEnabled) "-- m"
                             else "${"%.2f".format(effectiveStride)} m"
                         )
                         MetricItem(
-                            "垂直加速度（估算）",
+                            "垂直加速度",
                             if (simState.status is SimulationStatus.Running) "${"%.1f".format(sensorState.accelZ)} m/s²"
                             else "9.8 m/s²"
                         )

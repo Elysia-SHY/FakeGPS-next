@@ -132,8 +132,8 @@ class SensorMockEngine @Inject constructor(
         CadencePrefs.saveIntent(context, enabled, _sensorState.value.cadenceMode, _sensorState.value.customCadence)
 
         val rootOk = rootBridge.isRootConfirmed()
-        // 当前只做界面估算，不依赖 Root；保留 isRootActive 供诊断显示。
-        val actuallyEnabled = enabled
+        // 系统属性发布需要 Root；非 Root 只能停留在开关/预览。
+        val actuallyEnabled = enabled && rootOk
         val cadence = if (actuallyEnabled) {
             effectiveCadence(currentSpeedKmh, _sensorState.value.cadenceMode, _sensorState.value.customCadence)
         } else {
@@ -147,6 +147,9 @@ class SensorMockEngine @Inject constructor(
             strideVerdict = strideVerdict(currentSpeedKmh, stride),
             isRootActive = rootOk
         )
+        if (!actuallyEnabled) {
+            com.mockrun.app.hook.HookStateBridge.publishSensorState(false, accumulatedSteps, 0, 9.8f)
+        }
     }
 
     fun setCadenceMode(mode: CadenceMode, customValue: Int = _sensorState.value.customCadence, currentSpeedKmh: Float = 8f) {
@@ -218,6 +221,12 @@ class SensorMockEngine @Inject constructor(
             strideVerdict = strideVerdict(speedKmh, stride),
             accelZ = 9.8f + bounce
         )
+        com.mockrun.app.hook.HookStateBridge.publishSensorState(
+            active = isEnabled && cadence > 0,
+            steps = accumulatedSteps,
+            cadence = cadence,
+            accelZ = 9.8f + bounce
+        )
     }
 
     fun reset() {
@@ -228,5 +237,6 @@ class SensorMockEngine @Inject constructor(
             stepCount = 0L,
             accelZ = 9.8f
         )
+        com.mockrun.app.hook.HookStateBridge.publishSensorState(false, 0L, 0, 9.8f)
     }
 }

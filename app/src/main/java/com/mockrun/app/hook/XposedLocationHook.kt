@@ -1,6 +1,10 @@
 package com.mockrun.app.hook
 
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
@@ -9,6 +13,8 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -978,6 +984,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
     // =========================================================================
 
     private fun hookClientApp(lpparam: XC_LoadPackage.LoadPackageParam) {
+        // SensorManager client hooks (only for apps explicitly added to LSPosed scope)
+        hookSensorClient(lpparam)
+
         // LocationManager client API hooks
         hookLocationManager(lpparam)
 
@@ -989,6 +998,146 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
         // Map SDK hooks (AMap / Baidu)
         hookProprietaryMapSdks(lpparam)
+    }
+
+    /**
+     * 只对显式加入 LSPosed scope 的目标应用生效。
+     *
+     * Android 的 SensorService 是 native 的，system_server 的 Java hook 无法拦截每个
+     * SensorEvent；因此在目标应用进程里包装 SensorEventListener，把步数/加速度换成
+     * Root 侧发布的合成值。
+     */
+    private val sensorListenerProxies: MutableMap<SensorEventListener, SyntheticSensorListener> =
+        java.util.Collections.synchronizedMap(java.util.WeakHashMap())
+
+    private fun hookSensorClient(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val smClass = XposedHelpers.findClassIfExists(
+            "android.hardware.SensorManager", lpparam.classLoader
+        ) ?: return
+
+        runCatching {
+            XposedBridge.hookAllMethods(smClass, "registerListener", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
+                        ?: return
+                    val sensor = param.args.firstOrNull { it is Sensor } as? Sensor ?: return
+                    if (listener is SyntheticSensorListener) return
+                    val proxy = sensorListenerProxies[listener]
+                        ?: SyntheticSensorListener(listener).also {
+                            sensorListenerProxies[listener] = it
+                        }
+                    if (sensor.type == Sensor.TYPE_STEP_COUNTER) {
+                        proxy.attachStepSensor(sensor)
+                    }
+                    for (i in param.args.indices) {
+                        if (param.args[i] === listener) param.args[i] = proxy
+                    }
+                }
+            })
+        }.logFailure(TAG, "hook SensorManager.registerListener")
+
+        runCatching {
+            XposedBridge.hookAllMethods(smClass, "unregisterListener", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
+                        ?: return
+                    val proxy = sensorListenerProxies.remove(listener) ?: return
+                    proxy.stopStepTicker()
+                    for (i in param.args.indices) {
+                        if (param.args[i] === listener) param.args[i] = proxy
+                    }
+                }
+            })
+        }.logFailure(TAG, "hook SensorManager.unregisterListener")
+    }
+
+    private inner class SyntheticSensorListener(
+        private val delegate: SensorEventListener
+    ) : SensorEventListener {
+        private var cachedAt = 0L
+        private var active = false
+        private var steps = 0f
+        private var accelZ = 9.8f
+        private var stepSensor: Sensor? = null
+        private val handler = Handler(Looper.getMainLooper())
+        private val stepTicker = object : Runnable {
+            override fun run() {
+                emitStep()
+                if (stepSensor != null) handler.postDelayed(this, 1000L)
+            }
+        }
+
+        fun attachStepSensor(sensor: Sensor) {
+            if (stepSensor == null) {
+                stepSensor = sensor
+                handler.postDelayed(stepTicker, 500L)
+            }
+        }
+
+        fun stopStepTicker() {
+            handler.removeCallbacks(stepTicker)
+            stepSensor = null
+        }
+
+        private fun refresh() {
+            val now = SystemClock.elapsedRealtime()
+            if (now - cachedAt < 500L) return
+            cachedAt = now
+            val publishedAt = getSystemProperty("debug.fakegps.sensor_time").toLongOrNull() ?: 0L
+            active = getSystemProperty("debug.fakegps.sensor_active") == "1" &&
+                publishedAt > 0L && System.currentTimeMillis() - publishedAt in 0..5_000L
+            steps = getSystemProperty("debug.fakegps.sensor_steps").toFloatOrNull() ?: 0f
+            accelZ = getSystemProperty("debug.fakegps.sensor_accel").toFloatOrNull() ?: 9.8f
+        }
+
+        private fun emitStep() {
+            refresh()
+            val sensor = stepSensor ?: return
+            if (!active) return
+            runCatching {
+                // SensorEvent(int) 是 package-private；LSPosed 进程里用 XposedHelpers
+                // 走隐藏构造器，避免直接编译引用。
+                val event = XposedHelpers.newInstance(SensorEvent::class.java, 1) as SensorEvent
+                event.sensor = sensor
+                event.values[0] = steps
+                event.timestamp = SystemClock.elapsedRealtimeNanos()
+                event.accuracy = SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                delegate.onSensorChanged(event)
+            }.logFailure(TAG, "emit synthetic STEP_COUNTER", Diag.Level.DEBUG)
+        }
+
+        override fun onSensorChanged(event: SensorEvent) {
+            refresh()
+            // STEP_COUNTER 硬件通常只在真实步伐时出事件；激活时由 ticker 主动合成，
+            // 这里丢弃原事件，避免硬件 0 与合成值交替。
+            if (active && event.sensor.type == Sensor.TYPE_STEP_COUNTER) return
+            if (active && event.values != null) {
+                // 同一个 listener 往往同时注册 Step 和 Accel，不能按注册时的类型判；
+                // 必须看这条事件本身的 sensor type。
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        event.values[0] = 0f
+                        event.values[1] = 0f
+                        event.values[2] = accelZ
+                    }
+                    Sensor.TYPE_LINEAR_ACCELERATION -> {
+                        event.values[0] = 0f
+                        event.values[1] = 0f
+                        event.values[2] = (accelZ - 9.8f)
+                    }
+                    Sensor.TYPE_GRAVITY -> {
+                        event.values[0] = 0f
+                        event.values[1] = 0f
+                        event.values[2] = 9.8f
+                    }
+                }
+            }
+            delegate.onSensorChanged(event)
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            delegate.onAccuracyChanged(sensor, accuracy)
+        }
     }
 
     private fun hookMockDetection(lpparam: XC_LoadPackage.LoadPackageParam) {
