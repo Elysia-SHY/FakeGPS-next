@@ -223,7 +223,7 @@ fun LocationMockScreen(
         mutableStateOf(InjectionModePrefs.isRootMode(context))
     }
 
-    // 注入通道（与 isRootMode 正交）：AUTO / LSPOSED / PROVIDER，见 util/HookChannel.kt
+    // 注入通道（与 isRootMode 正交）：默认 PROVIDER，LSPOSED 仅手动高级选项
     var hookChannel by remember { mutableStateOf(HookChannelPrefs.get(context)) }
     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
     var isBatteryIgnoring by remember {
@@ -917,7 +917,11 @@ fun LocationMockScreen(
             // Item 1: LSPosed
             IosListRow(
                 title = "LSPosed 系统框架",
-                subtitle = if (isLsposedHookActive) "system_server 框架拦截 · 运行中" else "模块未激活 · 请在 LSPosed 中勾选并重启手机",
+                subtitle = if (isLsposedHookActive) {
+                    "system_server 框架拦截 · 运行中；目标应用仍需加入 scope"
+                } else {
+                    "模块未激活 · 请在 LSPosed 中勾选系统框架和目标应用并重启手机"
+                },
                 icon = Icons.Default.Build,
                 iconBackground = if (isLsposedHookActive) IosColors.SystemPurple else IosColors.SystemGray,
                 trailingText = if (isLsposedHookActive) "已接管系统框架" else "未勾选",
@@ -927,7 +931,7 @@ fun LocationMockScreen(
                     if (lsposedIntent != null) {
                         context.startActivity(lsposedIntent)
                     } else {
-                        Toast.makeText(context, "请在 LSPosed 管理器中勾选本模块与【系统框架】并软重启", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "请在 LSPosed 管理器中勾选本模块、【系统框架】以及目标应用，并软重启", Toast.LENGTH_LONG).show()
                     }
                 }
             )
@@ -975,15 +979,13 @@ fun LocationMockScreen(
             IosListRow(
                 title = "注入通道",
                 subtitle = when (hookChannel) {
-                    HookChannel.AUTO -> "自动：框架层存活就走 LSPosed，否则回退系统 MockProvider"
-                    HookChannel.LSPOSED -> "仅框架层（system_server 改写）：需 LSPosed 已激活，否则会明确报警"
-                    HookChannel.PROVIDER -> "仅系统 MockProvider：不向 hook 发布配置，无坐标残留"
+                    HookChannel.LSPOSED -> "LSPosed 框架层（高级/实验）：需已激活并勾选系统框架；部分设备可能无效"
+                    HookChannel.PROVIDER, HookChannel.AUTO -> "系统 MockProvider（默认）：兼容性最好；不向 LSPosed 发布配置，无坐标残留"
                 },
                 icon = Icons.Default.Tune,
                 iconBackground = when (hookChannel) {
                     HookChannel.LSPOSED -> IosColors.SystemPurple
-                    HookChannel.PROVIDER -> IosColors.SystemOrange
-                    HookChannel.AUTO -> IosColors.SystemBlue
+                    HookChannel.PROVIDER, HookChannel.AUTO -> IosColors.SystemOrange
                 },
                 trailingText = HookChannelPrefs.shortLabel(hookChannel),
                 showChevron = true,
@@ -1125,7 +1127,7 @@ fun LocationMockScreen(
         }
 
         Text(
-            text = "提示：在 LSPosed 管理器中开启模块并勾选【系统框架 (Android)】，由系统底层分发虚拟坐标，减少闪回真实位置现象。",
+            text = "提示：在 LSPosed 管理器中开启模块并勾选【系统框架 (Android)】；目标应用还需要单独加入 scope，才能稳定收到分发坐标/步频。",
             style = IosTypography.Footnote,
             color = IosColors.SecondaryLabel,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)

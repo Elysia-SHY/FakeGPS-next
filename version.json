@@ -1,20 +1,20 @@
 {
-  "versionName": "v2.4.4",
-  "versionCode": 60,
-  "releaseDate": "2026-10-27",
+  "versionName": "v2.4.5",
+  "versionCode": 61,
+  "releaseDate": "2026-10-28",
   "minSdk": 29,
-  "releaseNotes": "FakeGPS-next 2.4.4：修复 GPX 导入崩溃、规则 Provider 越权、Android 17 system_server 同步 Binder 异常；恢复步频/计步真实注入（Root + LSPosed 目标应用 scope）。\n\n【步频/计步怎么用】\n1. KernelSU 给 Fake GPS 超级用户授权，开启 Root 注入模式。\n2. LSPosed 作用域勾选「系统框架」和要接收步数的目标应用（如华为健康/微信/Keep），重启手机。\n3. 路线 → 参数设置 → 开启「步频与计步仿真」，再启动路线。\n未加入 scope 的应用不会收到合成传感器，仍读硬件。\n\n【这次修了什么】\n· GPX 导入时流提前关闭导致的崩溃。\n· 任意无权限应用可读取全部分流规则与坐标的 Provider 泄露。\n· Android 17 下 system_server 同步回调 App Provider 触发的 Binder 异常。\n· 停止后坐标仍残留在 Settings.Global / prefs 的问题。\n· 指纹 id 未转义导致的 root shell / 路径穿越风险。\n· 默认 LSPosed scope 只保留系统框架，避免默认注入微信/QQ/地图等第三方进程。\n· 步频/计步从“仅界面估算”恢复为目标应用内真实 SensorEventListener 注入。\n\n【说明】\n· 目标应用必须在 LSPosed scope 中；native sensor/SensorDirectChannel 路径不在本版覆盖范围。\n· 版本号跳过已撤回的 2.4.2/2.4.3，直接发布 2.4.4。",
-  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.4",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk",
-  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk",
-  "sha256": "5d759d3f78c25c1fe60f5758648852c41dd81fea1531b5af9611dbc719a57fac",
-  "sizeBytes": 4098982,
+  "releaseNotes": "FakeGPS-next 2.4.5：修复注入通道默认值与 LSPosed 作用域文案。默认改用兼容性更好的系统 MockProvider；LSPosed 改为手动高级选项，不再自动优先。\n\n【重要：LSPosed 作用域】\n只勾「系统框架」不再被描述成“全设备生效”。系统框架负责系统层改写；需要分流、Mock 隐藏或步频/计步的目标应用，必须把目标应用本身也加入 LSPosed scope，然后重启。只勾系统框架时，目标应用侧可能仍读真实值或收不到合成传感器。\n\n【注入通道】\n· Provider（默认）：系统 MockProvider，兼容性最好，不向 LSPosed 发布配置。\n· LSPosed（高级/实验）：需已激活并勾选系统框架；部分设备可能无效，失败时请切回 Provider。\n\n【步频/计步】\nRoot 授权 + 开启 Root 注入模式 + LSPosed 勾选目标应用 + 路线参数开启步频/计步仿真。\n\n【说明】\n· 旧 AUTO 配置会自动迁移到 Provider。\n· 目标应用必须在 LSPosed scope 中；native sensor/SensorDirectChannel 路径不在本版覆盖范围。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.5",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk",
+  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk",
+  "sha256": "",
+  "sizeBytes": 0,
   "contact": "2224958076@qq.com",
   "homepage": "https://github.com/Elysia-SHY/FakeGPS-next",
   "mirrorUrls": [
-    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk",
-    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk",
-    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk",
-    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.4/FakeGPS-next-v2.4.4-release.apk"
+    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk",
+    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk",
+    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk",
+    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.5/FakeGPS-next-v2.4.5-release.apk"
   ]
 }

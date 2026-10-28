@@ -43,9 +43,9 @@ data class HookChannelStatus(
             hookConfigActive: Boolean,
             isMockActive: Boolean
         ): HookChannelStatus {
-            // 1. 用户明确只要 Provider：即使框架层恰好活着也不算数 ——
-            //    该通道下我们不发布配置，hook 拿不到坐标，不会真的伪造。
-            if (preference == HookChannel.PROVIDER) {
+            // 1. 默认 Provider；旧 AUTO 也按 Provider 处理。
+            //    即使框架层恰好活着也不算数——该通道下我们不发布配置，hook 拿不到坐标。
+            if (preference == HookChannel.PROVIDER || preference == HookChannel.AUTO) {
                 return if (isMockActive) {
                     HookChannelStatus(
                         ActiveChannel.PROVIDER_ONLY,

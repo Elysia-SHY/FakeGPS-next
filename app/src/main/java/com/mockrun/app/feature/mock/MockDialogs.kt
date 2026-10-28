@@ -48,13 +48,13 @@ fun UsageGuideDialog(
             ) {
                 Column {
                     Text(
-                        "【LSPosed 仅勾选「系统框架」】",
+                        "【LSPosed 勾选「系统框架」+ 目标应用】",
                         style = IosTypography.Headline,
                         color = IosColors.SystemBlue
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "请在 LSPosed 作用域中仅勾选【系统框架 (Android 系统)】，切勿勾选目标软件自身。本模块直接接管系统级 LocationManagerService 并屏蔽扫描硬件，无需注入宿主应用。",
+                        "请在 LSPosed 作用域中勾选【系统框架 (Android 系统)】；如果要对某个目标应用生效（位置分流、Mock 隐藏、步频/计步），还必须把该目标应用本身也勾选。只勾系统框架时，目标应用侧可能仍读真实值或收不到合成传感器。",
                         style = IosTypography.Callout,
                         color = IosColors.SecondaryLabel
                     )

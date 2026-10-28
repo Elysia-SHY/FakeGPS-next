@@ -22,8 +22,8 @@ class HookChannelStatusTest {
     ) = HookChannelStatus.resolve(preference, lsposedAlive, configActive, mockActive)
 
     @Test
-    fun `lsposed alive is reported as the effective channel`() {
-        val s = resolve(HookChannel.AUTO, lsposedAlive = true, mockActive = true)
+    fun `explicit lsposed with live framework is reported as the effective channel`() {
+        val s = resolve(HookChannel.LSPOSED, lsposedAlive = true, mockActive = true)
         assertEquals(ActiveChannel.LSPOSED, s.active)
         assertFalse("框架层活着时不该报警", s.warn)
         assertEquals("LSPosed", s.shortLabel)

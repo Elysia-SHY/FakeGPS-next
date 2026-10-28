@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Hook-LSPosed_System_Server-FF3B30.svg?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![License](https://img.shields.io/badge/License-Apache_2.0-5856D6.svg?style=flat-square)](LICENSE)
 
-> **当前版本**：`v2.4.4`（`versionCode = 60`）
+> **当前版本**：`v2.4.5`（`versionCode = 61`）
 >
 > 版本号以 [`app/build.gradle.kts`](app/build.gradle.kts) 的 `versionName` / `versionCode` 为准，`version.json`、`package.json`、本文档与 [CHANGELOG.md](CHANGELOG.md) 与其保持一致。
 
@@ -75,8 +75,8 @@ graph TD
 
 ### 系统框架级集中拦截
 
-- **只需勾选系统框架**：在 LSPosed 中启用「系统框架 (system)」即可，不必逐个勾选目标应用。
-- **目标应用内不注入代码**：模块只在系统框架进程生效，目标应用进程里不加载 Xposed 类。这降低了被第三方反作弊扫描命中的概率，但不构成对检测的保证。
+- **系统框架 + 目标应用都要勾选**：LSPosed 作用域勾选「系统框架 (system)」负责系统层改写；要覆盖某个应用的分流、Mock 隐藏或步频/计步，还必须勾选该目标应用。只勾系统框架时，目标应用侧可能仍读真实值。
+- **目标应用侧仅在显式加入 scope 时注入**：未勾选的目标应用不加载 Xposed 类；勾选后才会启用客户端 fallback 与传感器注入。不是“永远不注入”，也不是“只勾系统框架就全设备生效”。
 - **去除 Mock 标记**：由系统框架分发的坐标不再携带 mock 标记，`isFromMockProvider` 与 `isMock()` 返回 `false`。
 - **抑制 AOSP 位移过滤**：定点驻留模式下动态放开 `minUpdateDistanceMeters` 限制并注入单调时钟，避免坐标因位移过小被底层丢弃。
 
@@ -127,7 +127,7 @@ graph TD
 | **生效机制** | 应用进程 `addTestProvider` | 应用进程 `addTestProvider` | system_server 层改写分发结果 |
 | **多应用独立分流** | 仅支持全局单点 | 仅支持全局单点 | 支持每应用绑定独立坐标与路线 |
 | **Mock 标记** | 保留（`isMock = true`） | 保留（依赖应用层规避） | 在系统框架层去除 |
-| **目标应用内注入** | 无 | 无 | 无，仅系统框架生效 |
+| **目标应用内注入** | 无 | 无 | 仅目标应用显式加入 LSPosed scope 时注入 |
 | **停止后恢复真机定位** | 依赖系统重新搜星（约 15 至 60 秒） | 通常在 2 秒内 | 通常快于 300 毫秒 |
 | **步频与计步** | 不开放 | 需 Root；目标应用需加入 LSPosed scope | 同 Root，目标应用需加入 scope |
 
@@ -152,9 +152,9 @@ graph TD
 ### 方式三：叠加 LSPosed 系统框架（可选增强）
 
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 在 LSPosed 管理器中启用本模块，**作用域只勾选「系统框架 (Android / android)」**，目标应用无需勾选；
+2. 在 LSPosed 管理器中启用本模块，作用域勾选「系统框架 (Android / android)」；然后**把你需要覆盖的目标应用也加入 scope**（如微信/华为健康/地图）。只勾系统框架时，系统层定位改写可能生效，但目标应用侧分流、Mock 隐藏和步频/计步可能无效；
 3. 重启设备，或软重启 `system_server` 后生效；
-4. 回到应用设置页，「LSPosed 系统框架」一行应显示 **已接管系统框架**。
+4. 回到应用设置页，「LSPosed 系统框架」一行应显示 **已接管系统框架**；目标应用是否真正收到坐标/步频，仍取决于它是否在 scope 中。
 
 ---
 
@@ -246,7 +246,7 @@ A：停止路径会清理全部测试 Provider 并主动向 `GPS_PROVIDER` / `NE
 A：确认新旧包签名一致。v1.4.2 起 CI 使用固定密钥，可从 v1.4.2 直接覆盖升级；v1.4.1 及更早为 debug 签名，需先卸载再安装（会清除收藏与分流配置）。
 
 **Q：不开 LSPosed 能用吗？**
-A：可以。Root 模式与免 Root 模式都不依赖 LSPosed，LSPosed 只提供系统框架层的额外能力（per-app 分流、去除 mock 标记、硬件静默时主动喂点）。
+A：可以。Root 模式与免 Root 模式都不依赖 LSPosed；LSPosed 是可选的系统框架层增强。若要使用 per-app 分流、去除 mock 标记或步频/计步注入，除了勾选系统框架，还要把对应目标应用加入 LSPosed scope。
 
 ---
 

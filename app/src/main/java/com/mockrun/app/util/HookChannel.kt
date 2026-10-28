@@ -23,7 +23,12 @@ import android.content.Context
  * 状态判定/清理/文案统一由 [com.mockrun.app.hook.HookChannelStatus] 处理。
  */
 enum class HookChannel {
-    /** 自动：检测到框架层存活就用 LSPOSED，否则只走 PROVIDER。默认值。 */
+    /**
+     * 旧版本的“自动优先 LSPosed”值，仅用于读取老配置。
+     *
+     * 2.4.5 起不再暴露、不再自动优先；读到 AUTO 时一律按 [PROVIDER] 处理。
+     * 很多设备上 LSPosed 实际不生效，不能让它成为默认路径。
+     */
     AUTO,
 
     /** 只用框架层改写。选了它但模块没激活时，状态判定会**显式报警**，而不是假装生效。 */
@@ -40,8 +45,11 @@ object HookChannelPrefs {
 
     fun get(context: Context): HookChannel {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_CHANNEL, null) ?: return HookChannel.AUTO
-        return HookChannel.values().firstOrNull { it.name == raw } ?: HookChannel.AUTO
+            .getString(KEY_CHANNEL, null)
+        // 默认 Provider；旧 AUTO 也迁移到 Provider，避免老用户继续走无效的 LSP。
+        if (raw == null || raw == HookChannel.AUTO.name) return HookChannel.PROVIDER
+        return HookChannel.values().firstOrNull { it.name == raw && it != HookChannel.AUTO }
+            ?: HookChannel.PROVIDER
     }
 
     fun set(context: Context, channel: HookChannel) {
@@ -51,18 +59,16 @@ object HookChannelPrefs {
             .apply()
     }
 
-    /** UI 点一下循环切换：AUTO → LSPOSED → PROVIDER → AUTO。 */
+    /** UI 点一下循环切换：PROVIDER（默认）↔ LSPOSED（手动高级）。 */
     fun next(current: HookChannel): HookChannel = when (current) {
-        HookChannel.AUTO -> HookChannel.LSPOSED
         HookChannel.LSPOSED -> HookChannel.PROVIDER
-        HookChannel.PROVIDER -> HookChannel.AUTO
+        HookChannel.PROVIDER, HookChannel.AUTO -> HookChannel.LSPOSED
     }
 
     /** 便于 UI 展示的短标签。 */
     fun shortLabel(channel: HookChannel): String = when (channel) {
-        HookChannel.AUTO -> "自动"
         HookChannel.LSPOSED -> "LSPosed"
-        HookChannel.PROVIDER -> "Provider"
+        HookChannel.PROVIDER, HookChannel.AUTO -> "Provider"
     }
 
     /**
@@ -72,7 +78,7 @@ object HookChannelPrefs {
      * （`getprop debug.fakegps.lat` 全局可读），所以直接不写。
      */
     fun shouldPublishHookConfig(context: Context): Boolean =
-        get(context) != HookChannel.PROVIDER
+        get(context) == HookChannel.LSPOSED
 
     /**
      * hook 通道是否能真正接管。
@@ -85,5 +91,5 @@ object HookChannelPrefs {
      * 发布是否成功由 HookChannelStatus 的 hookConfigActive 单独反映。
      */
     fun isHookChannelUsable(context: Context, lsposedAlive: Boolean): Boolean =
-        get(context) != HookChannel.PROVIDER && lsposedAlive
+        get(context) == HookChannel.LSPOSED && lsposedAlive
 }

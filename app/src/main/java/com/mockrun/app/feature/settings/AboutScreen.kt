@@ -65,7 +65,7 @@ private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.2.0 更新日志】
 
 5. 🔀 应用独立分流：移除全局 kill-switch、空规则清缓存、按方法记账可重试、IPackageManager 兜底。
 
-6. 🧩 新增注入通道维度 AUTO / LSPOSED / PROVIDER，Provider 通道不发布 hook 配置消除坐标残留。
+6. 🧩 注入通道默认 Provider；LSPosed 改为手动高级选项，不再自动优先。Provider 通道不发布 hook 配置，消除坐标残留。
 
 —— 以下为 v2.1.2 历史更新 ——
 
@@ -1083,7 +1083,7 @@ fun AboutScreen(
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
                             Text(
-                                text = "LSPosed 模块建议仅勾选「系统框架 (system)」，各分流目标应用无需勾选即可获得底层路由支持。",
+                                text = "LSPosed 作用域先勾选「系统框架 (system)」；需要分流、Mock 隐藏或步频/计步的目标应用，还必须单独勾选，仅系统框架不保证目标应用生效。",
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp,
                                 color = IosColors.SecondaryLabel
@@ -1271,8 +1271,8 @@ private fun AboutDetailsSheet(
                         icon = Icons.Default.Lock,
                         iconTint = IosColors.SystemGreen,
                         title = "系统内核集中拦截 (system_server Hook)",
-                        tags = listOf("0 注入特征", "仅勾选系统框架", "派发监听全拦截", "AOSP 丢包抑制"),
-                        desc = "在 LSPosed 中仅需勾选「系统框架」，由系统底层集中路由。宿主应用进程内 0 注入代码，彻底免除第三方反作弊扫描与封号风险。"
+                        tags = listOf("系统框架 + 目标应用", "需要显式 scope", "派发监听全拦截", "AOSP 丢包抑制"),
+                        desc = "系统框架负责系统层路由；目标应用必须在 LSPosed scope 中单独勾选，才能稳定收到分流/隐藏/步频注入。只勾系统框架时，目标应用侧可能仍读真实值。不要把它理解成“全设备零注入”。"
                     )
                     HorizontalDivider(color = IosColors.LineSoft)
                     FeatureItem(
