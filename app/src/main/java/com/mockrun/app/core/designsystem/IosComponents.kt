@@ -1160,7 +1160,7 @@ fun IosModePill(
 }
 
 /**
- * 中心定位 Pin　设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 38×46 蓝色水滴
+ * 中心定位 Pin　设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 32×40 蓝色水滴
  */
 @Composable
 fun IosCenterPin(
@@ -1184,7 +1184,7 @@ fun IosCenterPin(
                 .clip(AppShapes.pill)
                 .background(IosColors.PinTipBg)
                 .border(1.dp, IosColors.Line, AppShapes.pill)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (icon != null) {
@@ -1192,21 +1192,21 @@ fun IosCenterPin(
                     imageVector = icon,
                     contentDescription = null,
                     tint = IosColors.BrandOnGlass,
-                    modifier = Modifier.size(13.dp)
+                    modifier = Modifier.size(12.dp)
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(5.dp))
             }
             Text(
                 text = label,
-                style = IosTypography.ButtonSmall,
+                style = IosTypography.Caption1,
                 fontWeight = FontWeight.SemiBold,
                 color = IosColors.Label,
                 maxLines = 1
             )
         }
-        Spacer(Modifier.height(8.dp))
-        // 水滴形 Pin（38 × 46）
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 38.dp, height = 46.dp)) {
+        Spacer(Modifier.height(7.dp))
+        // 水滴形 Pin（32 × 40）
+        androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 32.dp, height = 40.dp)) {
             val w = size.width
             val h = size.height
             val path = androidx.compose.ui.graphics.Path().apply {
@@ -1224,7 +1224,7 @@ fun IosCenterPin(
         // 落地阴影
         Box(
             modifier = Modifier
-                .size(width = 18.dp, height = 6.dp)
+                .size(width = 15.dp, height = 5.dp)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.5f))
         )
