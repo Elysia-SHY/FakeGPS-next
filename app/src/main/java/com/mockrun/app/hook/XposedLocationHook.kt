@@ -178,6 +178,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
             // =========================================================================
             Diag.i(TAG, ">>> hooked system framework (system_server) <<<")
             hookSystemServer(lpparam)
+        } else if (isLocationProviderProcess(pkg)) {
+            // OEM 的 fused/provider 往往在独立进程，system_server hook 看不到它的内部结果。
+            // 参考 Portal 的 scope：这些系统定位进程也需要注入，否则表现为“框架已激活但目标应用不动”。
+            Diag.i(TAG, ">>> hooked system location provider process: $pkg <<<")
+            hookLocationProviderProcess(lpparam)
         } else {
             // =========================================================================
             // 客户端应用层 Hook (Client Application Fallback)
@@ -982,6 +987,65 @@ class XposedLocationHook : IXposedHookLoadPackage {
     // =========================================================================
     // 2. 客户端应用层 Hook 逻辑 (Client Application Fallback)
     // =========================================================================
+
+    private fun isLocationProviderProcess(pkg: String): Boolean =
+        pkg == "com.android.location.fused" ||
+            pkg == "com.xiaomi.location.fused" ||
+            pkg == "com.oplus.location"
+
+    /**
+     * 系统定位 provider 进程的兜底。
+     *
+     * 这些进程不像 system_server 那样持有 LocationManagerService；但它们是
+     * FusedLocationProvider / OEM SDK 的实际执行点。Portal 在 scope 中默认包含
+     * 这些包，原因就是只 hook system_server 会漏掉 OEM 的 fused 链路。
+     */
+    private fun hookLocationProviderProcess(lpparam: XC_LoadPackage.LoadPackageParam) {
+        hookLocationResultPipeline(lpparam)
+        hookFusedLocationProvider(lpparam)
+        hookProprietaryMapSdks(lpparam)
+    }
+
+    /** 让 provider 进程内部生成的 LocationResult / Location 也经过全局伪造点。 */
+    private fun hookLocationResultPipeline(lpparam: XC_LoadPackage.LoadPackageParam) {
+        runCatching {
+            val resultClass = XposedHelpers.findClassIfExists("android.location.LocationResult", lpparam.classLoader)
+                ?: return
+            XposedBridge.hookAllMethods(resultClass, "asList", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    val list = param.result as? List<*> ?: return
+                    param.result = list.mapNotNull { item ->
+                        (item as? Location)?.let { createSpoofedLocation(it.provider ?: LocationManager.GPS_PROVIDER, spoof) }
+                    }
+                }
+            })
+            XposedBridge.hookAllMethods(resultClass, "writeToParcel", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    rewriteLocationResult(param.thisObject, LocationManager.GPS_PROVIDER, spoof)
+                }
+            })
+        }.logFailure(TAG, "hook provider LocationResult pipeline")
+    }
+
+    private fun hookFusedLocationProvider(lpparam: XC_LoadPackage.LoadPackageParam) {
+        runCatching {
+            val cls = XposedHelpers.findClassIfExists(
+                "com.android.location.fused.FusedLocationProvider", lpparam.classLoader
+            ) ?: return
+            XposedBridge.hookAllMethods(cls, "chooseBestLocation", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val spoof = getActiveLocation() ?: return
+                    if (!spoof.isActive) return
+                    val loc = param.result as? Location ?: return
+                    param.result = createSpoofedLocation(loc.provider ?: LocationManager.GPS_PROVIDER, spoof)
+                }
+            })
+        }.logFailure(TAG, "hook FusedLocationProvider.chooseBestLocation")
+    }
 
     private fun hookClientApp(lpparam: XC_LoadPackage.LoadPackageParam) {
         // SensorManager client hooks (only for apps explicitly added to LSPosed scope)

@@ -1083,7 +1083,7 @@ fun AboutScreen(
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
                             Text(
-                                text = "LSPosed 作用域先勾选「系统框架 (system)」；需要分流、Mock 隐藏或步频/计步的目标应用，还必须单独勾选，仅系统框架不保证目标应用生效。",
+                                text = "LSPosed 作用域先勾选「系统框架 (system)」和系统定位服务（Android/小米/OPPO fused provider）；需要分流、Mock 隐藏或步频/计步的目标应用，还必须单独勾选。仅系统框架不保证 OEM fused 或目标应用生效。",
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp,
                                 color = IosColors.SecondaryLabel

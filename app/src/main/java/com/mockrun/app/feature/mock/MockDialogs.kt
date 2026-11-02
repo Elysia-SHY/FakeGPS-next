@@ -54,7 +54,7 @@ fun UsageGuideDialog(
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "请在 LSPosed 作用域中勾选【系统框架 (Android 系统)】；如果要对某个目标应用生效（位置分流、Mock 隐藏、步频/计步），还必须把该目标应用本身也勾选。只勾系统框架时，目标应用侧可能仍读真实值或收不到合成传感器。",
+                        "请在 LSPosed 作用域中勾选【系统框架 (Android 系统)】、【系统定位服务】（如 com.android.location.fused / com.xiaomi.location.fused / com.oplus.location，按设备实际存在的选）；如果要对某个目标应用生效（位置分流、Mock 隐藏、步频/计步），还必须把该目标应用本身也勾选。只勾系统框架时，OEM fused 链路和目标应用侧可能仍读真实值或收不到合成传感器。",
                         style = IosTypography.Callout,
                         color = IosColors.SecondaryLabel
                     )

@@ -12,7 +12,8 @@
 
 ### 变更 (Changed)
 
-- 借鉴 Portal（Apache-2.0）的两个低风险点：`Location.makeComplete()` + `maxCn0/meanCn0` extras，以及 `SystemSensorManager.registerListenerImpl` 传感器注册兜底。
+- 借鉴 Portal（Apache-2.0）的适配思路：`Location.makeComplete()` + `maxCn0/meanCn0` extras、`SystemSensorManager.registerListenerImpl` 传感器注册兜底。
+- 新增系统定位 provider 进程适配：默认 scope 加入 `com.android.location.fused`、`com.xiaomi.location.fused`、`com.oplus.location`；在 fused/OEM 进程内 hook `LocationResult` 与 `FusedLocationProvider.chooseBestLocation`，补上只 hook system_server 看不到的 OEM 链路。旧安装不会自动改 scope，需要用户手动勾选这些系统定位服务。
 - 不引入 Portal 的 LSPosed-only 架构；步频/计步仍由本项目的 Root + 目标应用 scope 链路负责。
 
 ---

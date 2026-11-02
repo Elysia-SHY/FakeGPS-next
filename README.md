@@ -75,7 +75,7 @@ graph TD
 
 ### 系统框架级集中拦截
 
-- **系统框架 + 目标应用都要勾选**：LSPosed 作用域勾选「系统框架 (system)」负责系统层改写；要覆盖某个应用的分流、Mock 隐藏或步频/计步，还必须勾选该目标应用。只勾系统框架时，目标应用侧可能仍读真实值。
+- **系统框架 + 系统定位服务 + 目标应用都要勾选**：LSPosed 作用域勾选「系统框架 (system)」负责系统层改写；再勾选系统定位服务（Android 融合定位 `com.android.location.fused`、小米融合定位 `com.xiaomi.location.fused`、OPPO 定位 `com.oplus.location`，设备上没有的会显示为空）；要覆盖某个应用的分流、Mock 隐藏或步频/计步，还必须勾选该目标应用。只勾系统框架时，OEM fused 链路和目标应用侧都可能仍读真实值。
 - **目标应用侧仅在显式加入 scope 时注入**：未勾选的目标应用不加载 Xposed 类；勾选后才会启用客户端 fallback 与传感器注入。不是“永远不注入”，也不是“只勾系统框架就全设备生效”。
 - **去除 Mock 标记**：由系统框架分发的坐标不再携带 mock 标记，`isFromMockProvider` 与 `isMock()` 返回 `false`。
 - **抑制 AOSP 位移过滤**：定点驻留模式下动态放开 `minUpdateDistanceMeters` 限制并注入单调时钟，避免坐标因位移过小被底层丢弃。
@@ -152,7 +152,7 @@ graph TD
 ### 方式三：叠加 LSPosed 系统框架（可选增强）
 
 1. 在手机上安装并激活 **LSPosed**（Zygisk 模式）；
-2. 在 LSPosed 管理器中启用本模块，作用域勾选「系统框架 (Android / android)」；然后**把你需要覆盖的目标应用也加入 scope**（如微信/华为健康/地图）。只勾系统框架时，系统层定位改写可能生效，但目标应用侧分流、Mock 隐藏和步频/计步可能无效；
+2. 在 LSPosed 管理器中启用本模块，作用域勾选「系统框架 (Android / android)」；再勾选系统定位服务（`com.android.location.fused` / `com.xiaomi.location.fused` / `com.oplus.location`，按设备实际存在的选）；最后**把你需要覆盖的目标应用也加入 scope**（如微信/华为健康/地图）。只勾系统框架时，OEM fused 链路和目标应用侧分流、Mock 隐藏、步频/计步都可能无效；
 3. 重启设备，或软重启 `system_server` 后生效；
 4. 回到应用设置页，「LSPosed 系统框架」一行应显示 **已接管系统框架**；目标应用是否真正收到坐标/步频，仍取决于它是否在 scope 中。
 

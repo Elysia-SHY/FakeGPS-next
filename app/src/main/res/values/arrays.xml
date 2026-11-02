@@ -4,5 +4,9 @@
          默认勾选微信/QQ/地图会让这些进程加载反作弊可见的 Xposed 类，和 README 的承诺冲突。 -->
     <string-array name="xposed_scope">
         <item>android</item>
+        <!-- OEM/系统定位 provider 进程：只 hook system_server 会漏掉 fused 链路 -->
+        <item>com.android.location.fused</item>
+        <item>com.xiaomi.location.fused</item>
+        <item>com.oplus.location</item>
     </string-array>
 </resources>

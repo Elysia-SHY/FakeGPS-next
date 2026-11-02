@@ -918,9 +918,9 @@ fun LocationMockScreen(
             IosListRow(
                 title = "LSPosed 系统框架",
                 subtitle = if (isLsposedHookActive) {
-                    "system_server 框架拦截 · 运行中；目标应用仍需加入 scope"
+                    "system_server 框架拦截 · 运行中；系统定位服务与目标应用仍需加入 scope"
                 } else {
-                    "模块未激活 · 请在 LSPosed 中勾选系统框架和目标应用并重启手机"
+                    "模块未激活 · 请在 LSPosed 中勾选系统框架、系统定位服务和目标应用并重启手机"
                 },
                 icon = Icons.Default.Build,
                 iconBackground = if (isLsposedHookActive) IosColors.SystemPurple else IosColors.SystemGray,
