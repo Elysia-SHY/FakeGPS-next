@@ -74,12 +74,17 @@ class MockLocationEngine(private val context: Context) {
         // 判据必须是「hook 真的拿到了 active 配置」，而不是「hook 通道可用」：
         // 可用只代表框架活着，配置没送到时 hook 什么都不会做 —— 那样跳过 Provider
         // 就等于两条路都没了（踩过一次，结果是"完全没效果"）。
-        if (!forceProvider &&
+        val lastHardwareReport = readSystemProperty("debug.fakegps.hardware_time").toLongOrNull() ?: 0L
+        val hasRecentHardwareFix = System.currentTimeMillis() - lastHardwareReport in 0..15_000L
+        if (!forceProvider && hasRecentHardwareFix &&
             HookChannelPrefs.isHookChannelUsable(context, XposedStatusHelper.isLsposedHookReallyActive(context)) &&
             com.mockrun.app.hook.HookStateBridge.isHookActive
         ) {
-            Diag.i("MockLocationEngine", "hook channel active — skipping test provider registration")
+            Diag.i("MockLocationEngine", "hook channel active + recent hardware fix — skipping test provider registration")
             return true
+        }
+        if (!forceProvider && !hasRecentHardwareFix) {
+            Diag.i("MockLocationEngine", "no recent hardware fix — forcing test provider fallback")
         }
         activeProviders.clear()
 
@@ -134,6 +139,12 @@ class MockLocationEngine(private val context: Context) {
         isRegistered = activeProviders.contains(LocationManager.GPS_PROVIDER) || activeProviders.isNotEmpty()
         return isRegistered
     }
+
+    private fun readSystemProperty(key: String): String = runCatching {
+        val clazz = Class.forName("android.os.SystemProperties")
+        val get = clazz.getMethod("get", String::class.java, String::class.java)
+        (get.invoke(null, key, "") as? String).orEmpty()
+    }.getOrDefault("")
 
     private fun registerTestProvider(
         provider: String,

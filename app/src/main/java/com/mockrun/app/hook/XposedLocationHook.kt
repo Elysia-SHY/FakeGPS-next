@@ -116,6 +116,9 @@ class XposedLocationHook : IXposedHookLoadPackage {
     @Volatile
     private var pushThreadStarted = false
 
+    @Volatile
+    private var lastHardwareReportWrite: Long = 0L
+
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName ?: return
         currentProcessPackage = pkg
@@ -2349,6 +2352,31 @@ class XposedLocationHook : IXposedHookLoadPackage {
      * 三条都失败才算失败 —— Channel 1 是最快的通道，静默失败会让 hook
      * 退到更慢的文件通道。
      */
+    private fun setSystemProperty(key: String, value: String) {
+        runCatching {
+            XposedHelpers.callStaticMethod(
+                XposedHelpers.findClass("android.os.SystemProperties", null),
+                "set", key, value
+            )
+        }.logFailure(TAG, "write SystemProperties[$key]", Diag.Level.DEBUG)
+    }
+
+    /**
+     * 只有真实、非 mock 的 provider 上报才刷新这个时间。
+     * App 用它判断 LSP 当前有没有可改写的 fix；getLastKnownLocation 可能返回上一轮假点，不能用。
+     */
+    private fun noteHardwareReport(result: Any?) {
+        val loc = extractLocationFromResult(result) ?: return
+        val mocked = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) loc.isMock else loc.isFromMockProvider
+        }.getOrDefault(false)
+        if (mocked) return
+        val now = System.currentTimeMillis()
+        if (now - lastHardwareReportWrite < 1_000L) return
+        lastHardwareReportWrite = now
+        setSystemProperty("debug.fakegps.hardware_time", now.toString())
+    }
+
     private fun getSystemProperty(key: String): String {
         val methodNames = listOf("get", "getBoolean")
 
@@ -3074,6 +3102,7 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 if (m != null) {
                     XposedBridge.hookMethod(m, object : XC_MethodHook() {
                         override fun beforeHookedMethod(param: MethodHookParam) {
+                            noteHardwareReport(param.args.getOrNull(0))
                             val spoof = getActiveLocation() ?: return
                             if (!spoof.isActive) return
                             rewriteLocationResult(param.args.getOrNull(0), LocationManager.GPS_PROVIDER, spoof)
@@ -3093,9 +3122,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
         runCatching {
             XposedBridge.hookAllMethods(lpm, "onReportLocation", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
+                    val result = param.args.getOrNull(0) ?: return
+                    noteHardwareReport(result)
                     val spoof = getActiveLocation() ?: return
                     if (!spoof.isActive) return
-                    val result = param.args.getOrNull(0) ?: return
                     val regsField = XposedHelpers.findFieldIfExists(lpm, "mRegistrations") ?: return
                     regsField.isAccessible = true
                     @Suppress("UNCHECKED_CAST")

@@ -194,19 +194,19 @@ class MockLocationService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        userStopped = true
-        // 用户从最近任务里划掉卡片是一个明确的结束意图。
-        //
-        // 此前这里会调度复活闹钟把服务拉回来继续模拟，而恢复出来的状态又会持续刷新 hook 的租约，
-        // 于是表现为「应用已经关掉了，位置却还停在伪造点上，怎么都回不来」。现在改成真正停下来：
-        // 停掉两个注入协程、把停止状态写回所有持久通道，再结束前台服务。
+        // 路线/单点仍在跑时，从最近任务划掉 App 不应停模拟：
+        // 用户需要切到高德/微信/Keep 看效果，而 OPPO 的 o-stop 会在任务消失时杀进程。
+        // 只有当前没有活动模拟时，才按“用户结束”清理。
         val sp = getSharedPreferences(PREFS_MOCK_SERVICE, Context.MODE_PRIVATE)
         val wasActive = pointMockJob?.isActive == true ||
             simulationJob?.isActive == true ||
             sp.getBoolean(KEY_IS_POINT_MOCK_ACTIVE, false) ||
             sp.getBoolean(KEY_IS_SIMULATION_ACTIVE, false)
-        if (!wasActive) return
-
+        if (wasActive) {
+            Diag.i(TAG, "task removed while mock active — keep foreground service")
+            return
+        }
+        userStopped = true
         Diag.i(TAG, "task removed by user — stopping mock and clearing hook state")
         runCatching { stopSimulation() }.logFailure(TAG, "stopSimulation on task removal")
         runCatching { stopPointMock() }.logFailure(TAG, "stopPointMock on task removal")
