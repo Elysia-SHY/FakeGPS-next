@@ -373,6 +373,12 @@ class MockLocationService : Service() {
         lastNotifyAt = 0L
         lastNotifiedPercent = -1f
 
+        // LSP 只能改写系统实际上报的点；室内/无 GNSS fix 时没有可改写事件。
+        // 启动时先探测是否有真实定位，没有就强制 Provider 兜底，避免“LSP 已激活但完全没效果”。
+        val hasHardwareFix = runCatching {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) != null
+        }.getOrDefault(false)
+
         // 先发布 active 配置，再决定是否注册 test provider：
         // 冷启动时 register() 读到的 isHookActive 必须已经是 true，否则会先给系统打上 mock 标记。
         com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(true)
@@ -382,7 +388,7 @@ class MockLocationService : Service() {
                 alt = 20.0, spd = speedKmh
             )
         }
-        if (!mockEngine.isRegistered() && !mockEngine.register()) {
+        if (!mockEngine.isRegistered() && !mockEngine.register(forceProvider = !hasHardwareFix)) {
             com.mockrun.app.hook.HookStateBridge.update(this, false)
             com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
@@ -567,9 +573,12 @@ class MockLocationService : Service() {
         com.mockrun.app.hook.HookStateBridge.setRouteSimulationMode(false)
         pointMockJob?.cancel()
 
-        // 同 route：先发布 active 配置，再注册 Provider。
+        // 同 route：先探测真实 fix，再发布配置并决定 Provider 兜底。
+        val hasHardwareFix = runCatching {
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) != null
+        }.getOrDefault(false)
         com.mockrun.app.hook.HookStateBridge.update(this, true, lat, lon)
-        if (!mockEngine.isRegistered() && !mockEngine.register()) {
+        if (!mockEngine.isRegistered() && !mockEngine.register(forceProvider = !hasHardwareFix)) {
             com.mockrun.app.hook.HookStateBridge.update(this, false, lat, lon)
             stateRepo.onError("权限不足：请在手机【开发者选项】中将 Fake GPS 设为「模拟位置信息应用」")
             stopSelf()
