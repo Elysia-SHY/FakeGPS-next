@@ -117,21 +117,21 @@ private const val ADDRESS_PLACEHOLDER = "正在获取当前地址..."
 
 /**
  * 中央准星 Pin 块的固有高度（dp）：
- * 胶囊提示条 ≈ 33（ButtonSmall 13pt + 上下 8dp padding + 描边）
- * + 10 间距 + 水滴 Pin 56 + 3 间距 + 落地阴影 7 ≈ 109dp。
+ * 胶囊提示条 ≈ 29（ButtonSmall 13pt + 上下 6dp padding + 描边）
+ * + 8 间距 + 水滴 Pin 46 + 3 间距 + 落地阴影 6 ≈ 92dp。
  *
  * 用于按底部面板实测高度反推 Pin 的垂直让位量，替代原先写死的 130dp。
  */
-private val CENTER_PIN_BLOCK_HEIGHT = 109.dp
+private val CENTER_PIN_BLOCK_HEIGHT = 92.dp
 
 /**
  * Pin 尖端相对「Pin 块中心」的垂直偏移（dp）。
  *
- * 块内自顶向下：胶囊提示条 ≈33 + 间距 10 + 水滴 Pin 56 + 间距 3 + 落地阴影 7 = 109dp，
- * 水滴的尖端在 33+10+56 = 99dp 处，块中心在 54.5dp 处 → 尖端在块中心下方 44.5dp。
- * 即：`CENTER_PIN_BLOCK_HEIGHT / 2 - (3 + 7)`。
+ * 块内自顶向下：胶囊提示条 ≈29 + 间距 8 + 水滴 Pin 46 + 间距 3 + 落地阴影 6 = 92dp，
+ * 水滴的尖端在 29+8+46 = 83dp 处，块中心在 46dp 处 → 尖端在块中心下方 37dp。
+ * 即：`CENTER_PIN_BLOCK_HEIGHT / 2 - (3 + 6)`。
  */
-private val PIN_TIP_BELOW_BLOCK_CENTER = CENTER_PIN_BLOCK_HEIGHT / 2 - 10.dp
+private val PIN_TIP_BELOW_BLOCK_CENTER = CENTER_PIN_BLOCK_HEIGHT / 2 - 9.dp
 
 /** Pin 尖端与底部抽屉顶边之间必须保留的呼吸距离。 */
 private val PIN_TIP_GAP = 12.dp
@@ -1532,7 +1532,7 @@ fun MapScreen(
                         .getOrNull()
                 } ?: IosBlue
 
-                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 46×56 水滴 Pin。
+                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 38×46 水滴 Pin。
                 //
                 // 几何（关键）：Pin 的**尖端**才是瞄准点，因此让位量按尖端算：
                 //   尖端屏幕 y = 容器中心 − 让位量，让位量 = pinTipClearancePx(...)
