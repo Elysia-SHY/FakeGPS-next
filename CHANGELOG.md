@@ -8,14 +8,23 @@
 
 ---
 
-## [Unreleased]
+## [2.4.6] - 2026-11-02
+
+> 地图选点更轻、LSPosed 在无 GPS fix / OEM fused 场景更稳。Keep 受 SecNeo 加固限制，暂不支持。
 
 ### 变更 (Changed)
 
 - 地图中心选点 Pin 缩小：46×56 → 32×40，提示胶囊/落地阴影同步收紧；定位页与路线页共用，尖端瞄准几何常量同步从 109dp 调整到 83dp。
 - 借鉴 Portal（Apache-2.0）的适配思路：`Location.makeComplete()` + `maxCn0/meanCn0` extras、`SystemSensorManager.registerListenerImpl` 传感器注册兜底。
 - 新增系统定位 provider 进程适配：默认 scope 加入 `com.android.location.fused`、`com.xiaomi.location.fused`、`com.oplus.location`；在 fused/OEM 进程内 hook `LocationResult` 与 `FusedLocationProvider.chooseBestLocation`，补上只 hook system_server 看不到的 OEM 链路。旧安装不会自动改 scope，需要用户手动勾选这些系统定位服务。
+- LSPosed 无真实 GPS fix 时自动回退 Provider；用真实、非 mock 的 `hardware_time` 租约判断，避免上一轮假点造成误判。
+- 单点/路线运行中从最近任务划掉 App 时不再主动停模拟，继续保留前台服务；OPPO 等 OEM 仍可能强杀，建议加电池白名单。
 - 不引入 Portal 的 LSPosed-only 架构；步频/计步仍由本项目的 Root + 目标应用 scope 链路负责。
+
+### 说明
+
+- 高德/微信走系统定位链路，已验证可用。
+- Keep 9.1.100 使用 SecNeo/DexHelper 壳与腾讯定位 SDK native 反调试，当前版本不保证 Keep 生效。
 
 ---
 
