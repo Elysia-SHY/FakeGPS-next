@@ -1049,6 +1049,30 @@ class XposedLocationHook : IXposedHookLoadPackage {
                 }
             })
         }.logFailure(TAG, "hook SensorManager.unregisterListener")
+
+        // 有些 SDK 直接走 SystemSensorManager.registerListenerImpl，不经过
+        // SensorManager 的公开重载；这里做兜底。hook 点参考 Portal（Apache-2.0）。
+        runCatching {
+            val systemSm = XposedHelpers.findClassIfExists(
+                "android.hardware.SystemSensorManager", lpparam.classLoader
+            ) ?: return@runCatching
+            XposedBridge.hookAllMethods(systemSm, "registerListenerImpl", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
+                        ?: return
+                    val sensor = param.args.firstOrNull { it is Sensor } as? Sensor ?: return
+                    if (listener is SyntheticSensorListener) return
+                    val proxy = sensorListenerProxies[listener]
+                        ?: SyntheticSensorListener(listener).also {
+                            sensorListenerProxies[listener] = it
+                        }
+                    if (sensor.type == Sensor.TYPE_STEP_COUNTER) proxy.attachStepSensor(sensor)
+                    for (i in param.args.indices) {
+                        if (param.args[i] === listener) param.args[i] = proxy
+                    }
+                }
+            })
+        }.logFailure(TAG, "hook SystemSensorManager.registerListenerImpl")
     }
 
     private inner class SyntheticSensorListener(
@@ -2944,8 +2968,21 @@ class XposedLocationHook : IXposedHookLoadPackage {
             val extras = loc.extras ?: Bundle()
             if (!extras.containsKey("satellites")) {
                 extras.putInt("satellites", 18 + kotlin.random.Random.nextInt(5))
-                loc.extras = extras
             }
+            // Portal 的做法：不少 ROM/风控直接读这两个 extra，缺失时会被判“无 GNSS 结果”。
+            if (!extras.containsKey("maxCn0")) {
+                extras.putInt("maxCn0", 30 + kotlin.random.Random.nextInt(20))
+            }
+            if (!extras.containsKey("meanCn0")) {
+                extras.putInt("meanCn0", 20 + kotlin.random.Random.nextInt(10))
+            }
+            loc.extras = extras
+
+            // makeComplete() 会补齐 speed/bearing/accuracy 等派生字段；
+            // 普通 new Location() 的 isComplete 为 false，部分 SDK 会直接丢弃。
+            // 思路参考 Portal（Apache-2.0）；这里只使用公开/隐藏 API 的调用，不复制其代码。
+            runCatching { XposedHelpers.callMethod(loc, "makeComplete") }
+                .logFailure(TAG, "Location.makeComplete", Diag.Level.DEBUG)
 
             if (loc.time == 0L) loc.time = System.currentTimeMillis()
             if (loc.elapsedRealtimeNanos == 0L) {

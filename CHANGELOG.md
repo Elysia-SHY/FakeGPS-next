@@ -8,6 +8,15 @@
 
 ---
 
+## [Unreleased]
+
+### 变更 (Changed)
+
+- 借鉴 Portal（Apache-2.0）的两个低风险点：`Location.makeComplete()` + `maxCn0/meanCn0` extras，以及 `SystemSensorManager.registerListenerImpl` 传感器注册兜底。
+- 不引入 Portal 的 LSPosed-only 架构；步频/计步仍由本项目的 Root + 目标应用 scope 链路负责。
+
+---
+
 ## [2.4.5] - 2026-10-28
 
 > 修复 LSPosed 注入默认值/作用域文案：不再自动优先，默认 Provider；只勾系统框架不够，目标应用必须加入 scope。
