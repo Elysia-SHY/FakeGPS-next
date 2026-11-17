@@ -89,10 +89,15 @@ class SimulationViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _isRootAvailable.value = rootBridge.isRootAvailable()
+            refreshRootAvailability()
             // root 状态已知后再应用「上次的开关意图」，避免把 false 当成用户选择落盘
             sensorEngine.applyPersistedIntent()
         }
+    }
+
+    /** 临时 Root 可能在应用运行期间才就绪；页面恢复时刷新共享状态。 */
+    suspend fun refreshRootAvailability(probeResult: Boolean? = null) {
+        _isRootAvailable.value = probeResult ?: rootBridge.isRootAvailable()
     }
 
     fun isRootConfirmed(): Boolean = rootBridge.isRootConfirmed()

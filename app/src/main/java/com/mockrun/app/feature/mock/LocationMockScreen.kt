@@ -238,6 +238,15 @@ fun LocationMockScreen(
     }
     var showKeepAliveSheet by remember { mutableStateOf(false) }
 
+    // GhostLock 等临时 Root 方案可能在应用已启动后才完成提权。
+    // 每次回到页面都重新探测，而不是把首次失败永久保存成免 Root 模式。
+    suspend fun refreshRootStatus() {
+        val rootOk = rootBridge.isRootAvailable()
+        isRootAvailable = rootOk
+        isRootMode = InjectionModePrefs.isRootMode(context, rootOk)
+        simulationViewModel.refreshRootAvailability(rootOk)
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -251,6 +260,7 @@ fun LocationMockScreen(
                 CoordinateConverter.getRealDeviceLocation(context)?.let {
                     realLocationCoord = it
                 }
+                coroutineScope.launch { refreshRootStatus() }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -258,8 +268,7 @@ fun LocationMockScreen(
     }
 
     LaunchedEffect(Unit) {
-        isRootAvailable = rootBridge.isRootAvailable()
-        isRootMode = InjectionModePrefs.validateOrDowngrade(context, isRootAvailable) == InjectionMode.ROOT
+        refreshRootStatus()
         isDevMockLocationEnabled = XposedStatusHelper.isMockLocationAppSelected(context)
         isLsposedHookActive = XposedStatusHelper.isLsposedHookReallyActive(context)
         if (isRootAvailable && isRootMode) {

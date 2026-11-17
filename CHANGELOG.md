@@ -8,6 +8,14 @@
 
 ---
 
+## [2.4.7] - 2026-11-17
+
+> 兼容 GhostLock + ReSukiSU 临时 Root 的就绪时序，返回应用即可重新检测，无需结束进程重开。
+
+### 修复 (Fixed)
+
+- **兼容 GhostLock + ReSukiSU 临时 Root 的就绪时序。** 虚拟定位页与地图页在 `ON_RESUME` 时重新探测 Root，并同步更新共享状态；首次探测失败不再把用户的 Root 模式偏好永久改写为免 Root。应用先启动、随后通过 GhostLock 完成提权时，返回应用即可刷新为已授权，无需结束进程重开。 ([#10](https://github.com/Elysia-SHY/FakeGPS-next/issues/10))
+
 ## [2.4.6] - 2026-11-02
 
 > 地图选点更轻、LSPosed 在无 GPS fix / OEM fused 场景更稳。Keep 受 SecNeo 加固限制，暂不支持。

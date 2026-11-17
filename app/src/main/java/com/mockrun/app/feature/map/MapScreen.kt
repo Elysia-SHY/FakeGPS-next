@@ -658,7 +658,10 @@ fun MapScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
-                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapViewRef?.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    mapViewRef?.onResume()
+                    coroutineScope.launch { simulationViewModel.refreshRootAvailability() }
+                }
                 androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapViewRef?.onPause()
                 else -> {}
             }
