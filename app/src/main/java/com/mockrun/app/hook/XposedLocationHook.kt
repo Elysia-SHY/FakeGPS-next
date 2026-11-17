@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -121,6 +122,10 @@ class XposedLocationHook : IXposedHookLoadPackage {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName ?: return
+        if (ClientHookPolicy.isAuxiliaryPackage(pkg)) {
+            Diag.i(TAG, "skip MIUI auxiliary package in ${lpparam.processName}: $pkg")
+            return
+        }
         currentProcessPackage = pkg
 
         // If loaded in Fake GPS itself, hook XposedStatusHelper to report module active, then return
@@ -1051,6 +1056,11 @@ class XposedLocationHook : IXposedHookLoadPackage {
     }
 
     private fun hookClientApp(lpparam: XC_LoadPackage.LoadPackageParam) {
+        if (!ClientHookPolicy.shouldInstall(lpparam.processName, Process.myUid())) {
+            Diag.i(TAG, "skip client hooks in system process: ${lpparam.processName}, uid=${Process.myUid()}")
+            return
+        }
+
         // SensorManager client hooks (only for apps explicitly added to LSPosed scope)
         hookSensorClient(lpparam)
 
@@ -1074,31 +1084,65 @@ class XposedLocationHook : IXposedHookLoadPackage {
      * SensorEvent；因此在目标应用进程里包装 SensorEventListener，把步数/加速度换成
      * Root 侧发布的合成值。
      */
-    private val sensorListenerProxies: MutableMap<SensorEventListener, SyntheticSensorListener> =
-        java.util.Collections.synchronizedMap(java.util.WeakHashMap())
+    private val sensorListenerProxies =
+        WeakListenerProxyRegistry<SensorEventListener, SyntheticSensorListener>()
 
+    private var sensorHooksInstalled = false
+
+    private fun replaceSensorListenerArgs(
+        param: XC_MethodHook.MethodHookParam,
+        listener: SensorEventListener,
+        proxy: SyntheticSensorListener
+    ) {
+        for (i in param.args.indices) {
+            if (param.args[i] === listener) param.args[i] = proxy
+        }
+    }
+
+    private fun proxySensorRegistration(param: XC_MethodHook.MethodHookParam) {
+        val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
+            ?: return
+        if (listener is SyntheticSensorListener) return
+        val sensor = param.args.firstOrNull { it is Sensor } as? Sensor ?: return
+        val proxy = sensorListenerProxies.getOrCreate(listener) {
+            SyntheticSensorListener(listener)
+        }
+        if (sensor.type == Sensor.TYPE_STEP_COUNTER) proxy.attachStepSensor(sensor)
+        replaceSensorListenerArgs(param, listener, proxy)
+    }
+
+    private fun proxySensorUnregistration(param: XC_MethodHook.MethodHookParam) {
+        val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
+            ?: return
+        if (listener is SyntheticSensorListener) return
+        val sensor = param.args.firstOrNull { it is Sensor } as? Sensor
+        val proxy = if (sensor == null) {
+            // unregisterListener(listener)：全部传感器都已注销，原子移除映射。
+            sensorListenerProxies.remove(listener)
+        } else {
+            // unregisterListener(listener, sensor)：其他传感器可能仍使用同一代理，保留映射。
+            sensorListenerProxies[listener]
+        } ?: return
+        replaceSensorListenerArgs(param, listener, proxy)
+
+        if (sensor == null || sensor.type == Sensor.TYPE_STEP_COUNTER) {
+            proxy.stopStepTicker()
+        }
+    }
+
+    @Synchronized
     private fun hookSensorClient(lpparam: XC_LoadPackage.LoadPackageParam) {
+        if (!ClientHookPolicy.shouldInstall(lpparam.processName, Process.myUid())) return
+        if (sensorHooksInstalled) return
         val smClass = XposedHelpers.findClassIfExists(
             "android.hardware.SensorManager", lpparam.classLoader
         ) ?: return
+        sensorHooksInstalled = true
 
         runCatching {
             XposedBridge.hookAllMethods(smClass, "registerListener", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
-                        ?: return
-                    val sensor = param.args.firstOrNull { it is Sensor } as? Sensor ?: return
-                    if (listener is SyntheticSensorListener) return
-                    val proxy = sensorListenerProxies[listener]
-                        ?: SyntheticSensorListener(listener).also {
-                            sensorListenerProxies[listener] = it
-                        }
-                    if (sensor.type == Sensor.TYPE_STEP_COUNTER) {
-                        proxy.attachStepSensor(sensor)
-                    }
-                    for (i in param.args.indices) {
-                        if (param.args[i] === listener) param.args[i] = proxy
-                    }
+                    proxySensorRegistration(param)
                 }
             })
         }.logFailure(TAG, "hook SensorManager.registerListener")
@@ -1106,40 +1150,28 @@ class XposedLocationHook : IXposedHookLoadPackage {
         runCatching {
             XposedBridge.hookAllMethods(smClass, "unregisterListener", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
-                        ?: return
-                    val proxy = sensorListenerProxies.remove(listener) ?: return
-                    proxy.stopStepTicker()
-                    for (i in param.args.indices) {
-                        if (param.args[i] === listener) param.args[i] = proxy
-                    }
+                    proxySensorUnregistration(param)
                 }
             })
         }.logFailure(TAG, "hook SensorManager.unregisterListener")
 
-        // 有些 SDK 直接走 SystemSensorManager.registerListenerImpl，不经过
-        // SensorManager 的公开重载；这里做兜底。hook 点参考 Portal（Apache-2.0）。
+        // 有些 SDK 直接走 SystemSensorManager.registerListenerImpl / unregisterListenerImpl，
+        // 两层必须对称替换：只 hook 注册会让系统持有代理、注销却收到原始 listener，代理必然泄漏。
         runCatching {
             val systemSm = XposedHelpers.findClassIfExists(
                 "android.hardware.SystemSensorManager", lpparam.classLoader
             ) ?: return@runCatching
             XposedBridge.hookAllMethods(systemSm, "registerListenerImpl", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    val listener = param.args.firstOrNull { it is SensorEventListener } as? SensorEventListener
-                        ?: return
-                    val sensor = param.args.firstOrNull { it is Sensor } as? Sensor ?: return
-                    if (listener is SyntheticSensorListener) return
-                    val proxy = sensorListenerProxies[listener]
-                        ?: SyntheticSensorListener(listener).also {
-                            sensorListenerProxies[listener] = it
-                        }
-                    if (sensor.type == Sensor.TYPE_STEP_COUNTER) proxy.attachStepSensor(sensor)
-                    for (i in param.args.indices) {
-                        if (param.args[i] === listener) param.args[i] = proxy
-                    }
+                    proxySensorRegistration(param)
                 }
             })
-        }.logFailure(TAG, "hook SystemSensorManager.registerListenerImpl")
+            XposedBridge.hookAllMethods(systemSm, "unregisterListenerImpl", object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    proxySensorUnregistration(param)
+                }
+            })
+        }.logFailure(TAG, "hook SystemSensorManager register/unregisterListenerImpl")
     }
 
     private inner class SyntheticSensorListener(

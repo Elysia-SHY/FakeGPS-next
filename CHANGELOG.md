@@ -8,6 +8,14 @@
 
 ---
 
+## [2.4.8] - 2026-11-17
+
+> 修复 `SyntheticSensorListener` 累积导致系统进程崩溃的问题。**测试范围：仅在 AOSP 环境完成测试；MIUI / 澎湃 OS 尚待真机验证。**
+
+### 修复 (Fixed)
+
+- **阻止 `SyntheticSensorListener` 在系统进程中累积并拖垮 `system_server`。** 用户日志确认自动亮度注册光线传感器时达到 128 个代理，抛出 `IllegalStateException: Too many sensor listeners (128)` 并导致 `PowerManagerService` 致命崩溃。现禁止 system 进程及系统 UID 安装客户端 Hook，忽略 MIUI `com.miui.contentcatcher` 的重复加载；`SensorManager` 与 `SystemSensorManager` 的注册/注销对称替换，单传感器注销不再误删整套映射，代理表改为弱键弱值以切断强引用环。
+
 ## [2.4.7] - 2026-11-17
 
 > 兼容 GhostLock + ReSukiSU 临时 Root 的就绪时序，返回应用即可重新检测，无需结束进程重开。

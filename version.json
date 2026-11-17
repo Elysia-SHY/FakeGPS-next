@@ -1,20 +1,20 @@
 {
-  "versionName": "v2.4.7",
-  "versionCode": 63,
+  "versionName": "v2.4.8",
+  "versionCode": 64,
   "releaseDate": "2026-11-17",
   "minSdk": 29,
-  "releaseNotes": "FakeGPS-next 2.4.7：兼容 GhostLock + ReSukiSU 临时 Root。\n\n【Root 兼容】\n· 修复应用先启动、后完成 GhostLock 临时提权时仍显示“未检测到 Root”。\n· 虚拟定位页与地图页在 ON_RESUME 时重新探测 Root，并同步共享状态。\n· 首次探测失败不再把 Root 模式偏好永久改写为免 Root。\n· ReSukiSU/BakaSU 中仍需允许 FakeGPS 的超级用户权限。\n\n【验证】\n· 156 项单元测试全部通过。\n· Release 构建与 APK 签名校验由 GitHub Actions 完成。",
-  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.7",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk",
-  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk",
+  "releaseNotes": "FakeGPS-next 2.4.8：修复 SyntheticSensorListener 累积导致系统进程崩溃。\n\n【修复内容】\n· 用户日志确认代理达到 128 个后会触发 PowerManagerService 致命异常。\n· 禁止 system 进程及系统 UID 安装客户端传感器 Hook。\n· 忽略 MIUI com.miui.contentcatcher 的重复加载。\n· SensorManager 与 SystemSensorManager 的注册、注销对称处理。\n· 修复单传感器注销误删映射及代理表强引用环。\n\n【测试范围】\n· 仅在 AOSP 环境完成测试。\n· MIUI / 澎湃 OS 尚待真机验证。\n· 164 项单元测试通过，Release 构建与 APK 签名校验由 GitHub Actions 完成。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.4.8",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk",
+  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk",
   "sha256": "efeba2632e45e9ec15b9109a92e0b83a6c8e37f320f0afbdb0907a9e4fd0ac41",
   "sizeBytes": 4099266,
   "contact": "2224958076@qq.com",
   "homepage": "https://github.com/Elysia-SHY/FakeGPS-next",
   "mirrorUrls": [
-    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk",
-    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk",
-    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk",
-    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.7/FakeGPS-next-v2.4.7-release.apk"
+    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk",
+    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk",
+    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk",
+    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.4.8/FakeGPS-next-v2.4.8-release.apk"
   ]
 }
