@@ -20,6 +20,7 @@ import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.core.location.PermissionCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.mockrun.app.core.data.repository.MultiTargetRepository
+import com.mockrun.app.core.data.LastMockSelectionStore
 import com.mockrun.app.domain.model.MultiTargetRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,7 +37,8 @@ class SimulationViewModel @Inject constructor(
     val sensorEngine: SensorMockEngine,
     val rootBridge: RootSuBridge,
     val multiTargetRepo: MultiTargetRepository,
-    val permissionCoordinator: PermissionCoordinator
+    val permissionCoordinator: PermissionCoordinator,
+    private val lastMockSelectionStore: LastMockSelectionStore
 ) : ViewModel() {
 
     val state: StateFlow<SimulationState> = stateRepo.state
@@ -51,12 +53,23 @@ class SimulationViewModel @Inject constructor(
     // Multi-tenant per-app virtualization rules
     val multiTargetRules: StateFlow<List<MultiTargetRule>> = multiTargetRepo.rules
 
+    private val restoredSelection = lastMockSelectionStore.load()
+    private val restoredTargetRule = restoredSelection.targetKey?.let { savedKey ->
+        multiTargetRepo.rules.value.firstOrNull { it.key == savedKey }
+    }
+
     // Currently active / focused app rule on map (null = Global Default Aiming)
-    private val _activeTargetKey = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val _activeTargetKey = MutableStateFlow(restoredTargetRule?.key)
     val activeTargetKey: StateFlow<String?> = _activeTargetKey.asStateFlow()
 
     fun setActiveTargetKey(key: String?) {
-        _activeTargetKey.value = key
+        val rule = key?.let { targetKey -> multiTargetRepo.rules.value.firstOrNull { it.key == targetKey } }
+        _activeTargetKey.value = rule?.key
+        lastMockSelectionStore.saveTargetKey(rule?.key)
+        if (rule != null) {
+            stateRepo.updateSelectedTarget(rule.latitude, rule.longitude)
+            lastMockSelectionStore.saveLocation(rule.latitude, rule.longitude)
+        }
     }
 
     fun addOrUpdateMultiTargetRule(rule: MultiTargetRule) {
@@ -67,6 +80,7 @@ class SimulationViewModel @Inject constructor(
         multiTargetRepo.removeRule(key)
         if (_activeTargetKey.value == key) {
             _activeTargetKey.value = null
+            lastMockSelectionStore.saveTargetKey(null)
         }
     }
 
@@ -76,6 +90,10 @@ class SimulationViewModel @Inject constructor(
 
     fun updateMultiTargetLocation(key: String, latitude: Double, longitude: Double) {
         multiTargetRepo.updateCoordinates(key, latitude, longitude)
+        if (_activeTargetKey.value == key) {
+            stateRepo.updateSelectedTarget(latitude, longitude)
+            lastMockSelectionStore.saveLocation(latitude, longitude)
+        }
     }
 
     fun setMultiTargetRuleMode(key: String, mode: com.mockrun.app.domain.model.TargetMockMode) {
@@ -88,6 +106,15 @@ class SimulationViewModel @Inject constructor(
     val isRootAvailable: StateFlow<Boolean> = _isRootAvailable.asStateFlow()
 
     init {
+        if (restoredSelection.targetKey != null && restoredTargetRule == null) {
+            // 规则已删除时不再恢复失效 key；保留点位和路线记忆，界面回退为全局。
+            lastMockSelectionStore.saveTargetKey(null)
+        }
+        val restoredLocation = restoredTargetRule?.let { it.latitude to it.longitude }
+            ?: restoredSelection.location?.let { it.latitude to it.longitude }
+        restoredLocation?.let { (latitude, longitude) ->
+            stateRepo.updateSelectedTarget(latitude, longitude)
+        }
         viewModelScope.launch {
             refreshRootAvailability()
             // root 状态已知后再应用「上次的开关意图」，避免把 false 当成用户选择落盘
@@ -126,6 +153,7 @@ class SimulationViewModel @Inject constructor(
 
     fun updateSelectedTarget(latitude: Double, longitude: Double) {
         stateRepo.updateSelectedTarget(latitude, longitude)
+        lastMockSelectionStore.saveLocation(latitude, longitude)
     }
 
     fun updateRealPhysicalLocation(latitude: Double, longitude: Double) {
@@ -155,6 +183,7 @@ class SimulationViewModel @Inject constructor(
                 stopSimulation(context)
             }
 
+            lastMockSelectionStore.saveLocation(latitude, longitude)
             stateRepo.setPointMock(true, com.mockrun.app.domain.model.WayPoint(latitude, longitude))
             stateRepo.updateJoystickLocation(latitude, longitude)
             com.mockrun.app.hook.HookStateBridge.update(context, true, latitude, longitude)
@@ -226,6 +255,7 @@ class SimulationViewModel @Inject constructor(
                 context.stopService(Intent(context, com.mockrun.app.core.location.FloatingJoystickService::class.java))
             }
 
+            lastMockSelectionStore.saveRoute(route)
             stateRepo.prepareRoute(route)
             val intent = Intent(context, MockLocationService::class.java).apply {
                 action = MockLocationService.ACTION_START

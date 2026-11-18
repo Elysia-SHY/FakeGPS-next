@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mockrun.app.core.data.parser.GpxParser
+import com.mockrun.app.core.data.LastMockSelectionStore
 import com.mockrun.app.core.data.repository.RouteRepository
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.RouteMode
@@ -27,7 +28,8 @@ import com.mockrun.app.core.location.RoadMode
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val routeRepository: RouteRepository,
-    private val gpxParser: GpxParser
+    private val gpxParser: GpxParser,
+    private val lastMockSelectionStore: LastMockSelectionStore
 ) : ViewModel() {
 
     private val _drawnWaypoints = MutableStateFlow<List<WayPoint>>(emptyList())
@@ -35,6 +37,17 @@ class MapViewModel @Inject constructor(
 
     private val _selectedRoute = MutableStateFlow<Route?>(null)
     val selectedRoute: StateFlow<Route?> = _selectedRoute.asStateFlow()
+
+    init {
+        lastMockSelectionStore.loadRoute()?.let { restored ->
+            _selectedRoute.value = restored
+            _drawnWaypoints.value = restored.waypoints
+        }
+        viewModelScope.launch {
+            // 统一捕获收藏、手绘、GPX、沿路规划、重命名与模式切换；停止模拟不会在这里清空。
+            _selectedRoute.collect { route -> lastMockSelectionStore.saveRoute(route) }
+        }
+    }
 
     val savedRoutes: StateFlow<List<Route>> = routeRepository.routes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
