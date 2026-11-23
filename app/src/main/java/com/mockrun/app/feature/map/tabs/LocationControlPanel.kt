@@ -16,13 +16,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -39,17 +37,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.IosGlassDock
-import com.mockrun.app.core.designsystem.IosSearchField
-import com.mockrun.app.core.designsystem.IosSearchFieldStyle
 import com.mockrun.app.core.designsystem.ScreenInsets
-import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
+import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
@@ -70,7 +64,6 @@ fun LocationControlPanel(
     searchQuery: String,
     searchResults: List<SearchResultItem>,
     isSearching: Boolean,
-    isLiquidGlass: Boolean,
     savedLocations: List<Route> = emptyList(),
     savedTracks: List<Route> = emptyList(),
     activeRule: MultiTargetRule? = null,
@@ -87,7 +80,6 @@ fun LocationControlPanel(
     onSelectSavedRoute: (Route) -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
     // 初始状态恒为「完全收起」—— 不读任何持久化存储、也不沿用上一次的选择。
     // 于是「首次安装 / 冷启动 / 从其它页面切回定位页」三条路径都从收起开始，先给用户一张完整地图。
     // 旧实现把用户选择写进 SharedPreferences 并在每次进入页面时读回来当初始值：
@@ -135,8 +127,7 @@ fun LocationControlPanel(
     val fullAddress = address.ifBlank { "已选定目标坐标" }
     var addressExpanded by remember(fullAddress) { mutableStateOf(false) }
 
-    // 设计稿 .dock —— 浮空玻璃卡片式抽屉（r32 / blur 30 / 1px 8% 白描边 / 内高光）
-    IosGlassDock(
+    Surface(
         modifier = modifier
             .widthIn(max = 560.dp)
             .fillMaxWidth()
@@ -149,9 +140,13 @@ fun LocationControlPanel(
                 )
             ),
         shape = AppShapes.sheet,
-        isLiquidGlass = isLiquidGlass,
-        elevation = 18.dp
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
+        Column {
         // 1. Drag Handle Pill (支持点击快速在 COLLAPSED / DEFAULT / EXPANDED 间循环切换)
         //    触区用 minTouchTarget 抬到 48dp —— 原实现只有 5dp 高的胶囊本身可点。
         //    位置固定在抽屉顶部、不随内容滚动：抽屉被高度上限压住后内容会滚动，
@@ -188,7 +183,7 @@ fun LocationControlPanel(
                     .width(42.dp)
                     .height(5.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(if (isDark) Color.White.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.25f))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
             )
         }
 
@@ -210,56 +205,36 @@ fun LocationControlPanel(
             // 2. Master Action & Search Rows
             if (activeRule != null) {
                 val defaultRuleColor = MaterialTheme.colorScheme.primary
-                val activeRuleColor = remember(activeRule.colorHex) {
+                val activeRuleColor = remember(activeRule.colorHex, defaultRuleColor) {
                     runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
                         .logFailure("LocationControlPanel", "parse rule color", Diag.Level.DEBUG)
                         .getOrDefault(defaultRuleColor)
                 }
 
-                // A. Search Box (Full Width) —— 统一走设计系统 IosSearchField（STANDARD 52dp / r18）
+                // A. Search Box (Full Width)
                 Box(modifier = Modifier.fillMaxWidth().then(dragGestureModifier)) {
-                    IosSearchField(
+                    MapSearchField(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
                         placeholder = "搜索【${activeRule.appName}】分流地点",
+                        onClear = onClearSearch,
                         modifier = Modifier.fillMaxWidth(),
-                        style = IosSearchFieldStyle.STANDARD
                     )
-                    if (searchQuery.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                                                            .clickable(onClick = onClearSearch),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // 20dp 遮罩圆：既让「清除」在玻璃底上可见，
-                            // 又遮住从按钮下方穿过的输入文字
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "清除搜索内容",
-                                    tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-                    }
                 }
 
                 // B. App Diversion Status Card with Inline Switch
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF2F2F7),
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 2.dp,
                     border = BorderStroke(
                         1.dp,
-                        if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.45f) else (if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA))
+                        if (activeRule.isEnabled) {
+                            activeRuleColor.copy(alpha = 0.6f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        }
                     ),
                     modifier = Modifier.fillMaxWidth().then(dragGestureModifier)
                 ) {
@@ -276,16 +251,20 @@ fun LocationControlPanel(
                             modifier = Modifier.weight(1f, fill = false)
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(9.dp),
-                                color = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.outline,
+                                shape = MaterialTheme.shapes.small,
+                                color = if (activeRule.isEnabled) {
+                                    activeRuleColor
+                                } else {
+                                    MaterialTheme.colorScheme.outline
+                                },
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = activeRule.appName.take(1),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -296,17 +275,21 @@ fun LocationControlPanel(
                                 ) {
                                     Text(
                                         text = activeRule.appName,
-                                        fontSize = 13.5.sp,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isDark) Color.White else Color.Black
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                        shape = MaterialTheme.shapes.small,
+                                        color = if (activeRule.isEnabled) {
+                                            activeRuleColor.copy(alpha = 0.16f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        }
                                     ) {
                                         Text(
                                             text = if (activeRule.isEnabled) "分流运行中" else "分流已暂停",
-                                            fontSize = 10.sp,
+                                            style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
                                             color = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
@@ -315,7 +298,7 @@ fun LocationControlPanel(
                                 }
                                 Text(
                                     text = if (activeRule.isEnabled) "独立虚拟定位生效中" else "暂停后使用全局或物理定位",
-                                    fontSize = 10.5.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -325,13 +308,7 @@ fun LocationControlPanel(
                             checked = activeRule.isEnabled,
                             onCheckedChange = { isChecked ->
                                 onToggleTargetRule?.invoke(activeRule, isChecked)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = activeRuleColor,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = if (isDark) Color(0xFF3A3A3C) else Color(0xFFD1D1D6)
-                            )
+                            }
                         )
                     }
                 }
@@ -342,72 +319,51 @@ fun LocationControlPanel(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
+                    Button(
+                        onClick = { onSetTargetLocation?.invoke(activeRule) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
-                            .liquidGlass(
-                                isLiquidGlass = isLiquidGlass,
-                                shape = RoundedCornerShape(24.dp),
-                                elevation = 8.dp,
-                                containerColor = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.primary
-                            )
-                            .clickable {
-                                onSetTargetLocation?.invoke(activeRule)
-                            },
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color.Transparent
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = Color.White,
                                 modifier = Modifier.size(19.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = if (activeRule.isEnabled) "更新【${activeRule.appName}】定位点" else "开启并设为【${activeRule.appName}】定位点",
-                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp,
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Surface(
+                    OutlinedButton(
+                        onClick = { onClearActiveTarget?.invoke() },
                         modifier = Modifier
-                            .height(48.dp)
-                            .liquidGlass(
-                                isLiquidGlass = isLiquidGlass,
-                                shape = RoundedCornerShape(24.dp),
-                                elevation = 4.dp
-                            )
-                            .clickable { onClearActiveTarget?.invoke() },
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color.Transparent
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large,
+                        contentPadding = PaddingValues(horizontal = 14.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(horizontal = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "切回全局",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1
-                            )
-                        }
+                        Text(
+                            text = "切回全局",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
                     }
                 }
             } else {
@@ -419,41 +375,15 @@ fun LocationControlPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 搜索框统一走 IosSearchField（STANDARD 52dp / r18 / 16sp）
+                    // 搜索框统一走 M3 OutlinedTextField 封装
                     Box(modifier = Modifier.weight(1f)) {
-                        IosSearchField(
+                        MapSearchField(
                             value = searchQuery,
                             onValueChange = onSearchQueryChange,
                             placeholder = "搜索地点",
+                            onClear = onClearSearch,
                             modifier = Modifier.fillMaxWidth(),
-                            style = IosSearchFieldStyle.STANDARD
                         )
-                        if (searchQuery.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                                                                    .clickable(onClick = onClearSearch),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // 20dp 遮罩圆：既让「清除」在玻璃底上可见，
-                                // 又遮住从按钮下方穿过的输入文字
-                                Box(
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "清除搜索内容",
-                                        tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     if (isMockActive) {
@@ -463,114 +393,94 @@ fun LocationControlPanel(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Surface(
+                            Button(
+                                onClick = onStartMock,
                                 modifier = Modifier
                                     .height(52.dp)
-                                    .liquidGlass(
-                                        isLiquidGlass = isLiquidGlass,
-                                        shape = RoundedCornerShape(16.dp),
-                                        elevation = 12.dp,
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    )
-                                    .clickable { onStartMock() },
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.Transparent
+                                    .widthIn(min = 88.dp),
+                                shape = MaterialTheme.shapes.large,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .padding(horizontal = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Place,
                                         contentDescription = null,
-                                        tint = Color.White,
                                         modifier = Modifier.size(15.dp)
                                     )
                                     Spacer(Modifier.width(3.dp))
                                     Text(
                                         text = "移动到此",
-                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.5.sp,
                                         maxLines = 1
                                     )
                                 }
                             }
 
-                            Surface(
+                            FilledTonalButton(
+                                onClick = onStopMock,
                                 modifier = Modifier
-                                    .height(52.dp)
-                                    .liquidGlass(
-                                        isLiquidGlass = isLiquidGlass,
-                                        shape = RoundedCornerShape(16.dp),
-                                        elevation = 12.dp,
-                                        containerColor = MaterialTheme.colorScheme.error
-                                    )
-                                    .clickable { onStopMock() },
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.Transparent
+                                    .height(52.dp),
+                                shape = MaterialTheme.shapes.large,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .padding(horizontal = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Stop,
                                         contentDescription = null,
-                                        tint = Color.White,
                                         modifier = Modifier.size(15.dp)
                                     )
                                     Spacer(Modifier.width(3.dp))
                                     Text(
                                         text = "停止定位",
-                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.5.sp,
                                         maxLines = 1
                                     )
                                 }
                             }
                         }
                     } else {
-                        Surface(
+                        Button(
+                            onClick = onStartMock,
                             modifier = Modifier
-                                .height(52.dp)
-                                .liquidGlass(
-                                    isLiquidGlass = isLiquidGlass,
-                                    shape = RoundedCornerShape(16.dp),
-                                    elevation = 12.dp,
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                )
-                                .clickable { onStartMock() },
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.Transparent
+                                .height(52.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp)
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(5.dp))
                                 Text(
                                     // 术语统一：与功能页「开启虚拟定位」同一动词与状态名
                                     text = "开启虚拟定位",
-                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
                                     maxLines = 1
                                 )
                             }
@@ -584,14 +494,13 @@ fun LocationControlPanel(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 240.dp)
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(22.dp),
-                            elevation = 10.dp
-                        ),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color.Transparent
+                        .heightIn(max = 240.dp),
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
@@ -616,16 +525,16 @@ fun LocationControlPanel(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = item.name,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = item.address,
-                                        fontSize = 12.sp,
-                                        color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -640,7 +549,6 @@ fun LocationControlPanel(
                     isSearching = isSearching,
                     query = searchQuery,
                     resultCount = searchResults.size,
-                    isLiquidGlass = isLiquidGlass,
                     loadingText = "正在检索地点…",
                     emptyText = "未找到匹配的地点，换个关键词或直接在地图上点选"
                 )
@@ -652,12 +560,13 @@ fun LocationControlPanel(
                 enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                 exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
             ) {
-                // 设计稿 .loccard —— r20 / 白 4.5% 底 / 6% 描边
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color(0x0BFFFFFF),
-                    border = BorderStroke(1.dp, Color(0x0FFFFFFF))
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 2.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier
@@ -672,14 +581,22 @@ fun LocationControlPanel(
                         ) {
                             Surface(
                                 modifier = Modifier.size(44.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (isMockActive) AppSemanticColors.current.success.copy(0.2f) else MaterialTheme.colorScheme.primary.copy(0.16f)
+                                shape = MaterialTheme.shapes.large,
+                                color = if (isMockActive) {
+                                    AppSemanticColors.current.successContainer
+                                } else {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                }
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Place,
                                         contentDescription = null,
-                                        tint = if (isMockActive) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
+                                        tint = if (isMockActive) {
+                                            AppSemanticColors.current.onSuccessContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        },
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -703,10 +620,9 @@ fun LocationControlPanel(
                                 ) {
                                     Text(
                                         text = fullAddress,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 17.sp,
-                                        lineHeight = 23.sp,
-                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = if (addressExpanded) Int.MAX_VALUE else 2,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
@@ -725,7 +641,7 @@ fun LocationControlPanel(
                                 Text(
                                     text = "WGS-84 · ${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}",
                                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -745,12 +661,12 @@ fun LocationControlPanel(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = AppShapes.button,
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
                                 Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("复制坐标", fontSize = 12.5.sp, maxLines = 1)
+                                Text("复制坐标", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                             }
 
                             // Reset to real device location button
@@ -759,12 +675,17 @@ fun LocationControlPanel(
                                 modifier = Modifier
                                     .weight(1.1f)
                                     .height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = AppShapes.button,
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
                                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = AppSemanticColors.current.warning)
                                 Spacer(Modifier.width(5.dp))
-                                Text("真机复位", fontSize = 12.5.sp, color = AppSemanticColors.current.warning, maxLines = 1)
+                                Text(
+                                    "真机复位",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppSemanticColors.current.warning,
+                                    maxLines = 1
+                                )
                             }
 
                             // Bookmark button —— 明确是「地点」收藏，与路线收藏区分
@@ -773,13 +694,16 @@ fun LocationControlPanel(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = AppShapes.button,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
                                 Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("收藏地点", fontSize = 12.5.sp, maxLines = 1)
+                                Text("收藏地点", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                             }
                         }
                     }
@@ -797,14 +721,12 @@ fun LocationControlPanel(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 260.dp)
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(22.dp),
-                            elevation = 8.dp
-                        ),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color.Transparent
+                        .heightIn(max = 260.dp),
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 2.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier
@@ -821,16 +743,16 @@ fun LocationControlPanel(
                             ) {
                                 Text(
                                     "暂无收藏：在地图上选点后点「收藏地点」，或规划航线后点「收藏路线」",
-                                    fontSize = 12.sp,
-                                    color = if (isDark) Color.White.copy(0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         } else {
                             Text(
                                 text = "⭐ 收藏地点 (${savedLocations.size})",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp,
-                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             if (savedLocations.isEmpty()) {
                                 Text(
@@ -854,7 +776,6 @@ fun LocationControlPanel(
                                                 route.waypoints.firstOrNull()?.longitude ?: 0.0
                                             ),
                                             icon = Icons.Default.Place,
-                                            isDark = isDark,
                                             onClick = { onSelectSavedRoute(route) }
                                         )
                                     }
@@ -864,9 +785,9 @@ fun LocationControlPanel(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = "🧭 收藏路线 (${savedTracks.size})",
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp,
-                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             if (savedTracks.isEmpty()) {
                                 Text(
@@ -887,7 +808,6 @@ fun LocationControlPanel(
                                             name = route.name,
                                             trailing = "%.2f km".format(route.totalDistanceKm),
                                             icon = Icons.Default.Route,
-                                            isDark = isDark,
                                             onClick = { onSelectSavedRoute(route) }
                                         )
                                     }
@@ -898,7 +818,8 @@ fun LocationControlPanel(
                 }
             }
         }
-    }  // IosGlassDock
+        }
+    }
 }
 
 /** 收藏条目行 —— 48dp 触区，名称省略、右侧数值等宽。 */
@@ -907,14 +828,13 @@ private fun SavedEntryRow(
     name: String,
     trailing: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isDark: Boolean,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .minTouchTarget(minHeight = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -928,9 +848,9 @@ private fun SavedEntryRow(
         Spacer(Modifier.width(8.dp))
         Text(
             text = name,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

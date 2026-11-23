@@ -1,9 +1,4 @@
 package com.mockrun.app.feature.mock
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.ui.text.font.FontFamily
-
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -15,28 +10,27 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -58,7 +52,6 @@ import com.mockrun.app.util.HookChannelPrefs
 import com.mockrun.app.util.InjectionModePrefs
 import com.mockrun.app.util.PermissionIssueType
 import com.mockrun.app.util.logFailure
-import androidx.compose.ui.text.style.TextAlign
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
 import com.mockrun.app.core.location.fingerprint.FingerprintCoordinator
@@ -282,18 +275,12 @@ fun LocationMockScreen(
     var showHelpSheet by remember { mutableStateOf(false) }
     var showWeChatGuideSheet by remember { mutableStateOf(false) }
 
-    val isLiquidGlass = LocalLiquidGlassEnabled.current
-
-    // 本页专属模糊源：AppBackground 铺底当源层，卡片玻璃采样它 ——
-    // 两者是同一个 Box 下的兄弟节点，不会自引用。
-    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
-
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.TopCenter
     ) {
-        AppBackground(hazeState = pageHaze)
-
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)
@@ -304,14 +291,14 @@ fun LocationMockScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
         // =====================================================================
-        // 1. 页面头（设计稿 .page-head：kicker + 30/800 大标题 + 状态徽标 + 版本芯片）
+        // 1. 页面头
         // =====================================================================
-        IosPageHead(
+        Md3PageHeader(
             kicker = "系统底层虚拟定位与全向漫游",
             title = "虚拟定位",
-            badgeText = if (isMockOn) "模拟生效中" else "待机中",
-            badgeRunning = isMockOn,
-            chipText = BuildConfig.VERSION_NAME
+            statusText = if (isMockOn) "模拟生效中" else "待机中",
+            statusTone = if (isMockOn) Md3Tone.SUCCESS else Md3Tone.NEUTRAL,
+            versionText = BuildConfig.VERSION_NAME
         )
 
         // =====================================================================
@@ -323,12 +310,12 @@ fun LocationMockScreen(
         // =====================================================================
         var showTroubleshootHint by remember { mutableStateOf(false) }
 
-        IosInsetGroupCard(hazeState = pageHaze) {
-            IosListRow(
+        Md3InsetCard {
+            Md3SettingRow(
                 title = "微信/打卡软件仍显示真实位置？",
                 subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
                 icon = Icons.Default.Info,
-                iconBackground = AppSemanticColors.current.warning,
+                tone = Md3Tone.WARNING,
                 trailingText = if (showTroubleshootHint) "收起" else "排查",
                 showChevron = !showTroubleshootHint,
                 onClick = { showTroubleshootHint = !showTroubleshootHint }
@@ -336,7 +323,7 @@ fun LocationMockScreen(
 
             AnimatedVisibility(visible = showTroubleshootHint) {
                 Column {
-                    IosHairlineDivider(startIndent = 58.dp)
+                    Md3InsetDivider(startIndent = 72.dp)
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(
                             text = "若目标应用仍读取到真实位置，通常是系统级 Wi‑Fi / 蓝牙背景扫描" +
@@ -346,9 +333,10 @@ fun LocationMockScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(10.dp))
-                        IosPrimaryButton(
+                        Md3PrimaryActionButton(
                             text = "查看完整排查指南",
-                            containerColor = AppSemanticColors.current.warning,
+                            containerColor = AppSemanticColors.current.warningContainer,
+                            contentColor = AppSemanticColors.current.onWarningContainer,
                             icon = Icons.Default.Build,
                             onClick = { showWeChatGuideSheet = true }
                         )
@@ -358,11 +346,11 @@ fun LocationMockScreen(
         }
 
         // =====================================================================
-        // 2. Target Location & Primary Master Controller (iOS Inset Group Card)
+        // 2. Target Location & Primary Master Controller
         // =====================================================================
-        IosSectionHeader("目标位置与主控")
+        Md3SectionHeader("目标位置与主控")
 
-        IosInsetGroupCard(hazeState = pageHaze) {
+        Md3InsetCard {
             // Address & Coordinate Detail Row
             Row(
                 modifier = Modifier
@@ -371,12 +359,17 @@ fun LocationMockScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(9.dp),
-                    color = MaterialTheme.colorScheme.error
+                    modifier = Modifier.size(40.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Default.Place, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Place,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -384,9 +377,7 @@ fun LocationMockScreen(
                     Text(
                         text = currentAddress,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
@@ -428,13 +419,14 @@ fun LocationMockScreen(
                 }
             }
 
-            IosHairlineDivider(startIndent = 16.dp)
+            Md3InsetDivider()
 
             // Master Control Button
             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                IosPrimaryButton(
+                Md3PrimaryActionButton(
                     text = if (isMockOn) "停止虚拟定位" else "开启虚拟定位",
                     containerColor = if (isMockOn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    contentColor = if (isMockOn) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
                     icon = if (isMockOn) Icons.Default.Close else Icons.Default.PlayArrow,
                     onClick = {
                         if (isMockOn) {
@@ -460,26 +452,26 @@ fun LocationMockScreen(
                 )
             }
 
-            IosHairlineDivider(startIndent = 16.dp)
+            Md3InsetDivider()
 
             // Map Picker Row
-            IosListRow(
+            Md3SettingRow(
                 title = "地图精准选点",
                 subtitle = "在交互式底图上任意点选或手绘连线",
                 icon = Icons.Default.LocationOn,
-                iconBackground = MaterialTheme.colorScheme.primary,
+                tone = Md3Tone.PRIMARY,
                 showChevron = true,
                 onClick = onNavigateToMap
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Reset to Real Physical Location Row
-            IosListRow(
+            Md3SettingRow(
                 title = "重置为真机物理位置",
                 subtitle = "复位并跳转至地图显示当前真实 GPS 定位",
                 icon = Icons.Default.Refresh,
-                iconBackground = MaterialTheme.colorScheme.primary,
+                tone = Md3Tone.PRIMARY,
                 showChevron = true,
                 onClick = {
                     if (isPointMockActive) {
@@ -509,14 +501,15 @@ fun LocationMockScreen(
         // =====================================================================
         // 2.5 环境指纹（实地采集 Wi-Fi / 基站 / 蓝牙，之后在虚拟点回放）
         // =====================================================================
-        IosGroupHeader(
+        Md3GroupHeader(
             title = "环境指纹",
             count = fingerprintIds.size.takeIf { it > 0 },
             linkText = "实地采集",
-            onLinkClick = onTriggerFingerprintCapture
+            onLinkClick = onTriggerFingerprintCapture,
+            linkIcon = Icons.Default.Add
         )
 
-        IosInsetGroupCard(hazeState = pageHaze) {
+        Md3InsetCard {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
                     text = "在目标地点实地采集周边的 Wi-Fi、基站、蓝牙快照，" +
@@ -536,9 +529,10 @@ fun LocationMockScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                IosPrimaryButton(
+                Md3PrimaryActionButton(
                     text = "采集当前地点",
                     containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = Icons.Filled.Wifi,
                     loading = isCapturingFingerprint,
                     loadingText = "采集中…",
@@ -563,7 +557,7 @@ fun LocationMockScreen(
                     // 原实现只在非空时渲染列表，没有指纹时页面上只有一段说明，
                     // 用户看不出"还没有采集过"还是"采集失败了"。
                     Spacer(Modifier.height(14.dp))
-                    IosHairlineDivider(startIndent = 0.dp)
+                    Md3InsetDivider()
                     Spacer(Modifier.height(14.dp))
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -584,110 +578,106 @@ fun LocationMockScreen(
                     }
                 } else {
                     Spacer(Modifier.height(12.dp))
-                    IosHairlineDivider(startIndent = 0.dp)
+                    Md3InsetDivider()
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = "已保存 (${fingerprintIds.size})".uppercase(),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
 
                     fingerprintIds.forEach { fid ->
                         val isActiveFp = fid == activeFingerprintId
                         val detail = fingerprintDetails[fid]
-                        Column(
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isActiveFp) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                    else Color.Transparent
-                                )
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = fid,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    // 采集时间与坐标让用户能认出"这是哪个地点采的"。
-                                    // 坐标是回放时重标定 RSSI 的输入，不是装饰元数据。
-                                    detail?.let { fp ->
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = formatCapturedAt(fp.capturedAt) +
-                                                " · ${"%.5f".format(fp.originLat)}, ${"%.5f".format(fp.originLon)}",
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                                            color = MaterialTheme.colorScheme.outline,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    fingerprintSummaries[fid]?.takeIf { it.isNotBlank() }?.let {
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                if (isActiveFp) {
-                                    IosStatusBadge(
-                                        text = "已启用",
-                                        running = true,
-                                        tone = IosBadgeTone.RUNNING
-                                    )
-                                }
+                                .padding(vertical = 2.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isActiveFp) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                Color.Transparent
                             }
-
-                            Spacer(Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // 「已启用」不再是一个既能看状态又能反向停用的按钮，
-                                // 状态归状态徽章，动作归动作按钮，避免误读与误触。
-                                IosGhostButton(
-                                    text = if (isActiveFp) "停用" else "启用",
-                                    modifier = Modifier.weight(1f),
-                                    height = 48.dp,
-                                    onClick = {
-                                        if (isActiveFp) {
-                                            FingerprintCoordinator.deactivate(context)
-                                            activeFingerprintId = null
-                                            Toast.makeText(context, "已停用环境指纹", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            val ok = FingerprintCoordinator.activate(context, fid)
-                                            activeFingerprintId = if (ok) fid else null
-                                            Toast.makeText(
-                                                context,
-                                                if (ok) "已启用 $fid"
-                                                else "导出失败：需要 root 写入 /data/local/tmp",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = fid,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        // 采集时间与坐标让用户能认出"这是哪个地点采的"。
+                                        // 坐标是回放时重标定 RSSI 的输入，不是装饰元数据。
+                                        detail?.let { fp ->
+                                            Spacer(Modifier.height(2.dp))
+                                            Text(
+                                                text = formatCapturedAt(fp.capturedAt) +
+                                                    " · ${"%.5f".format(fp.originLat)}, ${"%.5f".format(fp.originLon)}",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                                color = MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+                                        fingerprintSummaries[fid]?.takeIf { it.isNotBlank() }?.let {
+                                            Spacer(Modifier.height(2.dp))
+                                            Text(
+                                                text = it,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
                                     }
-                                )
 
-                                IosGhostButton(
-                                    text = "删除",
-                                    contentColor = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.weight(1f),
-                                    height = 48.dp,
-                                    onClick = {
-                                        pendingDeleteFingerprintId = fid
+                                    if (isActiveFp) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Md3StatusBadge(
+                                            text = "已启用",
+                                            tone = Md3Tone.SUCCESS
+                                        )
                                     }
-                                )
+                                }
+
+                                Spacer(Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 「已启用」不再是一个既能看状态又能反向停用的按钮，
+                                    // 状态归状态徽章，动作归动作按钮，避免误读与误触。
+                                    Md3OutlinedActionButton(
+                                        text = if (isActiveFp) "停用" else "启用",
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            if (isActiveFp) {
+                                                FingerprintCoordinator.deactivate(context)
+                                                activeFingerprintId = null
+                                                Toast.makeText(context, "已停用环境指纹", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                val ok = FingerprintCoordinator.activate(context, fid)
+                                                activeFingerprintId = if (ok) fid else null
+                                                Toast.makeText(
+                                                    context,
+                                                    if (ok) "已启用 $fid"
+                                                    else "导出失败：需要 root 写入 /data/local/tmp",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    )
+
+                                    Md3OutlinedActionButton(
+                                        text = "删除",
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            pendingDeleteFingerprintId = fid
+                                        }
+                                    )
+                                }
                             }
                         }
 
@@ -702,16 +692,17 @@ fun LocationMockScreen(
         Spacer(Modifier.height(20.dp))
 
         // =====================================================================
-        // 3. Multi-Target Per-App Virtualization Routing (iOS Inset Group Card)
+        // 3. Multi-Target Per-App Virtualization Routing
         // =====================================================================
-        IosGroupHeader(
+        Md3GroupHeader(
             title = "多应用独立分流",
             count = multiTargetRules.size,
             linkText = "添加分流应用",
-            onLinkClick = { showAppPickerSheet = true }
+            onLinkClick = { showAppPickerSheet = true },
+            linkIcon = Icons.Default.Add
         )
 
-        IosInsetGroupCard(hazeState = pageHaze) {
+        Md3InsetCard {
             if (multiTargetRules.isEmpty()) {
                 Column(
                     modifier = Modifier
@@ -734,16 +725,20 @@ fun LocationMockScreen(
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { showAppPickerSheet = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(13.dp)
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.small,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
-                        Text("+ 添加分流应用", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text("+ 添加分流应用", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             } else {
                 multiTargetRules.forEachIndexed { index, rule ->
                     if (index > 0) {
-                        IosHairlineDivider(startIndent = 58.dp)
+                        Md3InsetDivider(startIndent = 72.dp)
                     }
                     MultiTargetRuleItemRow(
                         rule = rule,
@@ -767,18 +762,18 @@ fun LocationMockScreen(
         }
 
         // =====================================================================
-        // 3. Floating Joystick Controller (iOS Inset Group Card)
+        // 3. Floating Joystick Controller
         // =====================================================================
-        IosSectionHeader("悬浮摇杆漫游")
+        Md3SectionHeader("悬浮摇杆漫游")
 
-        IosInsetGroupCard(hazeState = pageHaze) {
-            IosListRow(
+        Md3InsetCard {
+            Md3SettingRow(
                 title = "桌面万向悬浮摇杆",
                 subtitle = "常驻桌面浮窗，八方向实时移动",
                 icon = Icons.Default.ThumbUp,
-                iconBackground = AppSemanticColors.current.warning,
+                tone = Md3Tone.WARNING,
                 trailingContent = {
-                    IosSwitch(
+                    Switch(
                         checked = isJoystickRunning,
                         onCheckedChange = { checked ->
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
@@ -798,14 +793,15 @@ fun LocationMockScreen(
                                     Toast.makeText(context, "万向悬浮摇杆已关闭", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                        }
+                        },
+                        modifier = Modifier.minTouchTarget()
                     )
                 }
             )
 
             AnimatedVisibility(visible = isJoystickRunning) {
                 Column {
-                    IosHairlineDivider(startIndent = 58.dp)
+                    Md3InsetDivider(startIndent = 72.dp)
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -837,19 +833,18 @@ fun LocationMockScreen(
         }
 
         // =====================================================================
-        // 4. System Shield & Health Matrix (iOS Inset Grouped Table)
+        // 4. System Shield & Health Matrix
         // =====================================================================
-        IosGroupHeader(
+        Md3GroupHeader(
             title = "系统防护与保活状态",
             linkText = "使用指南",
             onLinkClick = { showHelpSheet = true },
-            // 「使用指南」不是新增动作，去掉默认的加号图标
             linkIcon = null
         )
 
-        IosInsetGroupCard(hazeState = pageHaze) {
+        Md3InsetCard {
             // Item 0: Developer Options Mock Location App Check
-            IosListRow(
+            Md3SettingRow(
                 title = "开发者选项模拟位置",
                 subtitle = when {
                     isRootMode && isDevMockLocationEnabled -> "Root 已自动授权 · 本应用为系统模拟位置信息应用"
@@ -858,7 +853,7 @@ fun LocationMockScreen(
                     else -> "未勾选 · 点击前往【开发者选项】勾选"
                 },
                 icon = Icons.Default.Settings,
-                iconBackground = if (isDevMockLocationEnabled) AppSemanticColors.current.success else AppSemanticColors.current.warning,
+                tone = if (isDevMockLocationEnabled) Md3Tone.SUCCESS else Md3Tone.WARNING,
                 trailingText = if (isDevMockLocationEnabled) "已勾选" else "未勾选",
                 showChevron = !isDevMockLocationEnabled && !isRootMode,
                 onClick = {
@@ -883,16 +878,16 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 0.5: Injection Mode Switch (Root vs No-Root)
-            IosListRow(
+            Md3SettingRow(
                 title = "Root 注入模式",
                 subtitle = if (isRootMode) "已开启：自动配置模拟权限与硬件高精度定位" else "免 Root：仅依赖开发者选项模拟位置，不调用 Root",
                 icon = Icons.Default.Lock,
-                iconBackground = if (isRootMode) AppSemanticColors.current.success else AppSemanticColors.current.warning,
+                tone = if (isRootMode) Md3Tone.SUCCESS else Md3Tone.WARNING,
                 trailingContent = {
-                    IosSwitch(
+                    Switch(
                         checked = isRootMode,
                         onCheckedChange = { enabled ->
                             if (enabled) {
@@ -919,15 +914,16 @@ fun LocationMockScreen(
                                 }
                                 Toast.makeText(context, "已切换为免 Root 注入模式", Toast.LENGTH_SHORT).show()
                             }
-                        }
+                        },
+                        modifier = Modifier.minTouchTarget()
                     )
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 1: LSPosed
-            IosListRow(
+            Md3SettingRow(
                 title = "LSPosed 系统框架",
                 subtitle = if (isLsposedHookActive) {
                     "system_server 框架拦截 · 运行中；系统定位服务与目标应用仍需加入 scope"
@@ -935,7 +931,7 @@ fun LocationMockScreen(
                     "模块未激活 · 请在 LSPosed 中勾选系统框架、系统定位服务和目标应用并重启手机"
                 },
                 icon = Icons.Default.Build,
-                iconBackground = if (isLsposedHookActive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
+                tone = if (isLsposedHookActive) Md3Tone.TERTIARY else Md3Tone.NEUTRAL,
                 trailingText = if (isLsposedHookActive) "已接管系统框架" else "未勾选",
                 showChevron = true,
                 onClick = {
@@ -948,10 +944,10 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 2: Root
-            IosListRow(
+            Md3SettingRow(
                 title = "Root 权限状态",
                 subtitle = when {
                     isRootMode && isRootAvailable -> "已授权 · 硬件高精度模式"
@@ -959,7 +955,7 @@ fun LocationMockScreen(
                     else -> "免 Root 模式 · 仅开发者选项模拟位置"
                 },
                 icon = Icons.Default.CheckCircle,
-                iconBackground = if (isRootMode && isRootAvailable) AppSemanticColors.current.success else AppSemanticColors.current.warning,
+                tone = if (isRootMode && isRootAvailable) Md3Tone.SUCCESS else Md3Tone.WARNING,
                 trailingText = when {
                     isRootMode && isRootAvailable -> "已授权"
                     isRootMode && !isRootAvailable -> "未检测到"
@@ -981,23 +977,23 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 2.5: 注入通道（与上面的「Root / 免 Root」正交的第二个维度）
             //
             // 上面那一项决定「怎么拿到注入许可」，这一项决定「hook 走哪条路送到目标进程」。
             // 分开的理由见 util/HookChannel.kt 的注释：两条通道的成功判据、失败面、
             // 停机清理方式完全不同，不能混在同一个开关里。
-            IosListRow(
+            Md3SettingRow(
                 title = "注入通道",
                 subtitle = when (hookChannel) {
                     HookChannel.LSPOSED -> "LSPosed 框架层（高级/实验）：需已激活并勾选系统框架；部分设备可能无效"
                     HookChannel.PROVIDER, HookChannel.AUTO -> "系统 MockProvider（默认）：兼容性最好；不向 LSPosed 发布配置，无坐标残留"
                 },
                 icon = Icons.Default.Tune,
-                iconBackground = when (hookChannel) {
-                    HookChannel.LSPOSED -> MaterialTheme.colorScheme.tertiary
-                    HookChannel.PROVIDER, HookChannel.AUTO -> AppSemanticColors.current.warning
+                tone = when (hookChannel) {
+                    HookChannel.LSPOSED -> Md3Tone.TERTIARY
+                    HookChannel.PROVIDER, HookChannel.AUTO -> Md3Tone.WARNING
                 },
                 trailingText = HookChannelPrefs.shortLabel(hookChannel),
                 showChevron = true,
@@ -1018,16 +1014,16 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 3: Notification
             // 注意：这里只能证明「通知权限已允许」，不能证明前台服务正在运行。
             // 原文案用「运行中」把权限状态说成了服务状态，属于过度承诺，已改正。
-            IosListRow(
+            Md3SettingRow(
                 title = "常驻前台通知",
                 subtitle = if (areNotificationsEnabled) "通知已允许 · 可提升后台留存" else "未开启通知保护 (易被系统清理)",
                 icon = Icons.Default.Notifications,
-                iconBackground = if (areNotificationsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                tone = if (areNotificationsEnabled) Md3Tone.PRIMARY else Md3Tone.ERROR,
                 trailingText = if (areNotificationsEnabled) "已允许" else "去开启",
                 showChevron = !areNotificationsEnabled,
                 onClick = {
@@ -1045,14 +1041,14 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
             // Item 4: Battery Optimization
-            IosListRow(
+            Md3SettingRow(
                 title = "电池优化策略",
                 subtitle = if (isBatteryIgnoring) "已豁免系统省电策略，保障持续注入" else "建议加入白名单避免被系统挂起",
                 icon = Icons.Default.Favorite,
-                iconBackground = if (isBatteryIgnoring) AppSemanticColors.current.success else AppSemanticColors.current.warning,
+                tone = if (isBatteryIgnoring) Md3Tone.SUCCESS else Md3Tone.WARNING,
                 trailingText = if (isBatteryIgnoring) "已加入白名单" else "申请豁免",
                 showChevron = !isBatteryIgnoring,
                 onClick = {
@@ -1064,17 +1060,16 @@ fun LocationMockScreen(
         // Background Keep-Alive & Anti-Kill Management
         Text(
             text = "后台保活与防杀配置 · ${KeepAliveHelper.getDeviceBrandName()}".uppercase(),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
         )
-        IosInsetGroupCard(hazeState = pageHaze) {
-            IosListRow(
+        Md3InsetCard {
+            Md3SettingRow(
                 title = "应用自启动管理",
                 subtitle = "跳转当前系统启动管理，允许 Fake GPS 自启动与关联启动",
                 icon = Icons.Default.PlayArrow,
-                iconBackground = MaterialTheme.colorScheme.primary,
+                tone = Md3Tone.PRIMARY,
                 trailingText = "去设置",
                 showChevron = true,
                 onClick = {
@@ -1085,13 +1080,13 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
-            IosListRow(
+            Md3SettingRow(
                 title = "多任务卡片加锁保护",
                 subtitle = "防止在多任务列表划掉或一键清理时被系统误杀",
                 icon = Icons.Default.Lock,
-                iconBackground = MaterialTheme.colorScheme.secondary,
+                tone = Md3Tone.SECONDARY,
                 trailingText = "查看指南",
                 showChevron = true,
                 onClick = {
@@ -1099,13 +1094,13 @@ fun LocationMockScreen(
                 }
             )
 
-            IosHairlineDivider(startIndent = 58.dp)
+            Md3InsetDivider(startIndent = 72.dp)
 
-            IosListRow(
+            Md3SettingRow(
                 title = "系统应用详情与权限",
                 subtitle = "管理悬浮窗、通知与后台高耗电权限",
                 icon = Icons.Default.Settings,
-                iconBackground = MaterialTheme.colorScheme.outline,
+                tone = Md3Tone.NEUTRAL,
                 trailingText = "打开设置",
                 showChevron = true,
                 onClick = {
@@ -1115,12 +1110,12 @@ fun LocationMockScreen(
         }
 
         // Root One-Click Anti-Flashback Optimization
-        IosInsetGroupCard(hazeState = pageHaze) {
-            IosListRow(
+        Md3InsetCard {
+            Md3SettingRow(
                 title = "恢复系统高精度定位",
                 subtitle = if (isRootMode && isRootAvailable) "配置模拟权限与 Wi-Fi/蓝牙辅助定位" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",
                 icon = Icons.Default.Build,
-                iconBackground = if (isRootMode && isRootAvailable) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
+                tone = if (isRootMode && isRootAvailable) Md3Tone.SUCCESS else Md3Tone.PRIMARY,
                 trailingText = if (isRootMode && isRootAvailable) "立即配置" else "使用指南",
                 showChevron = true,
                 onClick = {
@@ -1298,7 +1293,7 @@ fun LocationMockScreen(
                     pendingDeleteFingerprintId = null
                     Toast.makeText(context, "已删除 $fid", Toast.LENGTH_SHORT).show()
                 }) {
-                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text("删除", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -1306,6 +1301,423 @@ fun LocationMockScreen(
                     Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        )
+    }
+}
+
+private enum class Md3Tone {
+    PRIMARY,
+    SECONDARY,
+    TERTIARY,
+    SUCCESS,
+    WARNING,
+    ERROR,
+    NEUTRAL
+}
+
+@Composable
+private fun md3ToneContainer(tone: Md3Tone): Color {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    return when (tone) {
+        Md3Tone.PRIMARY -> scheme.primaryContainer
+        Md3Tone.SECONDARY -> scheme.secondaryContainer
+        Md3Tone.TERTIARY -> scheme.tertiaryContainer
+        Md3Tone.SUCCESS -> semantic.successContainer
+        Md3Tone.WARNING -> semantic.warningContainer
+        Md3Tone.ERROR -> scheme.errorContainer
+        Md3Tone.NEUTRAL -> scheme.surfaceContainerHighest
+    }
+}
+
+@Composable
+private fun md3ToneContent(tone: Md3Tone): Color {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    return when (tone) {
+        Md3Tone.PRIMARY -> scheme.onPrimaryContainer
+        Md3Tone.SECONDARY -> scheme.onSecondaryContainer
+        Md3Tone.TERTIARY -> scheme.onTertiaryContainer
+        Md3Tone.SUCCESS -> semantic.onSuccessContainer
+        Md3Tone.WARNING -> semantic.onWarningContainer
+        Md3Tone.ERROR -> scheme.onErrorContainer
+        Md3Tone.NEUTRAL -> scheme.onSurfaceVariant
+    }
+}
+
+@Composable
+private fun md3ToneAccent(tone: Md3Tone): Color {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    return when (tone) {
+        Md3Tone.PRIMARY -> scheme.primary
+        Md3Tone.SECONDARY -> scheme.secondary
+        Md3Tone.TERTIARY -> scheme.tertiary
+        Md3Tone.SUCCESS -> semantic.success
+        Md3Tone.WARNING -> semantic.warning
+        Md3Tone.ERROR -> scheme.error
+        Md3Tone.NEUTRAL -> scheme.onSurfaceVariant
+    }
+}
+
+@Composable
+private fun Md3PageHeader(
+    kicker: String,
+    title: String,
+    statusText: String,
+    statusTone: Md3Tone,
+    versionText: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 16.dp, top = 20.dp, bottom = 4.dp)
+    ) {
+        Text(
+            text = kicker,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Md3StatusBadge(text = statusText, tone = statusTone)
+            Md3VersionChip(text = versionText)
+        }
+    }
+}
+
+@Composable
+private fun Md3SectionHeader(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun Md3GroupHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    count: Int? = null,
+    linkText: String? = null,
+    onLinkClick: (() -> Unit)? = null,
+    linkIcon: ImageVector? = null
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (count != null) {
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ) {
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+        if (linkText != null && onLinkClick != null) {
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = onLinkClick) {
+                if (linkIcon != null) {
+                    Icon(
+                        imageVector = linkIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    text = linkText,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Md3InsetCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    OutlinedCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun Md3InsetDivider(
+    startIndent: Dp = 0.dp,
+    modifier: Modifier = Modifier
+) {
+    HorizontalDivider(
+        modifier = modifier.padding(start = startIndent),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
+}
+
+@Composable
+private fun Md3StatusBadge(
+    text: String,
+    tone: Md3Tone,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = md3ToneContainer(tone)
+    val contentColor = md3ToneContent(tone)
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = containerColor,
+        contentColor = contentColor
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(8.dp),
+                shape = CircleShape,
+                color = md3ToneAccent(tone)
+            ) {}
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun Md3VersionChip(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
+    }
+}
+
+@Composable
+private fun Md3SettingRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    tone: Md3Tone,
+    modifier: Modifier = Modifier,
+    trailingText: String? = null,
+    showChevron: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null
+) {
+    val rowModifier = if (onClick != null) {
+        modifier
+            .fillMaxWidth()
+            .minTouchTarget()
+            .clickable(onClick = onClick)
+    } else {
+        modifier.fillMaxWidth()
+    }
+
+    ListItem(
+        modifier = rowModifier,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = md3ToneContainer(tone)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = md3ToneContent(tone),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        headlineContent = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        supportingContent = if (subtitle.isNotBlank()) {
+            {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            null
+        },
+        trailingContent = if (
+            trailingText != null || trailingContent != null || showChevron
+        ) {
+            {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (trailingText != null) {
+                        Text(
+                            text = trailingText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = md3ToneAccent(tone),
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.widthIn(max = 104.dp)
+                        )
+                    }
+                    trailingContent?.invoke()
+                    if (showChevron) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            null
+        }
+    )
+}
+
+@Composable
+private fun Md3PrimaryActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    loadingText: String? = null
+) {
+    val clickable = enabled && !loading
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        enabled = clickable,
+        shape = MaterialTheme.shapes.small,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = contentColor
+            )
+            Spacer(Modifier.width(10.dp))
+        } else if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(
+            text = if (loading) loadingText ?: text else text,
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun Md3OutlinedActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentColor: Color = MaterialTheme.colorScheme.primary,
+    icon: ImageVector? = null
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp),
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge
         )
     }
 }

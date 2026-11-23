@@ -1,11 +1,6 @@
 package com.mockrun.app.feature.disclaimer
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -21,13 +17,17 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,15 +39,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.core.designsystem.AppSpacing
-import com.mockrun.app.core.designsystem.IosPrimaryButton
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
@@ -287,18 +286,17 @@ fun DisclaimerGateScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     // 把待输入的短语显著展示出来，避免用户猜测或复制困难
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(AppShapes.chip)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
                         Text(
                             text = DisclaimerPrefs.requiredPhrase,
                             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                         )
                     }
                     Spacer(Modifier.height(10.dp))
@@ -326,33 +324,51 @@ fun DisclaimerGateScreen(
 
                 Spacer(Modifier.height(14.dp))
 
-                IosPrimaryButton(
-                    text = "确认并继续",
-                    containerColor = if (inputMatches) AppSemanticColors.current.success else MaterialTheme.colorScheme.outline,
-                    icon = if (inputMatches) Icons.Default.CheckCircle else null,
+                Button(
                     enabled = reachedBottom && inputMatches,
                     onClick = {
                         if (inputMatches) onAccepted() else showMismatch = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppSemanticColors.current.success,
+                        contentColor = AppSemanticColors.current.onSuccess,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    if (inputMatches) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
                     }
-                )
+                    Text(
+                        text = "确认并继续",
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 2
+                    )
+                }
 
                 Spacer(Modifier.height(8.dp))
 
                 // 不同意也必须是一个可达的出口，而不是让用户卡死在这个页面
-                Box(
+                OutlinedButton(
+                    onClick = onDecline,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(AppShapes.button)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, AppShapes.button)
-                        .clickable(onClick = onDecline),
-                    contentAlignment = Alignment.Center
+                        .heightIn(min = 48.dp)
                 ) {
                     Text(
                         text = "不同意，退出应用",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
                     )
                 }
             }

@@ -1,15 +1,10 @@
 package com.mockrun.app.feature.track
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.foundation.clickable
 
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -17,9 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.data.db.TrackSummary
 import com.mockrun.app.core.designsystem.*
@@ -73,13 +68,7 @@ fun TrackRecordScreen(
                     .padding(start = 8.dp, end = 16.dp, top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .minTouchTarget()
-                        .clip(CircleShape)
-                        .clickable(onClick = onClose),
-                    contentAlignment = Alignment.Center
-                ) {
+                IconButton(onClick = onClose) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
@@ -90,7 +79,7 @@ fun TrackRecordScreen(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     "轨迹录制",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
@@ -104,7 +93,13 @@ fun TrackRecordScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    IosInsetGroupCard(isLiquidGlass = false) {
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 if (isRecording) "● 录制中" else "未在录制",
@@ -122,12 +117,11 @@ fun TrackRecordScreen(
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "不需要 Root。屏幕可以关，手机放口袋即可；从最近任务划掉不会丢数据。",
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(12.dp))
-                            IosPrimaryButton(
-                                text = if (isRecording) "停止并保存" else "开始录制",
+                            Button(
                                 onClick = {
                                     if (isRecording) {
                                         trackViewModel.stop(context)
@@ -136,8 +130,31 @@ fun TrackRecordScreen(
                                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                         }
                                     }
-                                }
-                            )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = MaterialTheme.shapes.large,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isRecording) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    contentColor = if (isRecording) {
+                                        MaterialTheme.colorScheme.onError
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    }
+                                ),
+                                contentPadding = PaddingValues(horizontal = 16.dp)
+                            ) {
+                                Text(
+                                    text = if (isRecording) "停止并保存" else "开始录制",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
@@ -145,7 +162,7 @@ fun TrackRecordScreen(
                 item {
                     Text(
                         "已录轨迹（${tracks.size}）",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                     )
@@ -155,7 +172,7 @@ fun TrackRecordScreen(
                     item {
                         Text(
                             "还没有录制过轨迹。走一遍没有路网的地方（操场、小区），回来就能把它变成巡航路线。",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
@@ -163,15 +180,23 @@ fun TrackRecordScreen(
                 }
 
                 items(tracks, key = { it.id }) { track ->
-                    IosInsetGroupCard(isLiquidGlass = false) {
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     track.name,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 if (track.isFavorite) {
                                     Icon(
@@ -198,28 +223,61 @@ fun TrackRecordScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(10.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { trackViewModel.toggleFavorite(track) }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { trackViewModel.toggleFavorite(track) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    contentPadding = PaddingValues(horizontal = 6.dp)
+                                ) {
                                     Text(
                                         if (track.isFavorite) "取消收藏" else "收藏",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelLarge,
                                         maxLines = 1
                                     )
                                 }
-                                OutlinedButton(onClick = {
-                                    trackViewModel.convertToRoute(track) { route ->
-                                        if (route != null) {
-                                            Toast.makeText(context, "已生成路线「${route.name}」", Toast.LENGTH_SHORT).show()
-                                            onRouteCreated(route)
-                                        } else {
-                                            Toast.makeText(context, "轨迹点数不足，无法生成路线", Toast.LENGTH_SHORT).show()
+                                OutlinedButton(
+                                    onClick = {
+                                        trackViewModel.convertToRoute(track) { route ->
+                                            if (route != null) {
+                                                Toast.makeText(context, "已生成路线「${route.name}」", Toast.LENGTH_SHORT).show()
+                                                onRouteCreated(route)
+                                            } else {
+                                                Toast.makeText(context, "轨迹点数不足，无法生成路线", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
-                                    }
-                                }) {
-                                    Text("转成路线", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    contentPadding = PaddingValues(horizontal = 6.dp)
+                                ) {
+                                    Text(
+                                        "转成路线",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 1
+                                    )
                                 }
-                                OutlinedButton(onClick = { trackViewModel.delete(track.id) }) {
-                                    Text("删除", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, maxLines = 1)
+                                OutlinedButton(
+                                    onClick = { trackViewModel.delete(track.id) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    contentPadding = PaddingValues(horizontal = 6.dp)
+                                ) {
+                                    Text(
+                                        "删除",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.error,
+                                        maxLines = 1
+                                    )
                                 }
                             }
                         }

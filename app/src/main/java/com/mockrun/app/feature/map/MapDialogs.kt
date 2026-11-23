@@ -1,79 +1,81 @@
 package com.mockrun.app.feature.map
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
 
-import android.content.Context
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.AddLocationAlt
-import androidx.compose.material.icons.rounded.CenterFocusStrong
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import com.mockrun.app.domain.model.Route
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.mockrun.app.domain.model.WayPoint
-import com.mockrun.app.core.location.CoordinateConverter
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.core.location.RoadMode
-import com.mockrun.app.core.location.RoadRouteResult
-import com.mockrun.app.core.location.SearchResultItem
-import com.mockrun.app.util.GeoTransform
-import com.mockrun.app.core.designsystem.*
+import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
+import com.mockrun.app.util.GeoTransform
 
-// =============================================================================
-// 弹窗 / 抽屉统一规范（全 App）
-// =============================================================================
-//   A. 短确认 / 短输入（重命名、删除确认、手动包名）→ AlertDialog，圆角 24dp
-//   B. 长表单 / 长列表（搜索、道路规划、收藏、应用选择）→ ModalBottomSheet，顶角 32dp
-//   C. 品牌更新对话框 → Dialog，圆角 28dp（唯一例外，见 AppUpdateDialog）
-//
-//   三条共用的细则：
-//     1. 底板统一 MaterialTheme.colorScheme.surfaceContainer
-//     2. 标题 MaterialTheme.typography.titleMedium + Bold + MaterialTheme.colorScheme.onSurface；副标题 MaterialTheme.typography.labelMedium
-//     3. 所有可点击元素 ≥48dp 触区（Modifier.minTouchTarget() 放在 bouncyClickable 外层）
-//     4. 内容超出可视区一律可滚动，输入区补 imePadding()
-// =============================================================================
-
-/** 长表单 / 长列表 sheet 的顶角圆角 —— 规范 B 的唯一取值。 */
-private val SheetCorner = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-
-/** 统一拖拽把手 —— 四个 sheet 共用同一几何。 */
-@Composable
-private fun SheetDragHandle() {
-    Surface(
-        modifier = Modifier
-            .padding(vertical = 10.dp)
-            .size(width = 36.dp, height = 5.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-    ) {}
-}
-
-/** sheet 标题行：左标题 + 右关闭（48dp 触区）。 */
+// Long-form dialogs use M3 modal bottom sheets and theme-owned surfaces.
 @Composable
 private fun SheetHeader(
     title: String,
@@ -84,50 +86,35 @@ private fun SheetHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle != null) {
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Box(
-            modifier = Modifier
-                .minTouchTarget()
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                .clickable(onClick = onClose),
-            contentAlignment = Alignment.Center
-        ) {
+        IconButton(onClick = onClose) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = "关闭",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
     }
 }
 
-/**
- * 可点击小胶囊 —— 视觉仍是紧凑 pill，热区由外层 Box 撑到 48dp。
- *
- * 若把 minTouchTarget 直接加在 pill 上，胶囊底板会被一起拉高到 48dp，
- * 观感变粗；这里把 bouncyClickable 放在外层 Box，视觉与热区解耦。
- */
 @Composable
 private fun TappableChip(
     text: String,
@@ -135,26 +122,29 @@ private fun TappableChip(
     onClick: () -> Unit,
     outlined: Boolean = false
 ) {
-    Box(
-        modifier = Modifier
-            .minTouchTarget()
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            shape = RoundedCornerShape(13.dp),
-            color = color.copy(alpha = 0.12f),
-            border = if (outlined) BorderStroke(0.5.dp, color.copy(alpha = 0.25f)) else null
-        ) {
+    AssistChip(
+        onClick = onClick,
+        label = {
             Text(
                 text = text,
-                color = color,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                style = MaterialTheme.typography.labelLarge
             )
+        },
+        shape = MaterialTheme.shapes.small,
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = if (outlined) {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            } else {
+                color.copy(alpha = 0.12f)
+            },
+            labelColor = color
+        ),
+        border = if (outlined) {
+            BorderStroke(1.dp, color.copy(alpha = 0.4f))
+        } else {
+            null
         }
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -179,8 +169,7 @@ fun SearchLocationDialog(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = SheetCorner,
-        dragHandle = { SheetDragHandle() }
+        shape = MaterialTheme.shapes.extraLarge
     ) {
         Column(
             modifier = Modifier
@@ -204,20 +193,22 @@ fun SearchLocationDialog(
                     mapViewModel.performSearch(it)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("输入地名/POI或经纬度(如 39.9, 116.4)", fontSize = 12.sp) },
+                placeholder = {
+                    Text(
+                        text = "输入地名/POI或经纬度(如 39.9, 116.4)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                textStyle = MaterialTheme.typography.bodyLarge,
+                shape = MaterialTheme.shapes.extraSmall,
                 trailingIcon = {
                     if (textInput.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .minTouchTarget()
-                                .clip(CircleShape)
-                                .clickable {
-                                    textInput = ""
-                                    mapViewModel.clearSearch()
-                                },
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = {
+                                textInput = ""
+                                mapViewModel.clearSearch()
+                            }
                         ) {
                             Icon(
                                 Icons.Default.Clear,
@@ -231,9 +222,13 @@ fun SearchLocationDialog(
             )
 
             // Quick Popular Shortcut Chips
-            Text("热门地点直达：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "热门地点直达：",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // 这些常量是**高德/腾讯地图上读到的 GCJ-02 值**（例：天安门 GCJ-02 ≈ 39.9087,116.3975，
@@ -262,7 +257,7 @@ fun SearchLocationDialog(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // Search Results or Loading
             if (isSearching) {
@@ -271,9 +266,14 @@ fun SearchLocationDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.5.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
                         Spacer(Modifier.height(8.dp))
-                        Text("正在联网检索地点信息...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "正在联网检索地点信息...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             } else if (searchResults.isNotEmpty()) {
@@ -282,11 +282,16 @@ fun SearchLocationDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(searchResults) { item ->
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                            shadowElevation = 1.dp,
+                        Card(
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
@@ -296,21 +301,25 @@ fun SearchLocationDialog(
                                 ) {
                                     Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
-                                Spacer(Modifier.height(2.dp))
+                                Spacer(Modifier.height(4.dp))
                                 Text(
                                     text = item.address,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Spacer(Modifier.height(4.dp))
-                                // 四个动作胶囊在窄屏 + 大字号下会超出一行（最小 48dp 触区
-                                // 把每个胶囊的下限抬到 48dp），用 FlowRow 折行保证都可达。
+                                Spacer(Modifier.height(8.dp))
                                 FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     TappableChip(
                                         text = "定位到此",
@@ -344,8 +353,9 @@ fun SearchLocationDialog(
                 ) {
                     Text(
                         "未找到相关地点，请尝试更通用的地名或输入坐标",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {
@@ -355,8 +365,9 @@ fun SearchLocationDialog(
                 ) {
                     Text(
                         "输入地名或直接粘贴经纬度即可全网智能联想定位",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -366,7 +377,7 @@ fun SearchLocationDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RoadRouteDialog(
     mapViewModel: MapViewModel,
@@ -401,8 +412,7 @@ fun RoadRouteDialog(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = SheetCorner,
-        dragHandle = { SheetDragHandle() }
+        shape = MaterialTheme.shapes.extraLarge
     ) {
         Column(
             modifier = Modifier
@@ -420,50 +430,61 @@ fun RoadRouteDialog(
             )
 
             // 1. Origin Card
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.size(10.dp).clip(CircleShape).background(AppSemanticColors.current.success)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        // 组合期取快照：roadOrigin 是 collectAsState() 委托，
-                        // 「清除」按钮会在点击时把它置为 null，
-                        // 而本行的 bouncyClickable lambda 稍后才重新读取 ——
-                        // 用 roadOrigin!! 会在这种情况下抛 KotlinNullPointerException。
-                        val origin = roadOrigin
-                        if (origin != null) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .minTouchTarget()
-                                        .clickable {
-                                            onNavigateToOrigin(origin.latitude, origin.longitude)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("定位", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(AppSemanticColors.current.success)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "起点 (Origin)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    // Snapshot the origin before the clear button can update the state.
+                    val origin = roadOrigin
+                    if (origin != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    onNavigateToOrigin(origin.latitude, origin.longitude)
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .minTouchTarget()
-                                        .clickable { mapViewModel.setRoadOrigin(null) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("清除", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
-                                }
+                            ) {
+                                Text(
+                                    text = "定位",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                            TextButton(
+                                onClick = { mapViewModel.setRoadOrigin(null) },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text(
+                                    text = "清除",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
                             }
                         }
                     }
@@ -471,11 +492,13 @@ fun RoadRouteDialog(
                     Text(
                         text = roadOrigin?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置起点",
                         style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (roadOrigin != null) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (roadOrigin != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         if (selectedTapPoint != null) {
                             TappableChip(
                                 text = "使用当前选点",
@@ -502,33 +525,49 @@ fun RoadRouteDialog(
             }
 
             // 2. Destination Card
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.size(10.dp).clip(CircleShape).background(AppSemanticColors.current.warning)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("终点 (Destination)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        if (roadDestination != null) {
-                            Box(
-                                modifier = Modifier
-                                    .minTouchTarget()
-                                    .clickable { mapViewModel.setRoadDestination(null) },
-                                contentAlignment = Alignment.Center
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(AppSemanticColors.current.warning)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "终点 (Destination)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (roadDestination != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = { mapViewModel.setRoadDestination(null) },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
                             ) {
-                                Text("清除", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = "清除",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
                             }
                         }
                     }
@@ -536,11 +575,13 @@ fun RoadRouteDialog(
                     Text(
                         text = roadDestination?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置终点",
                         style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (roadDestination != null) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (roadDestination != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         if (selectedTapPoint != null) {
                             TappableChip(
                                 text = "使用当前选点",
@@ -563,62 +604,48 @@ fun RoadRouteDialog(
                 }
             }
 
-            // 3. Transport Mode Selector (Segmented Control)
-            Text("出行方式 (道路拓扑权重)：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Surface(
+            // 3. Transport Mode Selector
+            Text(
+                text = "出行方式 (道路拓扑权重)：",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    RoadMode.values().forEach { mode ->
-                        val isSelected = mode == roadMode
-                        val isDark = LocalIosColors.current.isDark
-                        val activePillColor = if (isDark) Color(0xFF636366) else Color.White
-                        val activeTextColor = if (isDark) Color.White else Color.Black
-                        // 每段自带 48dp 热区：分段控件是主交互控件，
-                        // 34dp 的紧凑高度在拇指下命中率很差。
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .minTouchTarget()
-                                .clip(RoundedCornerShape(13.dp))
-                                .clickable { mapViewModel.setRoadMode(mode) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(13.dp),
-                                color = if (isSelected) activePillColor else Color.Transparent,
-                                shadowElevation = if (isSelected) 2.dp else 0.dp,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text(
-                                        text = "${mode.emoji} ${mode.label}",
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) activeTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
-                        }
-                    }
+                RoadMode.values().forEach { mode ->
+                    FilterChip(
+                        selected = mode == roadMode,
+                        onClick = { mapViewModel.setRoadMode(mode) },
+                        label = {
+                            Text(
+                                text = "${mode.emoji} ${mode.label}",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        },
+                        shape = MaterialTheme.shapes.small
+                    )
                 }
             }
 
             // 4. Speed Slider
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("模拟移动速度", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${speedSliderValue.toInt()} km/h", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "模拟移动速度",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${speedSliderValue.toInt()} km/h",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
             Slider(
                 value = speedSliderValue,
@@ -633,8 +660,7 @@ fun RoadRouteDialog(
             )
 
             // 5. Calculate Button
-            IosPrimaryButton(
-                text = "沿真实道路智能规划路线",
+            Button(
                 onClick = {
                     if (canPlan) {
                         mapViewModel.calculateRoadRoute { res ->
@@ -645,38 +671,72 @@ fun RoadRouteDialog(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                icon = Icons.Default.Route,
-                height = 50.dp,
                 enabled = canPlan && !isCalculatingRoute,
-                loading = isCalculatingRoute,
-                loadingText = "正在计算沿路折点..."
-            )
+            ) {
+                if (isCalculatingRoute) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = LocalContentColor.current
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "正在计算沿路折点...",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Route,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "沿真实道路智能规划路线",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
 
             // 6. Calculated Result Card & Start Simulation Action
             if (calculatedRoadResult != null) {
                 val result = calculatedRoadResult!!
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AppSemanticColors.current.success.copy(alpha = 0.12f),
-                    border = BorderStroke(0.5.dp, AppSemanticColors.current.success.copy(alpha = 0.3f)),
+                val semantic = AppSemanticColors.current
+                Card(
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(
+                        containerColor = semantic.successContainer,
+                        contentColor = semantic.onSuccessContainer
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        semantic.success.copy(alpha = 0.45f)
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(18.dp))
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = semantic.onSuccessContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(Modifier.width(6.dp))
-                            Text("路线已绘制至底图", fontWeight = FontWeight.Bold, color = AppSemanticColors.current.success, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = "路线已绘制至底图",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = semantic.onSuccessContainer
+                            )
                         }
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             "距离: ${"%.2f".format(result.distanceKm)} km · 预计耗时: ${"%.0f".format(result.durationMinutes)} 分钟 · 折点数: ${result.waypoints.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = semantic.onSuccessContainer
                         )
-                        Spacer(Modifier.height(10.dp))
-                        IosPrimaryButton(
-                            text = "立即开始沿路模拟",
+                        Spacer(Modifier.height(12.dp))
+                        Button(
                             onClick = {
                                 val route = Route(
                                     name = "沿路规划 (${result.mode.label} ${"%.1f".format(result.distanceKm)}km)",
@@ -687,10 +747,22 @@ fun RoadRouteDialog(
                                 Toast.makeText(context, "已开启沿真实道路模拟运动！", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            containerColor = AppSemanticColors.current.success,
-                            icon = Icons.AutoMirrored.Filled.DirectionsRun,
-                            height = 50.dp
-                        )
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = semantic.success,
+                                contentColor = semantic.onSuccess
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "立即开始沿路模拟",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                 }
             }

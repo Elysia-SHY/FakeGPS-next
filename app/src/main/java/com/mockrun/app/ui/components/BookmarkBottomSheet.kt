@@ -1,15 +1,10 @@
 package com.mockrun.app.ui.components
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -19,16 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.domain.model.Route
-import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.IosBadgeTone
-import com.mockrun.app.core.designsystem.IosStatusBadge
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.core.designsystem.minTouchTarget
+import com.mockrun.app.domain.model.Route
 
 /**
  * 收藏夹的两种视图。
@@ -41,7 +32,7 @@ enum class BookmarkKind { LOCATION, TRACK }
 /**
  * 右上角工具胶囊旁的收藏夹弹层。
  *
- * 弹窗规格：长列表 → ModalBottomSheet 顶角 32dp（规范 B）。
+ * 弹窗规格：长列表使用 Material 3 ModalBottomSheet。
  *
  * @param items 当前标签对应的收藏列表，已由调用方过滤。
  * @param selectedRouteId 用于标注「当前载入」的航线，地点收藏不参与该标记。
@@ -63,17 +54,7 @@ fun BookmarkBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        dragHandle = {
-            Surface(
-                modifier = Modifier
-                    .padding(vertical = 10.dp)
-                    .size(width = 36.dp, height = 5.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-            ) {}
-        }
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier
@@ -91,22 +72,40 @@ fun BookmarkBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (isLocation) "地点收藏" else "航线收藏",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = if (isLocation) "收藏本中的地点坐标，点按即可跳转定位" else "收藏本中的模拟航线，点按即可载入",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                IosStatusBadge(
-                    text = "${items.size} 条",
-                    tone = if (items.isEmpty()) null else IosBadgeTone.INFO
-                )
+                val badgeContainer = if (items.isEmpty()) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
+                val badgeContent = if (items.isEmpty()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = badgeContainer,
+                    contentColor = badgeContent
+                ) {
+                    Text(
+                        text = "${items.size} 条",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        maxLines = 1
+                    )
+                }
             }
 
             if (items.isEmpty()) {
@@ -119,8 +118,8 @@ fun BookmarkBottomSheet(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Surface(
-                            shape = RoundedCornerShape(22.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             modifier = Modifier.size(64.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -135,14 +134,14 @@ fun BookmarkBottomSheet(
                         Spacer(Modifier.height(12.dp))
                         Text(
                             text = if (isLocation) "还没有收藏地点" else "还没有收藏航线",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = if (isLocation) "在地图上选好位置后点「收藏此点」" else "在路线标签画好航线后点「收藏」",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -157,11 +156,9 @@ fun BookmarkBottomSheet(
                     items(items, key = { it.id }) { route ->
                         val isCurrent = !isLocation && selectedRouteId == route.id
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable { onSelect(route) },
-                            shape = RoundedCornerShape(16.dp),
+                            onClick = { onSelect(route) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large,
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             border = if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
                         ) {
@@ -173,18 +170,22 @@ fun BookmarkBottomSheet(
                             ) {
                                 Surface(
                                     modifier = Modifier.size(32.dp),
-                                    shape = AppShapes.icon,
+                                    shape = MaterialTheme.shapes.medium,
                                     color = if (isLocation) {
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                        MaterialTheme.colorScheme.primaryContainer
                                     } else {
-                                        AppSemanticColors.current.success.copy(alpha = 0.16f)
+                                        AppSemanticColors.current.successContainer
                                     }
                                 ) {
                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                         Icon(
                                             imageVector = if (isLocation) Icons.Default.Place else Icons.Default.Route,
                                             contentDescription = null,
-                                            tint = if (isLocation) MaterialTheme.colorScheme.primary else AppSemanticColors.current.success,
+                                            tint = if (isLocation) {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                AppSemanticColors.current.onSuccessContainer
+                                            },
                                             modifier = Modifier.size(17.dp)
                                         )
                                     }
@@ -195,9 +196,9 @@ fun BookmarkBottomSheet(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = route.name,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -213,7 +214,7 @@ fun BookmarkBottomSheet(
                                                 "${route.waypoints.size} 个折点 · %.2f km".format(route.totalDistanceKm)
                                             }
                                         } ?: "坐标缺失",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -230,14 +231,7 @@ fun BookmarkBottomSheet(
                                     Spacer(Modifier.width(4.dp))
                                 }
 
-                                // 删除：48dp 热区，视觉图标仍是 18dp
-                                Box(
-                                    modifier = Modifier
-                                        .minTouchTarget()
-                                        .clip(CircleShape)
-                                        .clickable { pendingDelete = route },
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                IconButton(onClick = { pendingDelete = route }) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "删除收藏",
@@ -255,16 +249,16 @@ fun BookmarkBottomSheet(
         }
     }
 
-    // 短确认 → 24dp 圆角 AlertDialog（规范 A）
+    // 短确认使用 Material 3 AlertDialog。
     pendingDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = {
                 Text(
                     text = if (isLocation) "删除该收藏地点？" else "删除该收藏航线？",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             },
             text = {
@@ -282,7 +276,12 @@ fun BookmarkBottomSheet(
                     },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "删除",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             },
             dismissButton = {
@@ -290,11 +289,13 @@ fun BookmarkBottomSheet(
                     onClick = { pendingDelete = null },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "取消",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
-            },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(24.dp)
+            }
         )
     }
 }

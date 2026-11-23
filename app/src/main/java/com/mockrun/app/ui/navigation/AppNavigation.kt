@@ -124,7 +124,6 @@ fun AppNavigation(
                             mapViewModel = mapViewModel,
                             simulationViewModel = simulationViewModel,
                             initialTab = mapTab,
-                            isLiquidGlass = false,
                             isTablet = isTablet,
                             bottomBarPadding = bottomBarPadding,
                             onNavigateToLibrary = { showLibrarySubScreen = true }

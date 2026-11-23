@@ -8,7 +8,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,16 +26,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.SearchResultItem
-import com.mockrun.app.core.designsystem.IosPrimaryButton
-import com.mockrun.app.core.designsystem.IosSearchField
+import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.ScreenInsets
-import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
+import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
 
 enum class RouteStage {
@@ -69,14 +66,22 @@ private fun RouteStageIndicator(
         steps.forEach { (step, label) ->
             val active = step == stage
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f) else Color.Transparent
+                shape = MaterialTheme.shapes.small,
+                color = if (active) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                }
             ) {
                 Text(
                     text = label,
-                    fontSize = 11.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (active) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                 )
             }
@@ -147,9 +152,18 @@ private fun RouteResultCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = accent.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+        shape = AppShapes.card,
+        color = if (isError) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        },
+        contentColor = if (isError) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        },
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -207,15 +221,20 @@ private fun RouteResultCard(
                 }
             }
 
-            IosPrimaryButton(
-                text = "重新开始",
+            Button(
                 onClick = onRestart,
                 modifier = Modifier.fillMaxWidth(),
-                containerColor = accent,
-                icon = Icons.Default.Refresh,
-                height = 48.dp,
-                enabled = canRestart
-            )
+                enabled = canRestart,
+                shape = AppShapes.button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accent,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("重新开始", style = MaterialTheme.typography.labelLarge)
+            }
             if (!canRestart) {
                 Text(
                     text = "航点不足 2 个，先在「选点」阶段补齐起终点后再重新开始",
@@ -234,7 +253,6 @@ fun RouteBottomPanel(
     waypoints: List<WayPoint>,
     simState: SimulationState,
     selectedSpeed: Float,
-    isLiquidGlass: Boolean,
     searchQuery: String = "",
     searchResults: List<SearchResultItem> = emptyList(),
     isSearching: Boolean = false,
@@ -253,7 +271,6 @@ fun RouteBottomPanel(
     onResumeSimulation: () -> Unit,
     onStopSimulation: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
     val isPaused = simState.status is SimulationStatus.Paused
     // 底部安全区统一由 ScreenInsets 推导（系统导航栏 + 底栏 72 + 上下外距 12 + 呼吸 8）。
     // 不再依赖调用方传入的 navBar + 94 硬编码值。
@@ -311,48 +328,14 @@ fun RouteBottomPanel(
         // 1. Search Bar & Search Results (Only in SELECTING stage)
         // =====================================================================
         if (stage == RouteStage.SELECTING) {
-            // 搜索框统一走设计系统的 IosSearchField（地图内嵌档：显式 50dp / r24，
-            // 与面板原有几何一致，不再单独手搓 Surface + BasicTextField）。
             Box(modifier = Modifier.fillMaxWidth()) {
-                IosSearchField(
+                MapSearchField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     placeholder = "搜索航点 / 地名 / 道路",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(24.dp),
-                            elevation = 6.dp
-                        ),
-                    height = 50.dp,
-                    cornerRadius = 24.dp
+                    onClear = onClearSearch,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                if (searchQuery.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                            .clickable(onClick = onClearSearch),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // 20dp 遮罩圆：可见 + 遮住从按钮下方穿过的输入文字
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "清除搜索内容",
-                                tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
-                }
             }
 
             // Search Results Dropdown List
@@ -360,14 +343,13 @@ fun RouteBottomPanel(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 200.dp)
-                        .liquidGlass(
-                            isLiquidGlass = isLiquidGlass,
-                            shape = RoundedCornerShape(22.dp),
-                            elevation = 10.dp
-                        ),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color.Transparent
+                        .heightIn(max = 200.dp),
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     LazyColumn(
                         modifier = Modifier
@@ -393,17 +375,17 @@ fun RouteBottomPanel(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         item.name,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.5.sp,
-                                        color = if (isDark) Color.White else Color.Black,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     if (item.address.isNotEmpty()) {
                                         Text(
                                             item.address,
-                                            fontSize = 11.5.sp,
-                                            color = if (isDark) Color.White.copy(0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -419,7 +401,6 @@ fun RouteBottomPanel(
                     isSearching = isSearching,
                     query = searchQuery,
                     resultCount = searchResults.size,
-                    isLiquidGlass = isLiquidGlass,
                     loadingText = "正在检索航点…",
                     emptyText = "未找到匹配的航点，换个关键词或直接在地图上点选"
                 )
@@ -431,14 +412,13 @@ fun RouteBottomPanel(
         // =====================================================================
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(22.dp),
-                    elevation = 8.dp
-                ),
-            shape = RoundedCornerShape(22.dp),
-            color = Color.Transparent
+                .fillMaxWidth(),
+            shape = AppShapes.card,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = 4.dp,
+            shadowElevation = 6.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Box(modifier = Modifier.padding(14.dp)) {
                 when (stage) {
@@ -476,19 +456,19 @@ fun RouteBottomPanel(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp),
-                                        shape = RoundedCornerShape(14.dp),
+                                        shape = MaterialTheme.shapes.large,
                                         contentPadding = PaddingValues(horizontal = 8.dp)
                                     ) {
                                         Icon(Icons.Default.Undo, null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(5.dp))
-                                        Text("撤销上一点", fontSize = 13.sp, maxLines = 1)
+                                        Text("撤销上一点", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                     }
                                     OutlinedButton(
                                         onClick = onClearWaypoints,
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(48.dp),
-                                        shape = RoundedCornerShape(14.dp),
+                                        shape = MaterialTheme.shapes.large,
                                         contentPadding = PaddingValues(horizontal = 8.dp)
                                     ) {
                                         Icon(
@@ -498,7 +478,12 @@ fun RouteBottomPanel(
                                             tint = MaterialTheme.colorScheme.error
                                         )
                                         Spacer(Modifier.width(5.dp))
-                                        Text("清空全部", fontSize = 13.sp, color = MaterialTheme.colorScheme.error, maxLines = 1)
+                                        Text(
+                                            "清空全部",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.error,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
 
@@ -516,15 +501,19 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.2f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
                                 ) {
                                     Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = if (waypoints.isEmpty()) "添加起点" else "添加第 ${waypoints.size + 1} 点",
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        maxLines = 1
                                     )
                                 }
 
@@ -534,18 +523,21 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = AppSemanticColors.current.success,
-                                        disabledContainerColor = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
+                                        contentColor = AppSemanticColors.current.onSuccess,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 ) {
                                     Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = "完成规划",
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -583,22 +575,20 @@ fun RouteBottomPanel(
                                 RouteStageIndicator(stage = stage)
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { onOpenConfig() },
-                                        color = MaterialTheme.colorScheme.primary.copy(0.12f),
-                                        shape = RoundedCornerShape(12.dp)
+                                    FilledTonalButton(
+                                        onClick = onOpenConfig,
+                                        modifier = Modifier.height(48.dp),
+                                        shape = MaterialTheme.shapes.large,
+                                        contentPadding = PaddingValues(horizontal = 12.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Default.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
-                                            Spacer(Modifier.width(5.dp))
-                                            Text("参数设置", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                        }
+                                        Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            "参数设置",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
                             }
@@ -606,7 +596,7 @@ fun RouteBottomPanel(
                             Text(
                                 text = "✅ 路线已就绪 · ${waypoints.size} 折点 · ${"%.1f".format(selectedSpeed)} km/h",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (isDark) Color.White.copy(0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Row(
@@ -619,12 +609,12 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
                                     Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("重选", fontSize = 13.sp, maxLines = 1)
+                                    Text("重选", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                 }
 
                                 OutlinedButton(
@@ -632,12 +622,12 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
                                     Icon(Icons.Default.BookmarkAdd, null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("收藏路线", fontSize = 13.sp, maxLines = 1)
+                                    Text("收藏路线", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                 }
 
                                 Button(
@@ -651,13 +641,21 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.4f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
                                     Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("开启模拟", fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                                    Text(
+                                        "开启模拟",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
                                 }
                             }
 
@@ -698,9 +696,9 @@ fun RouteBottomPanel(
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = if (isPaused) "已暂停" else "巡航中",
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -765,12 +763,12 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     contentPadding = PaddingValues(horizontal = 4.dp)
                                 ) {
                                     Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("配速", fontSize = 13.sp, maxLines = 1)
+                                    Text("配速", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                 }
 
                                 Button(
@@ -780,9 +778,18 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.1f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isPaused) AppSemanticColors.current.success else AppSemanticColors.current.warning
+                                        containerColor = if (isPaused) {
+                                            AppSemanticColors.current.success
+                                        } else {
+                                            AppSemanticColors.current.warning
+                                        },
+                                        contentColor = if (isPaused) {
+                                            AppSemanticColors.current.onSuccess
+                                        } else {
+                                            AppSemanticColors.current.onWarning
+                                        }
                                     )
                                 ) {
                                     Icon(
@@ -791,7 +798,11 @@ fun RouteBottomPanel(
                                         modifier = Modifier.size(17.dp)
                                     )
                                     Spacer(Modifier.width(4.dp))
-                                    Text(if (isPaused) "继续" else "暂停", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                                    Text(
+                                        if (isPaused) "继续" else "暂停",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
 
                                 Button(
@@ -799,12 +810,15 @@ fun RouteBottomPanel(
                                     modifier = Modifier
                                         .weight(1.2f)
                                         .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError
+                                    )
                                 ) {
                                     Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("停止", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                                    Text("停止", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

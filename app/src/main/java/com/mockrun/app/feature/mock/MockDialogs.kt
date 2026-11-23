@@ -1,6 +1,4 @@
 package com.mockrun.app.feature.mock
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import android.content.Context
 import android.content.Intent
@@ -8,7 +6,6 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -16,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.core.location.RootSuBridge
 import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.NonCancellable
@@ -23,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * iOS Style Guide Dialog: 防闪回与使用指南
+ * Material 3 guide dialog: 防闪回与使用指南
  */
 @Composable
 fun UsageGuideDialog(
@@ -91,11 +89,13 @@ fun UsageGuideDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    "我知道了",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-        },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        }
     )
 }
 
@@ -136,13 +136,14 @@ fun WeChatTroubleshootDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(13.dp),
-                    color = AppSemanticColors.current.warning.copy(alpha = 0.12f)
+                    shape = MaterialTheme.shapes.medium,
+                    color = AppSemanticColors.current.warningContainer,
+                    contentColor = AppSemanticColors.current.onWarningContainer
                 ) {
                     Text(
                         text = "💡 原理说明：微信内嵌腾讯定位 SDK。即便模拟了 GPS，微信默认仍会在后台扫描您周边的 Wi-Fi 路由器 MAC 地址（BSSID）上报给腾讯服务器反查真实经纬度；若检测到 Mock 标记则会直接舍弃 GPS 回退到 Wi-Fi 定位。",
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppSemanticColors.current.warning,
+                        color = AppSemanticColors.current.onWarningContainer,
                         modifier = Modifier.padding(10.dp)
                     )
                 }
@@ -181,25 +182,26 @@ fun WeChatTroubleshootDialog(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                 ) {
                     Text(
                         if (isRootMode && isRootAvailable) "一键关闭蓝牙 / Wi-Fi 与背景扫描" else "去系统设置关闭扫描开关",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    "我知道了",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-        },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        }
     )
 }
 
@@ -242,16 +244,22 @@ fun KeepAliveGuideDialog(
                         onClick = {
                             com.mockrun.app.core.location.KeepAliveHelper.requestIgnoreBatteryOptimization(context)
                         },
-                        shape = RoundedCornerShape(13.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isIgnoringBattery) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        colors = if (isIgnoringBattery) {
+                            ButtonDefaults.buttonColors(
+                                containerColor = AppSemanticColors.current.success,
+                                contentColor = AppSemanticColors.current.onSuccess
+                            )
+                        } else {
+                            ButtonDefaults.buttonColors()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                     ) {
                         Text(
                             if (isIgnoringBattery) "✓ 已加入电池优化白名单" else "前往设置电池白名单 (无限制)",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 2
                         )
                     }
                 }
@@ -281,10 +289,12 @@ fun KeepAliveGuideDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    "我知道了",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-        },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        }
     )
 }

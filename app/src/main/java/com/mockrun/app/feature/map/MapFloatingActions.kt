@@ -1,6 +1,4 @@
 package com.mockrun.app.feature.map
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.clickable
 
 import android.content.Context
 import android.widget.Toast
@@ -9,17 +7,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.rounded.CenterFocusStrong
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.CoordinateConverter
-import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -31,7 +27,6 @@ fun MapFloatingActions(
     drawnWaypoints: List<WayPoint>,
     currentMapType: MapSourceType,
     mapViewRef: MapView?,
-    isLiquidGlass: Boolean,
     isPointMockActive: Boolean,
     isJoystickRunning: Boolean,
     simState: com.mockrun.app.domain.model.SimulationState,
@@ -49,77 +44,77 @@ fun MapFloatingActions(
     ) {
         // Route Fit Bounds FAB (only in ROUTE mode when waypoints >= 2)
         if (activeMapTab == MapTab.ROUTE && drawnWaypoints.size >= 2) {
-            Surface(
-                modifier = Modifier
-                    .size(54.dp)
-                    .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
-                    .clickable {
-                        val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
-                        val points = drawnWaypoints.map { wp ->
-                            if (isGcj) CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude) else (wp.latitude to wp.longitude)
-                        }
-                        val minLat = points.minOf { it.first }
-                        val maxLat = points.maxOf { it.first }
-                        val minLon = points.minOf { it.second }
-                        val maxLon = points.maxOf { it.second }
-                        val box = org.osmdroid.util.BoundingBox(maxLat + 0.002, maxLon + 0.002, minLat - 0.002, minLon - 0.002)
-                        mapViewRef?.zoomToBoundingBox(box, true, 80)
-                    },
-                shape = CircleShape,
-                color = Color.Transparent
+            FilledTonalIconButton(
+                onClick = {
+                    val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                    val points = drawnWaypoints.map { wp ->
+                        if (isGcj) CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude) else (wp.latitude to wp.longitude)
+                    }
+                    val minLat = points.minOf { it.first }
+                    val maxLat = points.maxOf { it.first }
+                    val minLon = points.minOf { it.second }
+                    val maxLon = points.maxOf { it.second }
+                    val box = org.osmdroid.util.BoundingBox(maxLat + 0.002, maxLon + 0.002, minLat - 0.002, minLon - 0.002)
+                    mapViewRef?.zoomToBoundingBox(box, true, 80)
+                },
+                modifier = Modifier.size(54.dp),
+                shape = CircleShape
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                }
+                Icon(
+                    Icons.Rounded.CenterFocusStrong,
+                    contentDescription = "全览路线",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
         // Locate to Real Physical Location FAB —— 设计稿 .locate-btn 54dp 圆
-        Surface(
-            modifier = Modifier
-                .size(54.dp)
-                .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
-                .clickable {
-                    if (isPointMockActive) simulationViewModel.stopPointMock(context)
-                    if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
-                    CoordinateConverter.clearSavedRealLocation(context)
-                    // 必须加摇杆守卫。forceCleanAllTestProviders 会无条件移除
-                    // GPS/NETWORK/PASSIVE/fused 四个 test provider，而悬浮摇杆持有
-                    // 另一个 MockLocationEngine 实例、其 isRegistered 仍为 true，
-                    // 而 inject() 只在 `!isRegistered || activeProviders.isEmpty()`
-                    // 时才重新注册 —— 于是此后每次 setTestProviderLocation 都抛
-                    // IllegalArgumentException 并被内部 runCatching 吞掉：
-                    // 界面显示摇杆开着、浮窗也在动，但不再注入任何位置。
-                    // 项目另外三处调用点都带同样的守卫
-                    // （MockLocationService 的 start/stop 路径）。
-                    if (!isJoystickRunning) {
-                        com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+        FilledTonalIconButton(
+            onClick = {
+                if (isPointMockActive) simulationViewModel.stopPointMock(context)
+                if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
+                CoordinateConverter.clearSavedRealLocation(context)
+                // 必须加摇杆守卫。forceCleanAllTestProviders 会无条件移除
+                // GPS/NETWORK/PASSIVE/fused 四个 test provider，而悬浮摇杆持有
+                // 另一个 MockLocationEngine 实例、其 isRegistered 仍为 true，
+                // 而 inject() 只在 `!isRegistered || activeProviders.isEmpty()`
+                // 时才重新注册 —— 于是此后每次 setTestProviderLocation 都抛
+                // IllegalArgumentException 并被内部 runCatching 吞掉：
+                // 界面显示摇杆开着、浮窗也在动，但不再注入任何位置。
+                // 项目另外三处调用点都带同样的守卫
+                // （MockLocationService 的 start/stop 路径）。
+                if (!isJoystickRunning) {
+                    com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+                }
+                // 单路复位：requestFreshLocation 会同步回调一次，并在 provider
+                // 回调里再回调一次（取消信号挂 15 秒）。原先这里又独立查了一遍
+                // getRealDeviceLocation 并第二次调用 onResetToRealLocation，
+                // 于是用户重新瞄准后，迟到的回调会把准星和地图拽回物理位置。
+                CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
+                    onResetToRealLocation(freshLat to freshLon)
+                    val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
+                    val (tLat, tLon) = if (isGcj) {
+                        CoordinateConverter.wgs84ToGcj02(freshLat, freshLon)
+                    } else {
+                        freshLat to freshLon
                     }
-                    // 单路复位：requestFreshLocation 会同步回调一次，并在 provider
-                    // 回调里再回调一次（取消信号挂 15 秒）。原先这里又独立查了一遍
-                    // getRealDeviceLocation 并第二次调用 onResetToRealLocation，
-                    // 于是用户重新瞄准后，迟到的回调会把准星和地图拽回物理位置。
-                    CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
-                        onResetToRealLocation(freshLat to freshLon)
-                        val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
-                        val (tLat, tLon) = if (isGcj) {
-                            CoordinateConverter.wgs84ToGcj02(freshLat, freshLon)
-                        } else {
-                            freshLat to freshLon
-                        }
-                        mapViewRef?.controller?.apply {
-                            setZoom(16.5)
-                            animateTo(GeoPoint(tLat, tLon))
-                        }
+                    mapViewRef?.controller?.apply {
+                        setZoom(16.5)
+                        animateTo(GeoPoint(tLat, tLon))
                     }
-                    Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
-                },
-            shape = CircleShape,
-            color = Color.Transparent
+                }
+                Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
+            },
+            modifier = Modifier.size(54.dp),
+            shape = CircleShape
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-            }
+            Icon(
+                Icons.Default.MyLocation,
+                contentDescription = "真机物理定位",
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }

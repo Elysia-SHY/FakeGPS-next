@@ -1,7 +1,4 @@
 package com.mockrun.app.feature.route
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.foundation.clickable
 
 import android.content.Intent
 import android.net.Uri
@@ -15,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,12 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.BuildConfig
@@ -52,9 +47,8 @@ import java.util.*
  * 路线库覆盖层。
  *
  * 弹窗规范（本文件内统一）：
- *   - 短确认 / 短输入（重命名、删除确认）→ [RoundedCornerShape] 24dp 的 AlertDialog
- *   - 长表单 / 长列表 → 32dp 圆角的 sheet（见 BookmarkBottomSheet / AppPickerBottomSheet）
- *   - 品牌更新对话框 28dp 是唯一例外（见 AppUpdateDialog）
+ *   - 短确认 / 短输入（重命名、删除确认）→ M3 AlertDialog
+ *   - 长表单 / 长列表 → M3 ModalBottomSheet（见 BookmarkBottomSheet / AppPickerBottomSheet）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,16 +148,11 @@ fun RouteLibraryScreen(
         }
     }
 
-    // 本页专属模糊源：本页是「叠加层」，若只继承 AppNavigation 的全局源，
-    // 会采样到身后内容区的地图（而本页自己有铺底背景），观感是错的。
-    // 所以自建一个源，由本页 AppBackground 当源层，卡片玻璃采样它。
-    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
-
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        AppBackground(hazeState = pageHaze)
+        AppBackground()
 
         Column(
             modifier = Modifier
@@ -180,14 +169,10 @@ fun RouteLibraryScreen(
                 .padding(start = 8.dp, end = 16.dp, top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .minTouchTarget()
-                    .clip(CircleShape)
-                    .clickable {
-                        backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
-                    },
-                contentAlignment = Alignment.Center
+            IconButton(
+                onClick = {
+                    backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
+                }
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -197,63 +182,105 @@ fun RouteLibraryScreen(
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = if (showTrackScreen) "关闭轨迹库" else "轨迹录制",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .minTouchTarget()
-                    .clickable { showTrackScreen = !showTrackScreen }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
+            TextButton(onClick = { showTrackScreen = !showTrackScreen }) {
+                Text(
+                    text = if (showTrackScreen) "关闭轨迹库" else "轨迹录制",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
 
         // =====================================================================
         // 1. Page Head —— 与其他页面共用同一排版基准
         // =====================================================================
-        IosPageHead(
-            kicker = "FAKE GPS",
-            title = "路线库",
-            badgeText = "${savedRoutes.size} 条路线",
-            chipText = BuildConfig.VERSION_NAME
-        )
-
-        // =====================================================================
-        // 2. 搜索框 —— 复用设计系统 IosSearchField，清除按钮 48dp 触区
-        // =====================================================================
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)
         ) {
-            IosSearchField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = "搜索路线名称...",
-                modifier = Modifier.weight(1f),
-                style = IosSearchFieldStyle.STANDARD
+            Text(
+                text = "FAKE GPS",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
             )
-
-            // 固定占位：搜索框宽度不随清除按钮出现/消失而跳变。
-            Box(
-                modifier = Modifier
-                    .minTouchTarget()
-                    .clip(CircleShape)
-                    .clickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
-                contentAlignment = Alignment.Center
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "路线库",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (searchQuery.isNotEmpty()) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "清除搜索",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Text(
+                        text = "${savedRoutes.size} 条路线",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    Text(
+                        text = BuildConfig.VERSION_NAME,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
             }
         }
+
+        // =====================================================================
+        // 2. 搜索框 —— 复用地图页的 M3 OutlinedTextField 封装
+        // =====================================================================
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+            singleLine = true,
+            shape = MaterialTheme.shapes.large,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            placeholder = {
+                Text(
+                    text = "搜索路线名称...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            trailingIcon = if (searchQuery.isNotEmpty()) {
+                {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "清除搜索",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                null
+            }
+        )
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -295,16 +322,20 @@ fun RouteLibraryScreen(
                     val isCurrent = selectedRoute?.id == route.id
                     var menuExpanded by remember { mutableStateOf(false) }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .liquidGlass(
-                                isLiquidGlass = LocalLiquidGlassEnabled.current,
-                                shape = AppShapes.card,
-                                elevation = 8.dp,
-                                borderWidth = if (isCurrent) 1.5.dp else 1.0.dp,
-                                hazeState = pageHaze
-                            )
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        border = BorderStroke(
+                            width = if (isCurrent) 2.dp else 1.dp,
+                            color = if (isCurrent) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             // Top Row: Title + Date + Selection Capsule
@@ -318,7 +349,9 @@ fun RouteLibraryScreen(
                                         text = route.name,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     Text(
@@ -330,19 +363,29 @@ fun RouteLibraryScreen(
 
                                 if (isCurrent) {
                                     Spacer(Modifier.width(8.dp))
-                                    IosStatusBadge(text = "当前载入", tone = IosBadgeTone.RUNNING)
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = AppSemanticColors.current.successContainer,
+                                        contentColor = AppSemanticColors.current.onSuccessContainer
+                                    ) {
+                                        Text(
+                                            text = "当前载入",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
                                 }
                                 if (route.mode != RouteMode.ONE_WAY) {
                                     Spacer(Modifier.width(6.dp))
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                        shape = MaterialTheme.shapes.small,
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                     ) {
                                         Text(
                                             text = route.mode.label,
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                         )
                                     }
@@ -350,14 +393,14 @@ fun RouteLibraryScreen(
                                 if (route.sourceTrackId != null) {
                                     Spacer(Modifier.width(6.dp))
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceContainer
+                                        shape = MaterialTheme.shapes.small,
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     ) {
                                         Text(
                                             text = "轨迹",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                         )
                                     }
@@ -372,8 +415,8 @@ fun RouteLibraryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainer
+                                    shape = MaterialTheme.shapes.small,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -396,8 +439,8 @@ fun RouteLibraryScreen(
                                 }
 
                                 Surface(
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainer
+                                    shape = MaterialTheme.shapes.small,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -421,7 +464,7 @@ fun RouteLibraryScreen(
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 0.5.dp)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(Modifier.height(10.dp))
 
                             // Bottom Row: 「更多」菜单（重命名 / 导出 GPX / 删除）+ 载入主 CTA
@@ -431,12 +474,8 @@ fun RouteLibraryScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box {
-                                    Box(
-                                        modifier = Modifier
-                                            .minTouchTarget()
-                                            .clip(CircleShape)
-                                            .clickable { menuExpanded = true },
-                                        contentAlignment = Alignment.Center
+                                    IconButton(
+                                        onClick = { menuExpanded = true }
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.MoreVert,
@@ -511,17 +550,41 @@ fun RouteLibraryScreen(
                                     }
                                 }
 
-                                IosPrimaryButton(
-                                    text = if (isCurrent) "正在使用" else "载入路线",
+                                Button(
                                     onClick = {
                                         mapViewModel.selectRoute(route)
                                         onRouteSelected()
                                     },
-                                    modifier = Modifier.weight(1f),
-                                    containerColor = if (isCurrent) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
-                                    icon = if (isCurrent) Icons.Default.Check else Icons.Default.PlayArrow,
-                                    height = 48.dp
-                                )
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isCurrent) {
+                                            AppSemanticColors.current.success
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        contentColor = if (isCurrent) {
+                                            AppSemanticColors.current.onSuccess
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        }
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isCurrent) Icons.Default.Check else Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isCurrent) "正在使用" else "载入路线",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -532,7 +595,7 @@ fun RouteLibraryScreen(
     }
 
     // =========================================================================
-    // 短确认 / 短输入弹窗 —— 统一 24dp 圆角
+    // 短确认 / 短输入弹窗 —— 统一使用 M3 AlertDialog
     // =========================================================================
     routeToRename?.let { route ->
         AlertDialog(
@@ -540,7 +603,7 @@ fun RouteLibraryScreen(
             title = {
                 Text(
                     text = "重命名路线",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
@@ -551,7 +614,7 @@ fun RouteLibraryScreen(
                     onValueChange = { renameInput = it },
                     label = { Text("路线新名称", style = MaterialTheme.typography.labelMedium) },
                     singleLine = true,
-                    shape = RoundedCornerShape(13.dp),
+                    shape = MaterialTheme.shapes.small,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
@@ -569,7 +632,7 @@ fun RouteLibraryScreen(
                     enabled = renameInput.isNotBlank(),
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("确定", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("确定", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             },
             dismissButton = {
@@ -577,11 +640,11 @@ fun RouteLibraryScreen(
                     onClick = { routeToRename = null },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
             },
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(24.dp)
+            shape = MaterialTheme.shapes.extraLarge
         )
     }
 
@@ -591,7 +654,7 @@ fun RouteLibraryScreen(
             title = {
                 Text(
                     text = "确认删除路线？",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
@@ -611,7 +674,7 @@ fun RouteLibraryScreen(
                     },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             },
             dismissButton = {
@@ -619,11 +682,11 @@ fun RouteLibraryScreen(
                     onClick = { routeToDelete = null },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
             },
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(24.dp)
+            shape = MaterialTheme.shapes.extraLarge
         )
     }
 
@@ -675,10 +738,10 @@ private fun LibraryEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.size(72.dp),
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -694,7 +757,7 @@ private fun LibraryEmptyState(
 
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
@@ -703,7 +766,7 @@ private fun LibraryEmptyState(
 
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -714,20 +777,49 @@ private fun LibraryEmptyState(
                 modifier = Modifier.widthIn(max = 280.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                IosPrimaryButton(
-                    text = primaryText,
+                Button(
                     onClick = onPrimary,
-                    icon = primaryIcon,
-                    height = 48.dp
-                )
-                if (secondaryText != null && onSecondary != null) {
-                    IosGhostButton(
-                        text = secondaryText,
-                        onClick = onSecondary,
-                        modifier = Modifier.fillMaxWidth(),
-                        icon = secondaryIcon,
-                        height = 48.dp
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = MaterialTheme.shapes.large,
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    Icon(
+                        imageVector = primaryIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
                     )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = primaryText,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1
+                    )
+                }
+                if (secondaryText != null && onSecondary != null) {
+                    OutlinedButton(
+                        onClick = onSecondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = MaterialTheme.shapes.large,
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        if (secondaryIcon != null) {
+                            Icon(
+                                imageVector = secondaryIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = secondaryText,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }

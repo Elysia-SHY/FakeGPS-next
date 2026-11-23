@@ -1,18 +1,11 @@
 package com.mockrun.app.ui.components
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
 
-import android.graphics.drawable.Drawable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -31,12 +24,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.core.data.repository.InstalledAppItem
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.TargetMockMode
-import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.Dispatchers
@@ -120,17 +113,7 @@ fun AppPickerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        dragHandle = {
-            Surface(
-                modifier = Modifier
-                    .padding(vertical = 10.dp)
-                    .size(width = 36.dp, height = 5.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-            ) {}
-        }
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier
@@ -146,178 +129,136 @@ fun AppPickerBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "添加独立分流应用",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = "指定应用将拥有独立的虚拟坐标，不影响其他应用",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .minTouchTarget()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                        .clickable(onClick = onDismissRequest),
-                    contentAlignment = Alignment.Center
-                ) {
+                Spacer(Modifier.width(8.dp))
+                FilledTonalIconButton(onClick = onDismissRequest) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            // User Profile / Dual App Selector
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Option 1: Main User (User 0)
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .clickable {
-                                isCustomUserId = false
-                                selectedUserId = 0
-                            },
-                        color = if (!isCustomUserId && selectedUserId == 0) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
-                        shadowElevation = if (!isCustomUserId && selectedUserId == 0) 2.dp else 0.dp
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "主空间 (User 0)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (!isCustomUserId && selectedUserId == 0) FontWeight.Bold else FontWeight.Normal,
-                                color = if (!isCustomUserId && selectedUserId == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                SegmentedButton(
+                    selected = !isCustomUserId && selectedUserId == 0,
+                    onClick = {
+                        isCustomUserId = false
+                        selectedUserId = 0
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    label = {
+                        Text(
+                            text = "主空间 (User 0)",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-
-                    // Option 2: Cloned / Dual (User 999)
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .clickable {
-                                isCustomUserId = false
-                                selectedUserId = 999
-                            },
-                        color = if (!isCustomUserId && selectedUserId == 999) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
-                        shadowElevation = if (!isCustomUserId && selectedUserId == 999) 2.dp else 0.dp
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "应用分身 (User 999)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (!isCustomUserId && selectedUserId == 999) FontWeight.Bold else FontWeight.Normal,
-                                color = if (!isCustomUserId && selectedUserId == 999) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                )
+                SegmentedButton(
+                    selected = !isCustomUserId && selectedUserId == 999,
+                    onClick = {
+                        isCustomUserId = false
+                        selectedUserId = 999
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    label = {
+                        Text(
+                            text = "应用分身 (User 999)",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                }
+                )
             }
 
-            // Category Filter: 用户应用 / 全部应用 / 系统应用
-            Surface(
-                shape = RoundedCornerShape(13.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 10.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    AppCategoryFilter.values().forEach { cat ->
-                        val count = when (cat) {
-                            AppCategoryFilter.USER -> userCount
-                            AppCategoryFilter.ALL -> allCount
-                            AppCategoryFilter.SYSTEM -> systemCount
-                        }
-                        val isSelected = selectedCategory == cat
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(9.dp))
-                                .clickable { selectedCategory = cat },
-                            color = if (isSelected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
-                            shadowElevation = if (isSelected) 2.dp else 0.dp
-                        ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${cat.label} ($count)",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                AppCategoryFilter.values().forEachIndexed { index, cat ->
+                    val count = when (cat) {
+                        AppCategoryFilter.USER -> userCount
+                        AppCategoryFilter.ALL -> allCount
+                        AppCategoryFilter.SYSTEM -> systemCount
                     }
+                    SegmentedButton(
+                        selected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = AppCategoryFilter.values().size
+                        ),
+                        label = {
+                            Text(
+                                text = "${cat.label} ($count)",
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    )
                 }
             }
 
-            // Search Bar —— 复用设计系统 IosSearchField(COMPACT)，
-            // 清除按钮移到框外，热区 48dp（原先 24dp IconButton 难以命中）
-            Row(
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IosSearchField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = "搜索应用名称或包名...",
-                    modifier = Modifier.weight(1f),
-                    style = IosSearchFieldStyle.COMPACT
-                )
-                Box(
-                    modifier = Modifier
-                        .minTouchTarget()
-                        .clip(CircleShape)
-                        .clickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (searchQuery.isNotEmpty()) {
-                        Icon(
-                            Icons.Default.Clear,
-                            contentDescription = "清除搜索",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
+                singleLine = true,
+                shape = MaterialTheme.shapes.large,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                placeholder = {
+                    Text(
+                        text = "搜索应用名称或包名...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = if (searchQuery.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "清除搜索",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                } else {
+                    null
                 }
-            }
+            )
 
             // Filter status & Manual Input Action
             Row(
@@ -330,30 +271,28 @@ fun AppPickerBottomSheet(
                 Text(
                     text = "已筛选 ${filteredApps.size} 个应用",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    modifier = Modifier
-                        .minTouchTarget()
-                        .clip(RoundedCornerShape(13.dp))
-                        .clickable {
-                            manualPkgInput = searchQuery.trim()
-                            showManualInputDialog = true
-                        },
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(Modifier.width(8.dp))
+                TextButton(
+                    onClick = {
+                        manualPkgInput = searchQuery.trim()
+                        showManualInputDialog = true
+                    },
+                    modifier = Modifier.minTouchTarget()
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(3.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         text = "手动输入包名",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
@@ -395,25 +334,19 @@ fun AppPickerBottomSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (searchQuery.isNotBlank()) {
-                            Button(
+                            FilledTonalButton(
                                 onClick = {
                                     manualPkgInput = searchQuery.trim()
                                     showManualInputDialog = true
                                 },
-                                modifier = Modifier.minTouchTarget(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                    contentColor = MaterialTheme.colorScheme.primary
-                                ),
-                                shape = RoundedCornerShape(9.dp)
+                                modifier = Modifier.minTouchTarget()
                             ) {
                                 Text("直接以包名添加 \"${searchQuery.take(20)}\"")
                             }
                         } else {
                             OutlinedButton(
                                 onClick = { showManualInputDialog = true },
-                                modifier = Modifier.minTouchTarget(),
-                                shape = RoundedCornerShape(9.dp)
+                                modifier = Modifier.minTouchTarget()
                             ) {
                                 Text("手动输入包名添加")
                             }
@@ -463,21 +396,19 @@ fun AppPickerBottomSheet(
     if (showManualInputDialog) {
         AlertDialog(
             onDismissRequest = { showManualInputDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(24.dp),
             title = {
                 Text(
                     text = "手动指定应用包名",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "适用于隐藏应用、分身容器或未在列表展示的应用。输入包名后将直接按目标接管其位置。",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
@@ -528,7 +459,7 @@ fun AppPickerBottomSheet(
                     enabled = manualPkgInput.isNotBlank(),
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("确认添加", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text("确认添加", style = MaterialTheme.typography.labelLarge)
                 }
             },
             dismissButton = {
@@ -536,7 +467,7 @@ fun AppPickerBottomSheet(
                     onClick = { showManualInputDialog = false },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("取消", style = MaterialTheme.typography.labelLarge)
                 }
             }
         )
@@ -560,11 +491,15 @@ val bitmap = remember(item.icon) {
        }
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(enabled = !isAlreadyAdded, onClick = onSelect),
-        color = if (isAlreadyAdded) MaterialTheme.colorScheme.outline.copy(alpha = 0.08f) else Color.Transparent
+        onClick = onSelect,
+        enabled = !isAlreadyAdded,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = if (isAlreadyAdded) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            Color.Transparent
+        }
     ) {
         Row(
             modifier = Modifier
@@ -579,19 +514,20 @@ val bitmap = remember(item.icon) {
                     contentDescription = item.appName,
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(MaterialTheme.shapes.medium)
                 )
             } else {
                 Surface(
                     modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(9.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = item.appName.take(1),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -606,19 +542,20 @@ val bitmap = remember(item.icon) {
                         text = item.appName,
                         style = MaterialTheme.typography.titleMedium,
                         color = if (isAlreadyAdded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (item.isSystem) {
                         Spacer(Modifier.width(6.dp))
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ) {
                             Text(
                                 text = "系统",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -626,14 +563,14 @@ val bitmap = remember(item.icon) {
                     if (userId != 0) {
                         Spacer(Modifier.width(6.dp))
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = AppSemanticColors.current.warning.copy(alpha = 0.15f)
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = AppSemanticColors.current.warningContainer,
+                            contentColor = AppSemanticColors.current.onWarningContainer
                         ) {
                             Text(
                                 text = "分身 $userId",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = AppSemanticColors.current.warning,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -654,8 +591,9 @@ val bitmap = remember(item.icon) {
             // Status Badge
             if (isAlreadyAdded) {
                 Surface(
-                    shape = RoundedCornerShape(13.dp),
-                    color = AppSemanticColors.current.success.copy(alpha = 0.12f)
+                    shape = CircleShape,
+                    color = AppSemanticColors.current.successContainer,
+                    contentColor = AppSemanticColors.current.onSuccessContainer
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -664,7 +602,7 @@ val bitmap = remember(item.icon) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            tint = AppSemanticColors.current.success,
+                            tint = AppSemanticColors.current.onSuccessContainer,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(3.dp))
@@ -672,20 +610,21 @@ val bitmap = remember(item.icon) {
                             text = "已分流",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = AppSemanticColors.current.success
+                            color = AppSemanticColors.current.onSuccessContainer
                         )
                     }
                 }
             } else {
                 Surface(
-                    shape = RoundedCornerShape(13.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     Text(
                         text = "+ 添加",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     )
                 }

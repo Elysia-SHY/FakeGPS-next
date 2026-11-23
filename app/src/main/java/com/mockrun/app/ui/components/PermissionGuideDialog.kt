@@ -1,11 +1,7 @@
 package com.mockrun.app.ui.components
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -14,11 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.IosPrimaryButton
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
@@ -26,7 +20,7 @@ import com.mockrun.app.util.PermissionIssueType
 /**
  * 权限引导对话框。
  *
- * 弹窗规格：短确认 → AlertDialog 24dp 圆角（规范 A）。
+ * 弹窗规格：短确认使用 Material 3 AlertDialog。
  *
  * 原实现用手写的 `Color(0xFF1C1C1E)` / `Color.White` / `Color.Black` 作为
  * 底板与文字色，与设计系统的 `MaterialTheme.colorScheme.surfaceContainer` /
@@ -45,8 +39,7 @@ fun PermissionGuideDialog(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -59,17 +52,12 @@ fun PermissionGuideDialog(
                         PermissionIssueType.LOCATION_PERMISSION_MISSING -> "需授予系统定位权限"
                         else -> "提示"
                     },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
-                Box(
-                    modifier = Modifier
-                        .minTouchTarget()
-                        .clip(CircleShape)
-                        .clickable(onClick = onDismissRequest),
-                    contentAlignment = Alignment.Center
-                ) {
+                IconButton(onClick = onDismissRequest) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "关闭",
@@ -95,8 +83,8 @@ fun PermissionGuideDialog(
                         )
 
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
@@ -150,12 +138,7 @@ fun PermissionGuideDialog(
             }
         },
         confirmButton = {
-            IosPrimaryButton(
-                text = when (issueType) {
-                    PermissionIssueType.MOCK_LOCATION_APP_NOT_SET -> "前往【开发者选项】"
-                    PermissionIssueType.LOCATION_PERMISSION_MISSING -> "前往授权设置"
-                    else -> "前往设置"
-                },
+            Button(
                 onClick = {
                     onDismissRequest()
                     when (issueType) {
@@ -168,17 +151,37 @@ fun PermissionGuideDialog(
                         else -> {}
                     }
                 },
-                icon = Icons.Default.Settings,
-                height = 48.dp
-            )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+            ) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = when (issueType) {
+                        PermissionIssueType.MOCK_LOCATION_APP_NOT_SET -> "前往【开发者选项】"
+                        PermissionIssueType.LOCATION_PERMISSION_MISSING -> "前往授权设置"
+                        else -> "前往设置"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 2
+                )
+            }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismissRequest,
-                modifier = Modifier.minTouchTarget(),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.minTouchTarget()
             ) {
-                Text("暂不设置", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "暂不设置",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     )

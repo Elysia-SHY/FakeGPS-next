@@ -1,45 +1,42 @@
 package com.mockrun.app.feature.map
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.clickable
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.*
+import com.mockrun.app.core.designsystem.AppShapes
 
 /**
- * iOS Control Center Style Vertical Zoom Slider
- * Emil Kowalski & Apple Design principles:
- * - 1:1 direct vertical drag tracking with fluid spring settle
- * - Frosted glass capsule with subtle border and shadow
+ * Material 3 vertical zoom control.
+ * - Direct vertical drag tracking with a standard spring settle
+ * - Tonal surface with outline and restrained elevation
  * - 48dp 命中区（+/- 按钮 48dp，胶囊体宽 56dp），无需瞄准即可点中
- * - Responsive pointer-down bouncy tactile feedback
  */
 @Composable
-fun IosVerticalZoomControl(
+fun MapVerticalZoomControl(
     currentZoom: Double,
     minZoom: Double = 3.0,
     maxZoom: Double = 19.0,
@@ -78,20 +75,25 @@ fun IosVerticalZoomControl(
     val normalizedZoom = ((currentZoom - minZoom) / (maxZoom - minZoom)).coerceIn(0.0, 1.0).toFloat()
     val animatedFill by animateFloatAsState(
         targetValue = normalizedZoom,
-        animationSpec = if (isDragging) spring(stiffness = Spring.StiffnessHigh) else MotionTokens.FluidSpringSpec,
+        animationSpec = if (isDragging) {
+            spring(stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+        },
         label = "zoomFill"
     )
 
+    val shape = AppShapes.iconLg
     Surface(
         modifier = modifier
             .width(56.dp)
-            .height(renderedCapsuleHeight)
-            .clip(RoundedCornerShape(22.dp))
-            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp))
-            .bouncyScale(isDragging, pressedScale = 0.97f),
-        shape = RoundedCornerShape(22.dp),
-        color = IosFrostedCapsule,
-        shadowElevation = 8.dp
+            .height(renderedCapsuleHeight),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -101,12 +103,9 @@ fun IosVerticalZoomControl(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Zoom In (+) Button
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .clickable { onZoomIn() },
-                contentAlignment = Alignment.Center
+            IconButton(
+                onClick = onZoomIn,
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     Icons.Default.Add,
@@ -158,7 +157,7 @@ fun IosVerticalZoomControl(
                         .width(6.dp)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(3.dp))
-                        .background(IosSeparator.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 )
 
                 // Dynamic Active Progress Capsule
@@ -183,18 +182,14 @@ fun IosVerticalZoomControl(
                             .height(5.dp)
                             .clip(RoundedCornerShape(2.5.dp))
                             .background(MaterialTheme.colorScheme.primary)
-                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.5.dp))
                     )
                 }
             }
 
             // Zoom Out (-) Button
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .clickable { onZoomOut() },
-                contentAlignment = Alignment.Center
+            IconButton(
+                onClick = onZoomOut,
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     Icons.Default.Remove,
@@ -205,6 +200,60 @@ fun IosVerticalZoomControl(
             }
         }
     }
+}
+
+/**
+ * Material 3 search field shared by the location and route drawers.
+ *
+ * Keeping the clear action inside the field preserves the one-tap search reset
+ * while letting Material 3 own focus, state-layer, shape, and text styling.
+ */
+@Composable
+fun MapSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
+        singleLine = true,
+        shape = MaterialTheme.shapes.large,
+        textStyle = MaterialTheme.typography.bodyMedium,
+        placeholder = {
+            Text(
+                text = placeholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = if (value.isNotEmpty()) {
+            {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "清除搜索内容",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            null
+        }
+    )
 }
 
 /**
@@ -222,24 +271,20 @@ fun MapSearchState(
     isSearching: Boolean,
     query: String,
     resultCount: Int,
-    isLiquidGlass: Boolean,
     loadingText: String = "正在检索地点…",
     emptyText: String = "未找到匹配的地点，换个关键词或直接输入坐标"
 ) {
     val showEmpty = !isSearching && query.isNotBlank() && resultCount == 0
     if (!isSearching && !showEmpty) return
-    val isDark = isSystemInDarkTheme()
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = RoundedCornerShape(22.dp),
-                elevation = 10.dp
-            ),
-        shape = RoundedCornerShape(22.dp),
-        color = Color.Transparent
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.card,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -265,7 +310,7 @@ fun MapSearchState(
             Text(
                 text = if (isSearching) loadingText else emptyText,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

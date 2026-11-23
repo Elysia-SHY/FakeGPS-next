@@ -1,458 +1,498 @@
 package com.mockrun.app.ui.components
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.RemoteReleaseInfo
 import com.mockrun.app.core.data.repository.VersionSyncManager
-import com.mockrun.app.core.designsystem.liquidGlass
-import com.mockrun.app.core.designsystem.minTouchTarget
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.util.Diag
 
 /**
- * 品牌更新对话框。
+ * Material Design 3 update dialog.
  *
- * 弹窗规范例外：本弹窗是唯一使用 28dp 圆角的 Dialog
- * （规范 A = 24dp 短确认，规范 B = 32dp sheet）。
- *
- * **下载中不可关闭是有意为之**：`dismissOnBackPress` / `dismissOnClickOutside`
- * 在 [DownloadStatus.Downloading] 期间都为 false，用户必须显式点「取消下载」。
- * 不要为了「所有弹窗可随意关」把这个行为统一掉。
+ * Downloading intentionally disables both back-press and outside-tap dismissal.
+ * The user must explicitly choose 「取消下载」 before the dialog can be dismissed.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppUpdateDialog(
     info: RemoteReleaseInfo,
-    isLiquidGlass: Boolean = true,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
     val downloadStatus by VersionSyncManager.downloadStatus
+    val dismissAllowed = downloadStatus !is DownloadStatus.Downloading
 
-    Dialog(
+    AlertDialog(
         onDismissRequest = {
-            if (downloadStatus !is DownloadStatus.Downloading) {
+            if (dismissAllowed) {
                 onDismiss()
             }
         },
         properties = DialogProperties(
-            dismissOnBackPress = downloadStatus !is DownloadStatus.Downloading,
-            dismissOnClickOutside = downloadStatus !is DownloadStatus.Downloading,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .widthIn(max = 440.dp)
-                .liquidGlass(
-                    isLiquidGlass = isLiquidGlass,
-                    shape = RoundedCornerShape(28.dp),
-                    elevation = 16.dp
-                ),
-            shape = RoundedCornerShape(28.dp),
-            color = if (isLiquidGlass) Color.Transparent else if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF)
-        ) {
-            // 内容可滚动：错误详情展开后叠加长更新日志，小屏会超出对话框可视高度，
-            // 滚动保证「重试下载 / 关闭」始终可达。上限取屏幕高度的 78%。
-            val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.78f).dp
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxDialogHeight)
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            dismissOnBackPress = dismissAllowed,
+            dismissOnClickOutside = dismissAllowed
+        ),
+        shape = MaterialTheme.shapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 6.dp,
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                // Top Icon Badge
                 Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF007AFF), Color(0xFF5856D6))
-                            )
-                        ),
+                    modifier = Modifier.size(56.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.SystemUpdate,
                         contentDescription = null,
-                        tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                 }
+            }
+        },
+        title = {
+            Text(
+                text = "发现新版本",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            UpdateDialogBody(
+                info = info,
+                downloadStatus = downloadStatus
+            )
+        },
+        confirmButton = {
+            UpdateDialogActions(
+                context = context,
+                info = info,
+                downloadStatus = downloadStatus,
+                onDismiss = onDismiss
+            )
+        }
+    )
+}
 
-                Spacer(Modifier.height(14.dp))
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun UpdateDialogBody(
+    info: RemoteReleaseInfo,
+    downloadStatus: DownloadStatus
+) {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    val maxBodyHeight = (LocalConfiguration.current.screenHeightDp * 0.52f).dp
 
-                // Title
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = maxBodyHeight)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(
+                space = 8.dp,
+                alignment = Alignment.CenterHorizontally
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = scheme.primaryContainer,
+                contentColor = scheme.onPrimaryContainer
+            ) {
                 Text(
-                    text = "发现新版本",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.Black
+                    text = info.tagName,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+
+            if (info.publishedAt.isNotBlank()) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = scheme.surfaceContainerHigh,
+                    contentColor = scheme.onSurfaceVariant
+                ) {
+                    Text(
+                        text = info.publishedAt,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = "更新日志",
+            style = MaterialTheme.typography.titleSmall,
+            color = scheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        )
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 180.dp),
+            shape = MaterialTheme.shapes.medium,
+            color = scheme.surfaceContainerHigh,
+            contentColor = scheme.onSurface,
+            border = BorderStroke(1.dp, scheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = info.releaseNotes.ifBlank {
+                        "本次更新包含多项稳定性改进与细节体验优化。"
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
+        if (downloadStatus !is DownloadStatus.Idle) {
+            Spacer(Modifier.height(16.dp))
+        }
+
+        when (val state = downloadStatus) {
+            is DownloadStatus.Idle -> Unit
+
+            is DownloadStatus.Downloading -> {
+                val animatedProgress by animateFloatAsState(
+                    targetValue = state.progress,
+                    label = "downloadProgress"
                 )
 
-                Spacer(Modifier.height(6.dp))
-
-                // Version & Date Badges
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = info.tagName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            text = state.currentSource,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = scheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = "${(state.progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = scheme.onSurface
                         )
                     }
 
-                    if (info.publishedAt.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (isDark) Color(0x33FFFFFF) else Color(0x14000000)
-                        ) {
-                            Text(
-                                text = info.publishedAt,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
+                    Spacer(Modifier.height(8.dp))
+
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = scheme.primary,
+                        trackColor = scheme.surfaceContainerHighest
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${formatMb(state.downloadedBytes)} / ${formatMb(state.totalBytes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = formatSpeed(state.speedBytesPerSec),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = semantic.success
+                        )
                     }
                 }
+            }
 
-                Spacer(Modifier.height(16.dp))
+            is DownloadStatus.Success -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = semantic.success,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "安装包下载完成并已通过安全校验",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = semantic.success,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
 
-                // Release Notes Card
-                Text(
-                    text = "更新日志",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp)
-                )
+            is DownloadStatus.Error -> {
+                var errorExpanded by remember(state.message) { mutableStateOf(false) }
 
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 180.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isDark) Color(0x33000000) else Color(0x0A000000),
-                    border = androidx.compose.foundation.BorderStroke(
-                        0.5.dp,
-                        if (isDark) Color(0x22FFFFFF) else Color(0x15000000)
+                TextButton(
+                    onClick = { errorExpanded = !errorExpanded },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = scheme.error
                     )
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(12.dp)
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Start,
+                        maxLines = if (errorExpanded) Int.MAX_VALUE else 2,
+                        overflow = if (errorExpanded) {
+                            TextOverflow.Visible
+                        } else {
+                            TextOverflow.Ellipsis
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        imageVector = if (errorExpanded) {
+                            Icons.Default.ExpandLess
+                        } else {
+                            Icons.Default.ExpandMore
+                        },
+                        contentDescription = if (errorExpanded) "收起错误详情" else "展开错误详情",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateDialogActions(
+    context: Context,
+    info: RemoteReleaseInfo,
+    downloadStatus: DownloadStatus,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        when (val state = downloadStatus) {
+            is DownloadStatus.Idle -> {
+                Button(
+                    onClick = { VersionSyncManager.startDownload(context, info) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "立即在线更新",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(
+                        onClick = {
+                            try {
+                                val targetUrl = info.releaseHtmlUrl.ifBlank { info.downloadUrl }
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Diag.d(
+                                    "AppUpdateDialog",
+                                    "open browser for release page failed: ${e.message}"
+                                )
+                                Toast.makeText(
+                                    context,
+                                    "无法打开浏览器",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            text = info.releaseNotes.ifBlank { "本次更新包含多项稳定性改进与细节体验优化。" },
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            color = if (isDark) Color(0xFFDDDDDD) else Color(0xFF333333)
+                            text = "浏览器下载",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "稍后提醒",
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
+            }
 
-                Spacer(Modifier.height(18.dp))
+            is DownloadStatus.Downloading -> {
+                OutlinedButton(
+                    onClick = { VersionSyncManager.cancelDownload() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "取消下载",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
 
-                // Download Progress / Status Section
-                when (val state = downloadStatus) {
-                    is DownloadStatus.Idle -> {
-                        // Action Buttons: Update Now & Remind Later
-                        Button(
-                            onClick = { VersionSyncManager.startDownload(context, info) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("立即在线更新", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                        }
-
-                        Spacer(Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    try {
-                                        val targetUrl = info.releaseHtmlUrl.ifBlank { info.downloadUrl }
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Diag.d("AppUpdateDialog", "open browser for release page failed: ${e.message}")
-                                        android.widget.Toast.makeText(context, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier.minTouchTarget()
-                            ) {
-                                Text("浏览器下载", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-
-                            TextButton(
-                                onClick = onDismiss,
-                                modifier = Modifier.minTouchTarget()
-                            ) {
-                                Text("稍后提醒", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    is DownloadStatus.Downloading -> {
-                        val animatedProgress by animateFloatAsState(
-                            targetValue = state.progress,
-                            label = "downloadProgress"
+            is DownloadStatus.Success -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "稍后",
+                            style = MaterialTheme.typography.labelLarge
                         )
-
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = state.currentSource,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "${(state.progress * 100).toInt()}%",
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color.White else Color.Black
-                                )
-                            }
-
-                            Spacer(Modifier.height(8.dp))
-
-                            LinearProgressIndicator(
-                                progress = { animatedProgress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${formatMb(state.downloadedBytes)} / ${formatMb(state.totalBytes)}",
-                                    fontSize = 11.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = formatSpeed(state.speedBytesPerSec),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AppSemanticColors.current.success
-                                )
-                            }
-
-                            Spacer(Modifier.height(14.dp))
-
-                            OutlinedButton(
-                                onClick = { VersionSyncManager.cancelDownload() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Text("取消下载", fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
                     }
 
-                    is DownloadStatus.Success -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = AppSemanticColors.current.success,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "安装包下载完成并已通过安全校验",
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AppSemanticColors.current.success
-                                )
-                            }
+                    Button(
+                        onClick = { VersionSyncManager.installApk(context, state.file) },
+                        modifier = Modifier.weight(1.4f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.InstallMobile,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "立即安装",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
 
-                            Spacer(Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onDismiss,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
-                                    Text("稍后", fontSize = 13.5.sp)
-                                }
-
-                                Button(
-                                    onClick = { VersionSyncManager.installApk(context, state.file) },
-                                    modifier = Modifier
-                                        .weight(1.4f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = AppSemanticColors.current.success
-                                    )
-                                ) {
-                                    Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("立即安装", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                }
-                            }
-                        }
+            is DownloadStatus.Error -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "关闭",
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
 
-                    is DownloadStatus.Error -> {
-                        // 错误详情默认 2 行省略，长错误（HTTP 状态 + 堆栈摘要）
-                        // 由用户点按展开，避免撑破对话框。
-                        var errorExpanded by remember(state.message) { mutableStateOf(false) }
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .minTouchTarget()
-                                    .clickable { errorExpanded = !errorExpanded },
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.ErrorOutline,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = state.message,
-                                    fontSize = 12.5.sp,
-                                    color = MaterialTheme.colorScheme.error,
-                                    maxLines = if (errorExpanded) Int.MAX_VALUE else 2,
-                                    overflow = if (errorExpanded) TextOverflow.Visible else TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = if (errorExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = if (errorExpanded) "收起错误详情" else "展开错误详情",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            Spacer(Modifier.height(14.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onDismiss,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
-                                    Text("关闭", fontSize = 13.5.sp)
-                                }
-
-                                Button(
-                                    onClick = { VersionSyncManager.startDownload(context, info) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    )
-                                ) {
-                                    Text("重试下载", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
+                    Button(
+                        onClick = { VersionSyncManager.startDownload(context, info) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "重试下载",
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 }
             }

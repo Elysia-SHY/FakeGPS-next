@@ -1,7 +1,4 @@
 package com.mockrun.app.feature.settings
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -13,13 +10,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -32,16 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mockrun.app.BuildConfig
-import com.mockrun.app.core.data.repository.RemoteVersionInfo
 import com.mockrun.app.core.data.repository.VersionSyncManager
 import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.VersionSyncStatus
@@ -86,6 +79,58 @@ private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.2.0 更新日志】
    - 下载完成后执行 SHA-256 哈希与 APK 签名证书双重完整性校验。
 
 4. 📡 环境指纹采集与 5G NR 回放：打通 5G NR 36-bit NCI 采集与回放。"""
+
+@Composable
+private fun AboutSectionHeader(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = 4.dp, top = 8.dp)
+    )
+}
+
+@Composable
+private fun AboutCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    containerColor: Color? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val resolvedContainerColor = containerColor ?: MaterialTheme.colorScheme.surfaceContainer
+    val colors = CardDefaults.outlinedCardColors(containerColor = resolvedContainerColor)
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+
+    if (onClick != null) {
+        OutlinedCard(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = colors,
+            border = border
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                content = content
+            )
+        }
+    } else {
+        OutlinedCard(
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = colors,
+            border = border
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                content = content
+            )
+        }
+    }
+}
 
 @Composable
 fun AboutScreen(
@@ -179,11 +224,7 @@ fun AboutScreen(
             // =====================================================================
             // 0. 品牌标识（精简 Hero）—— 完整品牌介绍已移入「关于与致谢」详情 sheet
             // =====================================================================
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -194,8 +235,8 @@ fun AboutScreen(
                     Surface(
                         modifier = Modifier
                             .size(64.dp)
-                            .clip(AppShapes.iconLg),
-                        shape = AppShapes.iconLg,
+                            .clip(MaterialTheme.shapes.large),
+                        shape = MaterialTheme.shapes.large,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
@@ -223,7 +264,7 @@ fun AboutScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Surface(
-                                shape = AppShapes.pill,
+                                shape = CircleShape,
                                 color = MaterialTheme.colorScheme.secondaryContainer
                             ) {
                                 Text(
@@ -239,6 +280,7 @@ fun AboutScreen(
                                 text = "构建时间: ${BuildConfig.BUILD_TIME}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -250,13 +292,9 @@ fun AboutScreen(
             // =====================================================================
             // 2. 视觉渲染风格
             // =====================================================================
-            IosSectionHeader("外观与色彩")
+            AboutSectionHeader("外观与色彩")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-            ) {
+            AboutCard {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -271,7 +309,7 @@ fun AboutScreen(
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
-                                    .clip(AppShapes.button)
+                                    .clip(MaterialTheme.shapes.small)
                                     .background(
                                         if (dynamicColor) {
                                             MaterialTheme.colorScheme.primaryContainer
@@ -293,7 +331,7 @@ fun AboutScreen(
                                 )
                             }
 
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "动态取色",
                                     style = MaterialTheme.typography.titleMedium,
@@ -349,13 +387,9 @@ fun AboutScreen(
             // =====================================================================
             // 3. 个性化背景壁纸
             // =====================================================================
-            IosSectionHeader("个性化背景壁纸")
+            AboutSectionHeader("个性化背景壁纸")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-            ) {
+            AboutCard {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -366,34 +400,44 @@ fun AboutScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
+                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(AppShapes.icon)
-                                    .background(if (hasCustomWallpaper) AppSemanticColors.current.success.copy(alpha = 0.18f) else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)),
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(
+                                        if (hasCustomWallpaper) {
+                                            AppSemanticColors.current.successContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.tertiaryContainer
+                                        }
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (hasCustomWallpaper) Icons.Default.AddPhotoAlternate else Icons.Default.Palette,
                                     contentDescription = null,
-                                    tint = if (hasCustomWallpaper) AppSemanticColors.current.success else MaterialTheme.colorScheme.tertiary,
+                                    tint = if (hasCustomWallpaper) {
+                                        AppSemanticColors.current.onSuccessContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onTertiaryContainer
+                                    },
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = if (hasCustomWallpaper) "已应用自选相册壁纸" else "默认纯色背景",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = if (hasCustomWallpaper) "选择照片作为全应用底衬，卡片将通透毛玻璃折射" else "纯黑 / 纯白纯色底衬，卡片呈通透毛玻璃折射",
-                                    fontSize = 11.5.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -406,37 +450,37 @@ fun AboutScreen(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (hasCustomWallpaper) {
-                                TextButton(
-                                    onClick = {
-                                        BackgroundThemeManager.clearCustomWallpaper(context)
-                                        Toast.makeText(context, "已恢复为默认纯色背景", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.heightIn(min = 48.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Text("恢复默认", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                            Button(
-                                onClick = { photoPickerLauncher.launch("image/*") },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasCustomWallpaper) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary
-                                ),
-                                shape = AppShapes.button,
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        if (hasCustomWallpaper) {
+                            TextButton(
+                                onClick = {
+                                    BackgroundThemeManager.clearCustomWallpaper(context)
+                                    Toast.makeText(context, "已恢复为默认纯色背景", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = if (hasCustomWallpaper) "更换壁纸" else "从相册选取壁纸",
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White
+                                    text = "恢复默认",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
+                        }
+                        Button(
+                            onClick = { photoPickerLauncher.launch("image/*") },
+                            modifier = Modifier
+                                .weight(if (hasCustomWallpaper) 1.25f else 1f)
+                                .heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (hasCustomWallpaper) "更换壁纸" else "从相册选取壁纸",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
                     }
                 }
@@ -445,74 +489,56 @@ fun AboutScreen(
             // =====================================================================
             // 4. 数据管理与路线库
             // =====================================================================
-            IosSectionHeader("数据管理与路线库")
+            AboutSectionHeader("数据管理与路线库")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-                    .clickable { onNavigateToLibrary() }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.s4, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+            AboutCard(onClick = onNavigateToLibrary) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = "已收藏路线与航点库",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "管理历史规划、导入/导出 GPX 文件",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingContent = {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(AppShapes.icon)
-                                .background(MaterialTheme.colorScheme.tertiary.copy(0.18f)),
+                                .size(40.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.tertiaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Folder,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-
-                        Column {
-                            Text(
-                                text = "已收藏路线与航点库",
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "管理历史规划、导入/导出 GPX 文件",
-                                fontSize = 11.5.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                )
             }
 
             // =====================================================================
             // 5. 版本与云端同步
             // =====================================================================
-            IosSectionHeader("版本与云端同步")
+            AboutSectionHeader("版本与云端同步")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-            ) {
+            AboutCard {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     val isChecking = sync is VersionSyncStatus.Checking
 
@@ -539,19 +565,20 @@ fun AboutScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
+                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .clip(AppShapes.icon)
+                                    .clip(MaterialTheme.shapes.medium)
                                     .background(
                                         when (sync) {
-                                            is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning.copy(0.18f)
-                                            is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success.copy(0.18f)
-                                            is VersionSyncStatus.Error -> MaterialTheme.colorScheme.error.copy(0.18f)
-                                            else -> MaterialTheme.colorScheme.primary.copy(0.18f)
+                                            is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warningContainer
+                                            is VersionSyncStatus.UpToDate -> AppSemanticColors.current.successContainer
+                                            is VersionSyncStatus.Error -> MaterialTheme.colorScheme.errorContainer
+                                            else -> MaterialTheme.colorScheme.primaryContainer
                                         }
                                     ),
                                 contentAlignment = Alignment.Center
@@ -565,20 +592,19 @@ fun AboutScreen(
                                     },
                                     contentDescription = null,
                                     tint = when (sync) {
-                                        is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
-                                        is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
-                                        is VersionSyncStatus.Error -> MaterialTheme.colorScheme.error
-                                        else -> MaterialTheme.colorScheme.primary
+                                        is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.onWarningContainer
+                                        is VersionSyncStatus.UpToDate -> AppSemanticColors.current.onSuccessContainer
+                                        is VersionSyncStatus.Error -> MaterialTheme.colorScheme.onErrorContainer
+                                        else -> MaterialTheme.colorScheme.onPrimaryContainer
                                     },
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
 
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "云端版本自动同步",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
@@ -590,7 +616,7 @@ fun AboutScreen(
                                         is VersionSyncStatus.Error -> (sync as VersionSyncStatus.Error).message
                                         is VersionSyncStatus.Idle -> "自动同步已就绪"
                                     },
-                                    fontSize = 11.5.sp,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = when (sync) {
                                         is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
                                         is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
@@ -602,38 +628,27 @@ fun AboutScreen(
                         }
 
                         // Sync / Refresh Button
-                        Box(
-                            modifier = Modifier
-                                .minTouchTarget()
-                                .clickable(enabled = !isChecking) {
-                                    scope.launch {
-                                        val res = VersionSyncManager.checkForUpdates(force = true)
-                                        when (res) {
-                                            is VersionSyncStatus.UpToDate -> Toast.makeText(context, "已是最新版本 (${res.info.versionName})", Toast.LENGTH_SHORT).show()
-                                            is VersionSyncStatus.HasUpdate -> Toast.makeText(context, "发现新版本: ${res.info.versionName}", Toast.LENGTH_SHORT).show()
-                                            is VersionSyncStatus.Error -> Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
-                                            else -> {}
-                                        }
+                        FilledTonalIconButton(
+                            onClick = {
+                                scope.launch {
+                                    val res = VersionSyncManager.checkForUpdates(force = true)
+                                    when (res) {
+                                        is VersionSyncStatus.UpToDate -> Toast.makeText(context, "已是最新版本 (${res.info.versionName})", Toast.LENGTH_SHORT).show()
+                                        is VersionSyncStatus.HasUpdate -> Toast.makeText(context, "发现新版本: ${res.info.versionName}", Toast.LENGTH_SHORT).show()
+                                        is VersionSyncStatus.Error -> Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+                                        else -> {}
                                     }
-                                },
-                            contentAlignment = Alignment.Center
+                                }
+                            },
+                            enabled = !isChecking
                         ) {
-                            Box(
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "刷新同步",
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "刷新同步",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .then(if (isChecking) Modifier.rotate(angle) else Modifier)
-                                )
-                            }
+                                    .size(18.dp)
+                                    .then(if (isChecking) Modifier.rotate(angle) else Modifier)
+                            )
                         }
                     }
 
@@ -644,21 +659,21 @@ fun AboutScreen(
                     // Version comparison matrix
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "当前安装版本",
-                                fontSize = 11.5.sp,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = BuildConfig.VERSION_NAME,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace
+                                ),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -667,13 +682,16 @@ fun AboutScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
 
-                        Column(horizontalAlignment = Alignment.End) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.End
+                        ) {
                             Text(
                                 text = "云端最新版本",
-                                fontSize = 11.5.sp,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(2.dp))
@@ -685,9 +703,9 @@ fun AboutScreen(
                             }
                             Text(
                                 text = remoteName,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace
+                                ),
                                 color = when (sync) {
                                     is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
                                     is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
@@ -703,33 +721,44 @@ fun AboutScreen(
                         Spacer(Modifier.height(14.dp))
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = AppShapes.button,
-                            color = AppSemanticColors.current.warning.copy(alpha = 0.12f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, AppSemanticColors.current.warning.copy(alpha = 0.35f))
+                            shape = MaterialTheme.shapes.medium,
+                            color = AppSemanticColors.current.warningContainer,
+                            contentColor = AppSemanticColors.current.onWarningContainer,
+                            border = BorderStroke(
+                                1.dp,
+                                AppSemanticColors.current.warning.copy(alpha = 0.35f)
+                            )
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
+                                    verticalAlignment = Alignment.Top,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
+                                        modifier = Modifier.weight(1f),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Celebration, contentDescription = null, tint = AppSemanticColors.current.warning, modifier = Modifier.size(20.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Celebration,
+                                            contentDescription = null,
+                                            tint = AppSemanticColors.current.onWarningContainer,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                         Text(
                                             text = "发现新版本 ${info.versionName}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = AppSemanticColors.current.onWarningContainer
                                         )
                                     }
                                     if (info.releaseDate.isNotBlank()) {
                                         Text(
                                             text = info.releaseDate,
-                                            fontSize = 11.5.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = AppSemanticColors.current.onWarningContainer.copy(alpha = 0.8f),
+                                            textAlign = TextAlign.End,
+                                            modifier = Modifier.weight(0.6f)
                                         )
                                     }
                                 }
@@ -756,7 +785,7 @@ fun AboutScreen(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .height(6.dp)
-                                                    .clip(RoundedCornerShape(3.dp)),
+                                                    .clip(MaterialTheme.shapes.extraSmall),
                                                 color = AppSemanticColors.current.warning,
                                                 trackColor = AppSemanticColors.current.warning.copy(alpha = 0.2f)
                                             )
@@ -767,23 +796,37 @@ fun AboutScreen(
                                             ) {
                                                 Text(
                                                     text = "${(dl.progress * 100).toInt()}% (${formatMb(dl.downloadedBytes)} / ${formatMb(dl.totalBytes)})",
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        fontFamily = FontFamily.Monospace
+                                                    ),
+                                                    color = AppSemanticColors.current.onWarningContainer,
+                                                    modifier = Modifier.weight(1f)
                                                 )
                                                 Text(
                                                     text = formatSpeed(dl.speedBytesPerSec),
-                                                    fontSize = 11.5.sp,
-                                                    color = AppSemanticColors.current.warning,
-                                                    fontWeight = FontWeight.Bold
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontFamily = FontFamily.Monospace
+                                                    ),
+                                                    color = AppSemanticColors.current.onWarningContainer
                                                 )
                                             }
                                             OutlinedButton(
                                                 onClick = { VersionSyncManager.cancelDownload() },
-                                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                                shape = AppShapes.button
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .heightIn(min = 48.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.error
+                                                ),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    MaterialTheme.colorScheme.error
+                                                )
                                             ) {
-                                                Text("取消下载", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                                Text(
+                                                    text = "取消下载",
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
                                             }
                                         }
                                     }
@@ -801,9 +844,8 @@ fun AboutScreen(
                                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(16.dp))
                                                 Text(
                                                     text = "新版本已下载就绪 (${formatMb(file.length())})",
-                                                    fontSize = 12.sp,
-                                                    color = AppSemanticColors.current.success,
-                                                    fontWeight = FontWeight.SemiBold
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = AppSemanticColors.current.onWarningContainer
                                                 )
                                             }
                                             Row(
@@ -814,22 +856,37 @@ fun AboutScreen(
                                                     onClick = {
                                                         VersionSyncManager.startDownload(context, info)
                                                     },
-                                                    modifier = Modifier.weight(1f).height(48.dp),
-                                                    shape = AppShapes.button
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 48.dp)
                                                 ) {
-                                                    Text("重新下载", fontSize = 12.sp)
+                                                    Text(
+                                                        text = "重新下载",
+                                                        style = MaterialTheme.typography.labelLarge
+                                                    )
                                                 }
                                                 Button(
                                                     onClick = {
                                                         VersionSyncManager.installApk(context, file)
                                                     },
-                                                    modifier = Modifier.weight(1.3f).height(48.dp),
-                                                    shape = AppShapes.button,
-                                                    colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.success)
+                                                    modifier = Modifier
+                                                        .weight(1.3f)
+                                                        .heightIn(min = 48.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = AppSemanticColors.current.successContainer,
+                                                        contentColor = AppSemanticColors.current.onSuccessContainer
+                                                    )
                                                 ) {
-                                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                                    Icon(
+                                                        imageVector = Icons.Default.Download,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
                                                     Spacer(Modifier.width(4.dp))
-                                                    Text("立即安装", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                    Text(
+                                                        text = "立即安装",
+                                                        style = MaterialTheme.typography.labelLarge
+                                                    )
                                                 }
                                             }
                                         }
@@ -843,8 +900,8 @@ fun AboutScreen(
                                         ) {
                                             Text(
                                                 text = "下载失败: $errMsg",
-                                                fontSize = 11.5.sp,
-                                                color = MaterialTheme.colorScheme.error
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = AppSemanticColors.current.onWarningContainer
                                             )
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -852,11 +909,18 @@ fun AboutScreen(
                                             ) {
                                                 Button(
                                                     onClick = { VersionSyncManager.startDownload(context, info) },
-                                                    modifier = Modifier.weight(1f).height(48.dp),
-                                                    shape = AppShapes.button,
-                                                    colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.warning)
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 48.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = AppSemanticColors.current.warning,
+                                                        contentColor = AppSemanticColors.current.onWarning
+                                                    )
                                                 ) {
-                                                    Text("重试在线下载", fontSize = 12.sp, color = Color.White)
+                                                    Text(
+                                                        text = "重试在线下载",
+                                                        style = MaterialTheme.typography.labelLarge
+                                                    )
                                                 }
                                                 OutlinedButton(
                                                     onClick = {
@@ -867,10 +931,17 @@ fun AboutScreen(
                                                             Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
                                                         }
                                                     },
-                                                    modifier = Modifier.weight(1f).height(48.dp),
-                                                    shape = AppShapes.button
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 48.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(
+                                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                                    )
                                                 ) {
-                                                    Text("浏览器下载", fontSize = 12.sp)
+                                                    Text(
+                                                        text = "浏览器下载",
+                                                        style = MaterialTheme.typography.labelLarge
+                                                    )
                                                 }
                                             }
                                         }
@@ -885,24 +956,45 @@ fun AboutScreen(
                                                 onClick = {
                                                     showChangelogDialog = Pair("${info.versionName} 更新说明", info.releaseNotes)
                                                 },
-                                                modifier = Modifier.weight(1f).height(48.dp),
-                                                shape = AppShapes.button,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .heightIn(min = 48.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = AppSemanticColors.current.onWarningContainer
+                                                ),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    AppSemanticColors.current.onWarningContainer.copy(alpha = 0.5f)
+                                                )
                                             ) {
-                                                Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                                Text(
+                                                    text = "更新说明",
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
                                             }
 
                                             Button(
                                                 onClick = {
                                                     VersionSyncManager.startDownload(context, info)
                                                 },
-                                                modifier = Modifier.weight(1.3f).height(48.dp),
-                                                shape = AppShapes.button,
-                                                colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.warning)
+                                                modifier = Modifier
+                                                    .weight(1.3f)
+                                                    .heightIn(min = 48.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = AppSemanticColors.current.warning,
+                                                    contentColor = AppSemanticColors.current.onWarning
+                                                )
                                             ) {
-                                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                                Icon(
+                                                    imageVector = Icons.Default.CloudDownload,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
                                                 Spacer(Modifier.width(5.dp))
-                                                Text("在线下载更新", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                Text(
+                                                    text = "在线下载更新",
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
                                             }
                                         }
                                         Spacer(Modifier.height(6.dp))
@@ -913,7 +1005,7 @@ fun AboutScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .minTouchTarget()
-                                                    .clip(AppShapes.chip)
+                                                    .clip(MaterialTheme.shapes.small)
                                                     .clickable {
                                                         try {
                                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
@@ -926,8 +1018,8 @@ fun AboutScreen(
                                             ) {
                                                 Text(
                                                     text = "备用：在浏览器中直接下载",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.primary
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = AppSemanticColors.current.onWarningContainer
                                                 )
                                             }
                                         }
@@ -946,33 +1038,51 @@ fun AboutScreen(
                         val remoteNotes = (sync as? VersionSyncStatus.UpToDate)?.info?.releaseNotes?.takeIf { it.isNotBlank() } ?: BUILTIN_CHANGELOG
 
                         Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(AppShapes.button)
-                                .background(AppSemanticColors.current.success.copy(alpha = 0.1f))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = AppSemanticColors.current.successContainer,
+                            contentColor = AppSemanticColors.current.onSuccessContainer
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(15.dp))
-                                Text(
-                                    text = "已是最新版本 · $timeStr 已同步",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = AppSemanticColors.current.success
-                                )
-                            }
-
-                            TextButton(
-                                onClick = {
-                                    showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 最新特性日志", remoteNotes)
-                                },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            Row(
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("查看日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "已是最新版本 · $timeStr 已同步",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 最新特性日志", remoteNotes)
+                                    },
+                                    modifier = Modifier
+                                        .weight(0.45f)
+                                        .heightIn(min = 48.dp),
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = AppSemanticColors.current.onSuccessContainer
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "查看日志",
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
                             }
                         }
                     }
@@ -980,33 +1090,51 @@ fun AboutScreen(
                     // Error banner
                     if (sync is VersionSyncStatus.Error) {
                         Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(AppShapes.button)
-                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(15.dp))
-                                Text(
-                                    text = "网络离线或同步受阻",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-
-                            TextButton(
-                                onClick = {
-                                    showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 本地特性说明", BUILTIN_CHANGELOG)
-                                },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            Row(
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("本地日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "网络离线或同步受阻",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        showChangelogDialog = Pair("${BuildConfig.VERSION_NAME} 本地特性说明", BUILTIN_CHANGELOG)
+                                    },
+                                    modifier = Modifier
+                                        .weight(0.45f)
+                                        .heightIn(min = 48.dp),
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "本地日志",
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
                             }
                         }
                     }
@@ -1016,13 +1144,9 @@ fun AboutScreen(
             // =====================================================================
             // 6. 设备环境与运行诊断
             // =====================================================================
-            IosSectionHeader("设备环境与运行诊断")
+            AboutSectionHeader("设备环境与运行诊断")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-            ) {
+            AboutCard {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1042,20 +1166,24 @@ fun AboutScreen(
                     Spacer(Modifier.height(4.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = AppShapes.button,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Text(
                                 text = "LSPosed 作用域先勾选「系统框架 (system)」和系统定位服务（Android/小米/OPPO fused provider）；需要分流、Mock 隐藏或步频/计步的目标应用，还必须单独勾选。仅系统框架不保证 OEM fused 或目标应用生效。",
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -1065,64 +1193,48 @@ fun AboutScreen(
             // =====================================================================
             // 7. 更多与关于
             // =====================================================================
-            IosSectionHeader("更多与关于")
+            AboutSectionHeader("更多与关于")
 
-            // 详情 sheet 入口 —— 触区 >= 56dp
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-                    .clickable { showDetailsSheet = true }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.s4, vertical = 14.dp)
-                        .heightIn(min = 56.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+            AboutCard(onClick = { showDetailsSheet = true }) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = "关于与致谢",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "品牌介绍 · 架构特性 · 官网 · 联系 · 开源许可",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingContent = {
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(AppShapes.icon)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-
-                        Column {
-                            Text(
-                                text = "关于与致谢",
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "品牌介绍 · 架构特性 · 官网 · 联系 · 开源许可",
-                                fontSize = 11.5.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                )
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1139,17 +1251,7 @@ private fun AboutDetailsSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = {
-            Surface(
-                modifier = Modifier
-                    .padding(vertical = 10.dp)
-                    .size(width = 36.dp, height = 5.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-            ) {}
-        }
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Column(
             modifier = Modifier
@@ -1184,26 +1286,21 @@ private fun AboutDetailsSheet(
             // =====================================================================
             // S1. 品牌介绍
             // =====================================================================
-            IosSectionHeader("品牌介绍")
+            AboutSectionHeader("品牌介绍")
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.card,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "系统框架底层分流 · 物理运动学拟真 · 动态多星座 GNSS 星历合成",
-                        fontSize = 13.sp,
-                        lineHeight = 19.sp,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "构建时间: ${BuildConfig.BUILD_TIME} · 当前版本 ${BuildConfig.VERSION_NAME}",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1212,13 +1309,9 @@ private fun AboutDetailsSheet(
             // =====================================================================
             // S2. 核心功能与架构特性
             // =====================================================================
-            IosSectionHeader("核心功能与架构特性")
+            AboutSectionHeader("核心功能与架构特性")
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.card,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -1260,13 +1353,9 @@ private fun AboutDetailsSheet(
             // =====================================================================
             // S3. 开源仓库与版本发布
             // =====================================================================
-            IosSectionHeader("开源仓库与版本发布")
+            AboutSectionHeader("开源仓库与版本发布")
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.card,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1275,7 +1364,7 @@ private fun AboutDetailsSheet(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(AppShapes.icon)
+                                .clip(MaterialTheme.shapes.medium)
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1290,14 +1379,13 @@ private fun AboutDetailsSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "项目主页与发布页",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = VersionSyncManager.HOMEPAGE_URL,
-                                fontSize = 12.sp,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1312,23 +1400,23 @@ private fun AboutDetailsSheet(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         // Copy URL Button
-                        Button(
+                        FilledTonalButton(
                             onClick = {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 val clip = ClipData.newPlainText("Website", VersionSyncManager.HOMEPAGE_URL)
                                 cm.setPrimaryClip(clip)
                                 Toast.makeText(context, "已复制项目主页地址至剪贴板！", Toast.LENGTH_SHORT).show()
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = AppShapes.button,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("复制链接", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = "复制链接",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
 
                         // Open Browser Button
@@ -1342,16 +1430,16 @@ private fun AboutDetailsSheet(
                                     Toast.makeText(context, "无法打开浏览器", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = AppShapes.button,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White
-                            )
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
                         ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("打开主页", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "打开主页",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
                     }
                 }
@@ -1360,13 +1448,9 @@ private fun AboutDetailsSheet(
             // =====================================================================
             // S4. 联系与反馈
             // =====================================================================
-            IosSectionHeader("联系与反馈")
+            AboutSectionHeader("联系与反馈")
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.card,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1375,7 +1459,7 @@ private fun AboutDetailsSheet(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(AppShapes.icon)
+                                .clip(MaterialTheme.shapes.medium)
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1390,14 +1474,13 @@ private fun AboutDetailsSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "邮箱",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = VersionSyncManager.CONTACT_EMAIL,
-                                fontSize = 12.sp,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1411,23 +1494,23 @@ private fun AboutDetailsSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
+                        FilledTonalButton(
                             onClick = {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 val clip = ClipData.newPlainText("Email", VersionSyncManager.CONTACT_EMAIL)
                                 cm.setPrimaryClip(clip)
                                 Toast.makeText(context, "已复制邮箱地址至剪贴板！", Toast.LENGTH_SHORT).show()
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = AppShapes.button,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("复制邮箱", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = "复制邮箱",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
 
                         Button(
@@ -1450,16 +1533,16 @@ private fun AboutDetailsSheet(
                                     Toast.makeText(context, "未找到邮件应用", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = AppShapes.button,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White
-                            )
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("发送邮件", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "发送邮件",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
                     }
                 }
@@ -1468,13 +1551,9 @@ private fun AboutDetailsSheet(
             // =====================================================================
             // S5. 开源致谢与许可协议
             // =====================================================================
-            IosSectionHeader("开源致谢与许可协议")
+            AboutSectionHeader("开源致谢与许可协议")
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = AppShapes.card,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
+            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
                     verticalArrangement = Arrangement.spacedBy(10.dp)

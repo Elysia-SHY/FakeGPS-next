@@ -1,9 +1,5 @@
 package com.mockrun.app.feature.mock
-import androidx.compose.material3.MaterialTheme
-import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.ui.text.font.FontFamily
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,22 +9,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mockrun.app.core.designsystem.AppSemanticColors
 import com.mockrun.app.core.location.fingerprint.EnvironmentFingerprint
 import com.mockrun.app.core.location.fingerprint.FingerprintCoordinator
 import com.mockrun.app.core.location.fingerprint.SourceState
@@ -268,65 +266,83 @@ fun FingerprintResultCard(
         FeedbackSeverity.WARNING -> Icons.Default.Warning
         FeedbackSeverity.ERROR -> Icons.Default.ErrorOutline
     }
+    val container = when (result.severity) {
+        FeedbackSeverity.SUCCESS -> AppSemanticColors.current.successContainer
+        FeedbackSeverity.PARTIAL -> AppSemanticColors.current.warningContainer
+        FeedbackSeverity.WARNING -> AppSemanticColors.current.warningContainer
+        FeedbackSeverity.ERROR -> MaterialTheme.colorScheme.errorContainer
+    }
+    val onContainer = when (result.severity) {
+        FeedbackSeverity.SUCCESS -> AppSemanticColors.current.onSuccessContainer
+        FeedbackSeverity.PARTIAL -> AppSemanticColors.current.onWarningContainer
+        FeedbackSeverity.WARNING -> AppSemanticColors.current.onWarningContainer
+        FeedbackSeverity.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(accent.copy(alpha = 0.12f))
-            .padding(12.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = container,
+        contentColor = onContainer
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = result.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = accent,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onDismiss) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.Close,
-                    contentDescription = "关闭结果提示",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+                    icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(18.dp)
                 )
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = result.detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        if (result.sourceLines.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            result.sourceLines.forEach { line ->
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(2.dp))
-            }
-        }
-
-        if (!result.saved || result.severity == FeedbackSeverity.ERROR ||
-            result.severity == FeedbackSeverity.PARTIAL
-        ) {
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onRetry) {
-                Text(
-                    text = "重新采集",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = result.title,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = accent
+                    color = onContainer,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "关闭结果提示",
+                        tint = onContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = result.detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = onContainer
+            )
+
+            if (result.sourceLines.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                result.sourceLines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        color = onContainer
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
+            }
+
+            if (!result.saved || result.severity == FeedbackSeverity.ERROR ||
+                result.severity == FeedbackSeverity.PARTIAL
+            ) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onRetry) {
+                    Text(
+                        text = "重新采集",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = onContainer
+                    )
+                }
             }
         }
     }

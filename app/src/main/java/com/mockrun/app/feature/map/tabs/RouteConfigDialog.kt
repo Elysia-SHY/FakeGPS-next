@@ -1,11 +1,9 @@
 package com.mockrun.app.feature.map.tabs
 import androidx.compose.material3.MaterialTheme
 import com.mockrun.app.core.designsystem.AppSemanticColors
-import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsBike
@@ -16,14 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.IosPrimaryButton
-import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RouteSimulator
 import com.mockrun.app.domain.model.RouteMode
@@ -34,7 +28,7 @@ data class SpeedPreset(val label: String, val speed: Float, val icon: ImageVecto
 /**
  * 巡航参数配置。
  *
- * 弹窗规格：短表单 → AlertDialog 24dp 圆角（规范 A）。
+ * 弹窗规格：短表单 → AlertDialog（28dp 圆角）。
  *
  * 两处修复（v1.7.1 精致玻璃风统一）：
  *   1. 五档配速原本是等宽一排（每档 ≈ 55dp），窄屏 + 系统大字号下
@@ -53,7 +47,6 @@ fun RouteConfigDialog(
     onSpeedChange: (Float) -> Unit,
     onCadenceToggle: (Boolean) -> Unit,
     onDismiss: () -> Unit,
-    isLiquidGlass: Boolean = true,
     // v2.4.1：运行方式与步频模式放进「参数设置」，用户在这里就能看到，不必去路线库翻菜单
     mode: RouteMode = RouteMode.ONE_WAY,
     closingGapMeters: Double = 0.0,
@@ -125,16 +118,26 @@ fun RouteConfigDialog(
                     presets.forEach { p ->
                         val isSelected = kotlin.math.abs(speedVal - p.speed) < 0.2f
                         Surface(
+                            onClick = {
+                                speedVal = p.speed
+                                onSpeedChange(p.speed)
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(64.dp)
-                                .clip(RoundedCornerShape(13.dp))
-                                .clickable {
-                                    speedVal = p.speed
-                                    onSpeedChange(p.speed)
-                                },
-                            shape = RoundedCornerShape(13.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
+                                .fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            contentColor = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            tonalElevation = if (isSelected) 2.dp else 1.dp
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize(),
@@ -144,7 +147,11 @@ fun RouteConfigDialog(
                                 Icon(
                                     imageVector = p.icon,
                                     contentDescription = null,
-                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.height(3.dp))
@@ -152,7 +159,11 @@ fun RouteConfigDialog(
                                     text = p.label,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
                                     maxLines = 1
                                 )
                             }
@@ -204,19 +215,24 @@ fun RouteConfigDialog(
                                 closingGapMeters > RouteSimulator.LOOP_MAX_GAP_M
                             val selected = m == modeVal
                             Surface(
+                                onClick = {
+                                    modeVal = m
+                                    onModeChange(m)
+                                },
+                                enabled = !loopBlocked,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(58.dp)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .clickable(enabled = !loopBlocked) {
-                                        modeVal = m
-                                        onModeChange(m)
-                                    },
-                                shape = RoundedCornerShape(13.dp),
+                                    .heightIn(min = 58.dp),
+                                shape = MaterialTheme.shapes.medium,
                                 color = when {
-                                    selected -> MaterialTheme.colorScheme.primary
-                                    loopBlocked -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f)
-                                    else -> MaterialTheme.colorScheme.surfaceContainer
+                                    selected -> MaterialTheme.colorScheme.primaryContainer
+                                    loopBlocked -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                },
+                                contentColor = when {
+                                    selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    loopBlocked -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    else -> MaterialTheme.colorScheme.onSurface
                                 }
                             ) {
                                 Column(
@@ -230,7 +246,11 @@ fun RouteConfigDialog(
                                         text = m.label,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
                                         maxLines = 1
                                     )
                                     Spacer(Modifier.height(2.dp))
@@ -241,7 +261,11 @@ fun RouteConfigDialog(
                                             RouteMode.LOOP -> "首尾相连"
                                         },
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (selected) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                         maxLines = 1
                                     )
                                 }
@@ -263,18 +287,29 @@ fun RouteConfigDialog(
                         CadenceMode.entries.forEach { cm ->
                             val selected = cm == cadenceModeVal
                             Surface(
+                                onClick = {
+                                    cadenceModeVal = cm
+                                    onCadenceConfigChange(cm, customVal.roundToInt())
+                                },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(42.dp)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .clickable {
-                                        cadenceModeVal = cm
-                                        onCadenceConfigChange(cm, customVal.roundToInt())
-                                    },
-                                shape = RoundedCornerShape(11.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
+                                    .heightIn(min = 48.dp),
+                                shape = MaterialTheme.shapes.medium,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                },
+                                contentColor = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
                                         text = when (cm) {
                                             CadenceMode.AUTO -> "自适应"
@@ -285,8 +320,12 @@ fun RouteConfigDialog(
                                         },
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                        maxLines = 2
                                     )
                                 }
                             }
@@ -349,36 +388,29 @@ fun RouteConfigDialog(
                             color = if (isRootAvailable) MaterialTheme.colorScheme.onSurfaceVariant else AppSemanticColors.current.warning
                         )
                     }
-                    Box(
-                        modifier = Modifier.minTouchTarget(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Switch(
-                            checked = if (isRootAvailable) cadenceVal else false,
-                            enabled = isRootAvailable,
-                            onCheckedChange = {
-                                if (isRootAvailable) {
-                                    cadenceVal = it
-                                    onCadenceToggle(it)
-                                }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = AppSemanticColors.current.success
-                            )
-                        )
-                    }
+                    Switch(
+                        checked = if (isRootAvailable) cadenceVal else false,
+                        enabled = isRootAvailable,
+                        onCheckedChange = {
+                            if (isRootAvailable) {
+                                cadenceVal = it
+                                onCadenceToggle(it)
+                            }
+                        }
+                    )
                 }
             }
         },
         confirmButton = {
-            IosPrimaryButton(
-                text = "确定",
+            Button(
                 onClick = onDismiss,
-                height = 48.dp
-            )
+                modifier = Modifier.heightIn(min = 48.dp),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text("确定", style = MaterialTheme.typography.labelLarge)
+            }
         },
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(24.dp)
+        shape = MaterialTheme.shapes.extraLarge
     )
 }
