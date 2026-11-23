@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.map
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import com.mockrun.app.feature.map.IosVerticalZoomControl
 import com.mockrun.app.feature.map.SearchLocationDialog
@@ -1007,7 +1009,7 @@ fun MapScreen(
                         runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }
                             .logFailure("MapScreen", "parse active rule color", Diag.Level.DEBUG)
                             .getOrNull()
-                    } ?: IosBlue
+                    } ?: MaterialTheme.colorScheme.primary
 
                     Surface(
                         modifier = Modifier
@@ -1017,7 +1019,7 @@ fun MapScreen(
                                 shape = AppShapes.panel,
                                 elevation = 14.dp
                             )
-                            .bouncyClickable {
+                            .clickable {
                                 val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                                 val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(activeCoord.first, activeCoord.second) else activeCoord
                                 mapViewRef?.controller?.apply {
@@ -1077,7 +1079,7 @@ fun MapScreen(
                                 Text(
                                     text = topTitle,
                                     style = IosTypography.BarTitle,
-                                    color = IosColors.Label,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
@@ -1085,7 +1087,7 @@ fun MapScreen(
                                 Text(
                                     text = topSub,
                                     style = IosTypography.BarSub,
-                                    color = IosColors.SecondaryLabel,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
@@ -1120,7 +1122,7 @@ fun MapScreen(
                                     onClick = { showMapTypeMenu = true },
                                     modifier = Modifier.size(48.dp)
                                 ) {
-                                    Icon(Icons.Default.Layers, contentDescription = "切换底图API", tint = IosBlue, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Layers, contentDescription = "切换底图API", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 }
                                 DropdownMenu(
                                     expanded = showMapTypeMenu,
@@ -1132,7 +1134,7 @@ fun MapScreen(
                                                 Text(
                                                     type.label,
                                                     fontWeight = if (type == currentMapType) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (type == currentMapType) IosBlue else IosColors.Label
+                                                    color = if (type == currentMapType) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                 )
                                             },
                                             onClick = {
@@ -1162,7 +1164,7 @@ fun MapScreen(
                                 Icon(
                                     imageVector = Icons.Default.Bookmark,
                                     contentDescription = if (activeMapTab == MapTab.LOCATION) "地点收藏" else "航线收藏",
-                                    tint = IosBlue,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1176,7 +1178,7 @@ fun MapScreen(
                                     Icon(
                                         imageVector = Icons.Default.FiberManualRecord,
                                         contentDescription = "轨迹录制",
-                                        tint = IosDanger,
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -1192,7 +1194,7 @@ fun MapScreen(
                                         Icon(
                                             Icons.Default.MoreVert,
                                             contentDescription = "更多路线工具",
-                                            tint = IosBlue,
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -1201,14 +1203,14 @@ fun MapScreen(
                                         onDismissRequest = { showMoreToolsMenu = false }
                                     ) {
                                         DropdownMenuItem(
-                                            text = { Text("沿路规划 🛣️", color = IosColors.Label) },
+                                            text = { Text("沿路规划 🛣️", color = MaterialTheme.colorScheme.onSurface) },
                                             onClick = {
                                                 showMoreToolsMenu = false
                                                 showRoadRouteDialog = true
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("导入 GPX 文件", color = IosColors.Label) },
+                                            text = { Text("导入 GPX 文件", color = MaterialTheme.colorScheme.onSurface) },
                                             onClick = {
                                                 showMoreToolsMenu = false
                                                 gpxPickerLauncher.launch(arrayOf("*/*"))
@@ -1242,9 +1244,9 @@ fun MapScreen(
                                         isLiquidGlass = isLiquidGlass,
                                         shape = AppShapes.pill,
                                         elevation = if (isSelected) 14.dp else 8.dp,
-                                        containerColor = if (isSelected) IosColors.SystemBlue else null
+                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary else null
                                     )
-                                    .bouncyClickable {
+                                    .clickable {
                                         simulationViewModel.setActiveTargetKey(null)
                                         val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                                         val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
@@ -1264,9 +1266,9 @@ fun MapScreen(
                                 ) {
                                     Text(
                                         text = "全局通用",
-                                        style = IosTypography.Subheadline,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (isSelected) Color.White else IosColors.Label
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -1278,7 +1280,7 @@ fun MapScreen(
                             key = { r: MultiTargetRule -> r.key }
                         ) { rule ->
                             val isSelected = activeTargetKey == rule.key
-                            val defaultRuleColor = IosColors.SystemBlue
+                            val defaultRuleColor = MaterialTheme.colorScheme.primary
                             val ruleColor = remember(rule.colorHex) {
                                 runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
                                     .logFailure("MapScreen", "parse rule color chip", Diag.Level.DEBUG)
@@ -1295,7 +1297,7 @@ fun MapScreen(
                                         elevation = if (isSelected) 14.dp else 8.dp,
                                         containerColor = if (isSelected) ruleColor else null
                                     )
-                                    .bouncyClickable {
+                                    .clickable {
                                         simulationViewModel.setActiveTargetKey(rule.key)
                                     centerAimingCoord = rule.latitude to rule.longitude
                                     val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
@@ -1312,7 +1314,7 @@ fun MapScreen(
                                     Surface(
                                         modifier = Modifier.size(8.dp),
                                         shape = CircleShape,
-                                        color = if (isSelected) Color.White else (if (rule.isEnabled) ruleColor else IosColors.SystemGray)
+                                        color = if (isSelected) Color.White else (if (rule.isEnabled) ruleColor else MaterialTheme.colorScheme.outline)
                                     ) {}
                                     Spacer(Modifier.width(6.dp))
                                     Text(
@@ -1322,7 +1324,7 @@ fun MapScreen(
                                         },
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else (if (rule.isEnabled) IosColors.Label else IosColors.SecondaryLabel)
+                                        color = if (isSelected) Color.White else (if (rule.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                                     )
                                 }
                             }
@@ -1340,7 +1342,7 @@ fun MapScreen(
                                         shape = AppShapes.pill,
                                         elevation = 8.dp
                                     )
-                                    .bouncyClickable { showMapAppPickerSheet = true }
+                                    .clickable { showMapAppPickerSheet = true }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -1351,7 +1353,7 @@ fun MapScreen(
                                     Icon(
                                         Icons.Default.Add,
                                         contentDescription = "添加分流",
-                                        tint = IosBlue,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(Modifier.width(4.dp))
@@ -1359,7 +1361,7 @@ fun MapScreen(
                                         text = "添加分流",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = IosBlue
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
@@ -1482,15 +1484,15 @@ fun MapScreen(
                         Surface(
                             shape = RoundedCornerShape(9.dp),
                             color = when (hookChannelStatus.active) {
-                                com.mockrun.app.hook.ActiveChannel.LSPOSED -> IosColors.SystemPurple.copy(alpha = 0.85f)
-                                com.mockrun.app.hook.ActiveChannel.PROVIDER_ONLY -> IosColors.SystemOrange.copy(alpha = 0.85f)
+                                com.mockrun.app.hook.ActiveChannel.LSPOSED -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f)
+                                com.mockrun.app.hook.ActiveChannel.PROVIDER_ONLY -> AppSemanticColors.current.warning.copy(alpha = 0.85f)
                                 com.mockrun.app.hook.ActiveChannel.NONE -> IosRed.copy(alpha = 0.85f)
                             }
                         ) {
                             Text(
                                 text = hookChannelStatus.shortLabel,
                                 color = Color.White,
-                                style = IosTypography.Caption2,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -1501,7 +1503,7 @@ fun MapScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(13.dp))
                                 .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
-                                .bouncyClickable {
+                                .clickable {
                                     simulationViewModel.stopPointMock(context)
                                     Toast.makeText(context, "已停止虚拟定位", Toast.LENGTH_SHORT).show()
                                 }
@@ -1513,7 +1515,7 @@ fun MapScreen(
                                 Text(
                                     "停止定位",
                                     color = Color.White,
-                                    style = IosTypography.Caption2,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1534,7 +1536,7 @@ fun MapScreen(
                     runCatching { Color(android.graphics.Color.parseColor(it.colorHex)) }
                         .logFailure("MapScreen", "parse aiming-color", Diag.Level.DEBUG)
                         .getOrNull()
-                } ?: IosBlue
+                } ?: MaterialTheme.colorScheme.primary
 
                 // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 32×40 水滴 Pin。
                 //
@@ -1828,8 +1830,8 @@ fun MapScreen(
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text("保存路线", fontWeight = FontWeight.Bold, color = IosColors.Label) },
-            containerColor = IosColors.SecondaryGroupedBackground,
+            title = { Text("保存路线", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             text = {
                 OutlinedTextField(
                     value = routeNameInput,
@@ -1845,7 +1847,7 @@ fun MapScreen(
                     showSaveDialog = false
                     routeNameInput = ""
                 }) {
-                    Text("保存", color = IosBlue, fontWeight = FontWeight.Bold)
+                    Text("保存", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

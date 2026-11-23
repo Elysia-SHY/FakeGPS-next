@@ -1,4 +1,8 @@
 package com.mockrun.app.feature.disclaimer
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,10 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.AppSpacing
-import com.mockrun.app.core.designsystem.IosColors
 import com.mockrun.app.core.designsystem.IosPrimaryButton
-import com.mockrun.app.core.designsystem.IosTypography
-import com.mockrun.app.core.designsystem.bouncyClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
@@ -158,7 +159,7 @@ fun DisclaimerGateScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(IosColors.SystemGroupedBackground, IosColors.Bg1)
+                    listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.surfaceContainerLow)
                 )
             )
     ) {
@@ -179,22 +180,22 @@ fun DisclaimerGateScreen(
                     Icon(
                         Icons.Default.Warning,
                         contentDescription = null,
-                        tint = IosColors.SystemOrange,
+                        tint = AppSemanticColors.current.warning,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = "使用前请阅读",
-                        style = IosTypography.Title2,
-                        color = IosColors.Label,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = "本软件会修改设备的定位行为，请在充分理解后果后使用。",
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -209,15 +210,15 @@ fun DisclaimerGateScreen(
                     disclaimerSections.forEach { (title, body) ->
                         Text(
                             text = title,
-                            style = IosTypography.Headline,
-                            color = IosColors.Label,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = body,
-                            style = IosTypography.Footnote,
-                            color = IosColors.SecondaryLabel
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(18.dp))
                     }
@@ -225,8 +226,8 @@ fun DisclaimerGateScreen(
                     // 正文末尾的落款，滚动到这里即代表读完
                     Text(
                         text = "—— 以上条款构成您与本软件作者之间的完整约定 ——",
-                        style = IosTypography.Caption2,
-                        color = IosColors.TertiaryLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -243,8 +244,8 @@ fun DisclaimerGateScreen(
                                 Brush.verticalGradient(
                                     listOf(
                                         Color.Transparent,
-                                        IosColors.SystemGroupedBackground.copy(alpha = 0.92f),
-                                        IosColors.SystemGroupedBackground
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                                        MaterialTheme.colorScheme.background
                                     )
                                 )
                             )
@@ -253,8 +254,8 @@ fun DisclaimerGateScreen(
                     ) {
                         Text(
                             text = "↓ 请向下滚动阅读至底部",
-                            style = IosTypography.Caption1,
-                            color = IosColors.SystemOrange,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AppSemanticColors.current.warning,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -265,7 +266,7 @@ fun DisclaimerGateScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(IosColors.SecondaryGroupedBackground)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .navigationBarsPadding()
                     .padding(horizontal = AppSpacing.pageH)
                     .padding(top = 16.dp, bottom = 20.dp)
@@ -273,16 +274,16 @@ fun DisclaimerGateScreen(
                 if (!reachedBottom) {
                     Text(
                         text = "阅读到最底部后即可输入确认短语。",
-                        style = IosTypography.Caption1,
-                        color = IosColors.TertiaryLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                 } else {
                     Text(
                         text = "请输入以下短语以确认（须完全一致）：",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
                     // 把待输入的短语显著展示出来，避免用户猜测或复制困难
@@ -290,13 +291,13 @@ fun DisclaimerGateScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(AppShapes.chip)
-                            .background(IosColors.SystemBlue.copy(alpha = 0.12f))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                             .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
                         Text(
                             text = DisclaimerPrefs.requiredPhrase,
-                            style = IosTypography.Mono13,
-                            color = IosColors.SystemBlue,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -308,14 +309,14 @@ fun DisclaimerGateScreen(
                             input = it
                             if (showMismatch) showMismatch = false
                         },
-                        placeholder = { Text("在此输入上方短语", style = IosTypography.Footnote) },
+                        placeholder = { Text("在此输入上方短语", style = MaterialTheme.typography.bodySmall) },
                         singleLine = true,
                         isError = showMismatch,
                         supportingText = {
                             if (showMismatch) {
                                 Text(
                                     "输入与要求不一致，请逐字核对",
-                                    style = IosTypography.Caption2
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             }
                         },
@@ -327,7 +328,7 @@ fun DisclaimerGateScreen(
 
                 IosPrimaryButton(
                     text = "确认并继续",
-                    containerColor = if (inputMatches) IosColors.SystemGreen else IosColors.SystemGray,
+                    containerColor = if (inputMatches) AppSemanticColors.current.success else MaterialTheme.colorScheme.outline,
                     icon = if (inputMatches) Icons.Default.CheckCircle else null,
                     enabled = reachedBottom && inputMatches,
                     onClick = {
@@ -343,14 +344,14 @@ fun DisclaimerGateScreen(
                         .fillMaxWidth()
                         .height(48.dp)
                         .clip(AppShapes.button)
-                        .border(1.dp, IosColors.Line, AppShapes.button)
-                        .bouncyClickable(onClick = onDecline),
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, AppShapes.button)
+                        .clickable(onClick = onDecline),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "不同意，退出应用",
-                        style = IosTypography.ButtonSmall,
-                        color = IosColors.SecondaryLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }

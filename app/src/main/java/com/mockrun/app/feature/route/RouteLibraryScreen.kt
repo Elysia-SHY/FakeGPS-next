@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.route
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.foundation.clickable
 
 import android.content.Intent
 import android.net.Uri
@@ -181,7 +184,7 @@ fun RouteLibraryScreen(
                 modifier = Modifier
                     .minTouchTarget()
                     .clip(CircleShape)
-                    .bouncyClickable {
+                    .clickable {
                         backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
                     },
                 contentAlignment = Alignment.Center
@@ -189,19 +192,19 @@ fun RouteLibraryScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "返回",
-                    tint = IosColors.Label,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(22.dp)
                 )
             }
             Spacer(Modifier.weight(1f))
             Text(
                 text = if (showTrackScreen) "关闭轨迹库" else "轨迹录制",
-                style = IosTypography.Footnote,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = IosColors.SystemBlue,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .minTouchTarget()
-                    .bouncyClickable { showTrackScreen = !showTrackScreen }
+                    .clickable { showTrackScreen = !showTrackScreen }
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
@@ -238,14 +241,14 @@ fun RouteLibraryScreen(
                 modifier = Modifier
                     .minTouchTarget()
                     .clip(CircleShape)
-                    .bouncyClickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
+                    .clickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
                 contentAlignment = Alignment.Center
             ) {
                 if (searchQuery.isNotEmpty()) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "清除搜索",
-                        tint = IosColors.SecondaryLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -313,15 +316,15 @@ fun RouteLibraryScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = route.name,
-                                        style = IosTypography.Headline,
-                                        color = IosColors.Label,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         text = "存档时间: ${dateFormatter.format(Date(route.createdAt))}",
-                                        style = IosTypography.Footnote,
-                                        color = IosColors.SecondaryLabel
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
 
@@ -333,13 +336,13 @@ fun RouteLibraryScreen(
                                     Spacer(Modifier.width(6.dp))
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = IosColors.SystemBlue.copy(alpha = 0.14f)
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                                     ) {
                                         Text(
                                             text = route.mode.label,
-                                            style = IosTypography.Caption2,
+                                            style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = IosColors.SystemBlue,
+                                            color = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                         )
                                     }
@@ -348,13 +351,13 @@ fun RouteLibraryScreen(
                                     Spacer(Modifier.width(6.dp))
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = IosColors.TertiarySystemFill
+                                        color = MaterialTheme.colorScheme.surfaceContainer
                                     ) {
                                         Text(
                                             text = "轨迹",
-                                            style = IosTypography.Caption2,
+                                            style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = IosColors.SecondaryLabel,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                         )
                                     }
@@ -370,7 +373,7 @@ fun RouteLibraryScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(9.dp),
-                                    color = IosColors.TertiarySystemFill
+                                    color = MaterialTheme.colorScheme.surfaceContainer
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -380,13 +383,13 @@ fun RouteLibraryScreen(
                                             Icons.Default.Place,
                                             contentDescription = null,
                                             modifier = Modifier.size(14.dp),
-                                            tint = IosColors.SystemBlue
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = "${"%.2f".format(route.totalDistanceKm)} km",
-                                            style = IosTypography.Caption1,
-                                            color = IosColors.Label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -394,7 +397,7 @@ fun RouteLibraryScreen(
 
                                 Surface(
                                     shape = RoundedCornerShape(9.dp),
-                                    color = IosColors.TertiarySystemFill
+                                    color = MaterialTheme.colorScheme.surfaceContainer
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -404,13 +407,13 @@ fun RouteLibraryScreen(
                                             Icons.Default.Check,
                                             contentDescription = null,
                                             modifier = Modifier.size(14.dp),
-                                            tint = IosColors.SystemGreen
+                                            tint = AppSemanticColors.current.success
                                         )
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = "${route.waypoints.size} 航点",
-                                            style = IosTypography.Caption1,
-                                            color = IosColors.Label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -418,7 +421,7 @@ fun RouteLibraryScreen(
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = IosColors.Separator.copy(alpha = 0.5f), thickness = 0.5.dp)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 0.5.dp)
                             Spacer(Modifier.height(10.dp))
 
                             // Bottom Row: 「更多」菜单（重命名 / 导出 GPX / 删除）+ 载入主 CTA
@@ -432,13 +435,13 @@ fun RouteLibraryScreen(
                                         modifier = Modifier
                                             .minTouchTarget()
                                             .clip(CircleShape)
-                                            .bouncyClickable { menuExpanded = true },
+                                            .clickable { menuExpanded = true },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.MoreVert,
                                             contentDescription = "更多操作",
-                                            tint = IosColors.SecondaryLabel,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -446,12 +449,12 @@ fun RouteLibraryScreen(
                                     DropdownMenu(
                                         expanded = menuExpanded,
                                         onDismissRequest = { menuExpanded = false },
-                                        containerColor = IosColors.SecondaryGroupedBackground
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer
                                     ) {
                                         DropdownMenuItem(
-                                            text = { Text("重命名", style = IosTypography.Subheadline, color = IosColors.Label) },
+                                            text = { Text("重命名", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
                                             leadingIcon = {
-                                                Icon(Icons.Default.Edit, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                                                Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                             },
                                             onClick = {
                                                 menuExpanded = false
@@ -460,9 +463,9 @@ fun RouteLibraryScreen(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("导出 GPX / 分享", style = IosTypography.Subheadline, color = IosColors.Label) },
+                                            text = { Text("导出 GPX / 分享", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
                                             leadingIcon = {
-                                                Icon(Icons.Default.Share, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                                                Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                             },
                                             onClick = {
                                                 menuExpanded = false
@@ -474,12 +477,12 @@ fun RouteLibraryScreen(
                                                 text = {
                                                     Text(
                                                         "运行方式改为「${targetMode.label}」",
-                                                        style = IosTypography.Subheadline,
-                                                        color = IosColors.Label
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurface
                                                     )
                                                 },
                                                 leadingIcon = {
-                                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                                 },
                                                 onClick = {
                                                     menuExpanded = false
@@ -496,9 +499,9 @@ fun RouteLibraryScreen(
                                             )
                                         }
                                         DropdownMenuItem(
-                                            text = { Text("删除路线", style = IosTypography.Subheadline, color = IosDanger) },
+                                            text = { Text("删除路线", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) },
                                             leadingIcon = {
-                                                Icon(Icons.Default.Delete, contentDescription = null, tint = IosDanger, modifier = Modifier.size(18.dp))
+                                                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                                             },
                                             onClick = {
                                                 menuExpanded = false
@@ -515,7 +518,7 @@ fun RouteLibraryScreen(
                                         onRouteSelected()
                                     },
                                     modifier = Modifier.weight(1f),
-                                    containerColor = if (isCurrent) IosColors.SystemGreen else IosColors.SystemBlue,
+                                    containerColor = if (isCurrent) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
                                     icon = if (isCurrent) Icons.Default.Check else Icons.Default.PlayArrow,
                                     height = 48.dp
                                 )
@@ -537,8 +540,8 @@ fun RouteLibraryScreen(
             title = {
                 Text(
                     text = "重命名路线",
-                    style = IosTypography.Headline,
-                    color = IosColors.Label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -546,12 +549,12 @@ fun RouteLibraryScreen(
                 OutlinedTextField(
                     value = renameInput,
                     onValueChange = { renameInput = it },
-                    label = { Text("路线新名称", style = IosTypography.Caption1) },
+                    label = { Text("路线新名称", style = MaterialTheme.typography.labelMedium) },
                     singleLine = true,
                     shape = RoundedCornerShape(13.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = IosColors.SystemBlue,
-                        unfocusedBorderColor = IosColors.Separator
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     )
                 )
             },
@@ -566,7 +569,7 @@ fun RouteLibraryScreen(
                     enabled = renameInput.isNotBlank(),
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("确定", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold, style = IosTypography.Headline)
+                    Text("确定", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             },
             dismissButton = {
@@ -574,10 +577,10 @@ fun RouteLibraryScreen(
                     onClick = { routeToRename = null },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = IosColors.SecondaryLabel, style = IosTypography.Headline)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
                 }
             },
-            containerColor = IosColors.SecondaryGroupedBackground,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -588,16 +591,16 @@ fun RouteLibraryScreen(
             title = {
                 Text(
                     text = "确认删除路线？",
-                    style = IosTypography.Headline,
-                    color = IosColors.Label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
                     text = "确定要删除路线「${route.name}」吗？此操作无法撤销。",
-                    style = IosTypography.Subheadline,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -608,7 +611,7 @@ fun RouteLibraryScreen(
                     },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("删除", color = IosDanger, fontWeight = FontWeight.Bold, style = IosTypography.Headline)
+                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             },
             dismissButton = {
@@ -616,10 +619,10 @@ fun RouteLibraryScreen(
                     onClick = { routeToDelete = null },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = IosColors.SecondaryLabel, style = IosTypography.Headline)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
                 }
             },
-            containerColor = IosColors.SecondaryGroupedBackground,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -673,16 +676,16 @@ private fun LibraryEmptyState(
         ) {
             Surface(
                 shape = RoundedCornerShape(22.dp),
-                color = IosColors.SecondaryGroupedBackground,
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier = Modifier.size(72.dp),
-                border = BorderStroke(0.5.dp, IosColors.Separator)
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         modifier = Modifier.size(36.dp),
-                        tint = IosColors.SecondaryLabel
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -691,8 +694,8 @@ private fun LibraryEmptyState(
 
             Text(
                 text = title,
-                style = IosTypography.Headline,
-                color = IosColors.Label,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
 
@@ -700,8 +703,8 @@ private fun LibraryEmptyState(
 
             Text(
                 text = subtitle,
-                style = IosTypography.Footnote,
-                color = IosColors.SecondaryLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 

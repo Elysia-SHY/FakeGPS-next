@@ -1,4 +1,5 @@
 package com.mockrun.app.feature.settings
+import androidx.compose.material3.MaterialTheme
 
 import android.content.Context
 import android.content.Intent
@@ -27,7 +28,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.IosColors
 import com.mockrun.app.core.designsystem.minTouchTarget
 
 @Composable
@@ -42,7 +42,7 @@ fun ChangelogDialog(
         onDismissRequest = onDismissRequest,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.NewReleases, contentDescription = null, tint = IosColors.SystemBlue)
+                Icon(Icons.Default.NewReleases, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text(
                     text = dialogTitle,
                     fontSize = 17.sp,
@@ -62,7 +62,7 @@ fun ChangelogDialog(
                     text = dialogContent,
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
-                    color = IosColors.Label
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -79,18 +79,18 @@ fun ChangelogDialog(
                         Toast.makeText(context, "无法打开更新日志", Toast.LENGTH_SHORT).show()
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("在线更新日志", color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("关闭", color = IosColors.SystemBlue)
+                Text("关闭", color = MaterialTheme.colorScheme.primary)
             }
         },
         shape = AppShapes.card,
-        containerColor = IosColors.SecondaryGroupedBackground
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     )
 }
 
@@ -102,13 +102,13 @@ fun DiagnosticRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = 13.sp, color = IosColors.SecondaryLabel)
+        Text(text = label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             text = value,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
-            color = IosColors.Label
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -152,12 +152,12 @@ fun CreditItem(
                     text = name,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = IosColors.Label
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
-                    tint = IosColors.SystemBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -165,7 +165,7 @@ fun CreditItem(
                 text = author,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = IosColors.SystemBlue
+                color = MaterialTheme.colorScheme.primary
             )
         }
         Spacer(Modifier.height(3.dp))
@@ -173,14 +173,14 @@ fun CreditItem(
             text = desc,
             fontSize = 11.5.sp,
             lineHeight = 16.sp,
-            color = IosColors.SecondaryLabel
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = url,
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
-            color = IosColors.SecondaryLabel.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -220,7 +220,7 @@ fun FeatureItem(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = IosColors.Label
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             if (tags.isNotEmpty()) {
@@ -254,7 +254,7 @@ fun FeatureItem(
                 text = desc,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
-                color = IosColors.SecondaryLabel
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

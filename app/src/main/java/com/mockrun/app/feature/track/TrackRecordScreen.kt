@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.track
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.foundation.clickable
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -55,7 +58,7 @@ fun TrackRecordScreen(
     val elapsedSec = if (isRecording && startedAt > 0) ((now - startedAt) / 1000).coerceAtLeast(0) else 0L
     val dateFormatter = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
 
-    Box(modifier = Modifier.fillMaxSize().background(IosColors.SystemGroupedBackground)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -74,22 +77,22 @@ fun TrackRecordScreen(
                     modifier = Modifier
                         .minTouchTarget()
                         .clip(CircleShape)
-                        .bouncyClickable(onClick = onClose),
+                        .clickable(onClick = onClose),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = IosColors.Label,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(Modifier.width(4.dp))
                 Text(
                     "轨迹录制",
-                    style = IosTypography.Headline,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = IosColors.Label,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -105,22 +108,22 @@ fun TrackRecordScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 if (isRecording) "● 录制中" else "未在录制",
-                                style = IosTypography.Subheadline,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isRecording) IosDanger else IosColors.SecondaryLabel
+                                color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 "${"%.2f".format(distance / 1000.0)} km · $pointCount 点 · ${formatDuration(elapsedSec)}",
-                                style = IosTypography.Title2,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "不需要 Root。屏幕可以关，手机放口袋即可；从最近任务划掉不会丢数据。",
-                                style = IosTypography.Caption1,
-                                color = IosColors.SecondaryLabel
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(12.dp))
                             IosPrimaryButton(
@@ -142,8 +145,8 @@ fun TrackRecordScreen(
                 item {
                     Text(
                         "已录轨迹（${tracks.size}）",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SecondaryLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                     )
                 }
@@ -152,8 +155,8 @@ fun TrackRecordScreen(
                     item {
                         Text(
                             "还没有录制过轨迹。走一遍没有路网的地方（操场、小区），回来就能把它变成巡航路线。",
-                            style = IosTypography.Caption1,
-                            color = IosColors.SecondaryLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
                     }
@@ -165,16 +168,16 @@ fun TrackRecordScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     track.name,
-                                    style = IosTypography.Subheadline,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.Label,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 if (track.isFavorite) {
                                     Icon(
                                         Icons.Default.Star,
                                         contentDescription = "已收藏",
-                                        tint = IosWarning,
+                                        tint = AppSemanticColors.current.warning,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -184,22 +187,22 @@ fun TrackRecordScreen(
                                 "${"%.2f".format(track.distanceMeters / 1000.0)} km · ${formatDuration(track.durationMs / 1000)} · " +
                                     "${"%.1f".format(track.avgSpeedKmh)} km/h" +
                                     if (track.avgCadenceSpm > 0) " · ${track.avgCadenceSpm} SPM" else " · 步频估算",
-                                style = IosTypography.Caption1,
-                                color = IosColors.SecondaryLabel
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "${dateFormatter.format(Date(track.startedAt))} · ${track.pointCount} 点" +
                                     if (track.isClosed) " · 闭合" else "",
-                                style = IosTypography.Footnote,
-                                color = IosColors.SecondaryLabel
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = { trackViewModel.toggleFavorite(track) }) {
                                     Text(
                                         if (track.isFavorite) "取消收藏" else "收藏",
-                                        style = IosTypography.Caption1,
+                                        style = MaterialTheme.typography.labelMedium,
                                         maxLines = 1
                                     )
                                 }
@@ -213,10 +216,10 @@ fun TrackRecordScreen(
                                         }
                                     }
                                 }) {
-                                    Text("转成路线", style = IosTypography.Caption1, maxLines = 1)
+                                    Text("转成路线", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                 }
                                 OutlinedButton(onClick = { trackViewModel.delete(track.id) }) {
-                                    Text("删除", style = IosTypography.Caption1, color = IosDanger, maxLines = 1)
+                                    Text("删除", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error, maxLines = 1)
                                 }
                             }
                         }

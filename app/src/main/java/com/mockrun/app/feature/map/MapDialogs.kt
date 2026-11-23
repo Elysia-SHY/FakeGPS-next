@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.map
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import android.content.Context
 import android.widget.Toast
@@ -50,8 +52,8 @@ import com.mockrun.app.ui.viewmodel.SimulationViewModel
 //   C. 品牌更新对话框 → Dialog，圆角 28dp（唯一例外，见 AppUpdateDialog）
 //
 //   三条共用的细则：
-//     1. 底板统一 IosColors.SecondaryGroupedBackground
-//     2. 标题 IosTypography.Headline + Bold + IosColors.Label；副标题 IosTypography.Caption1
+//     1. 底板统一 MaterialTheme.colorScheme.surfaceContainer
+//     2. 标题 MaterialTheme.typography.titleMedium + Bold + MaterialTheme.colorScheme.onSurface；副标题 MaterialTheme.typography.labelMedium
 //     3. 所有可点击元素 ≥48dp 触区（Modifier.minTouchTarget() 放在 bouncyClickable 外层）
 //     4. 内容超出可视区一律可滚动，输入区补 imePadding()
 // =============================================================================
@@ -67,7 +69,7 @@ private fun SheetDragHandle() {
             .padding(vertical = 10.dp)
             .size(width = 36.dp, height = 5.dp),
         shape = CircleShape,
-        color = IosColors.SystemGray.copy(alpha = 0.4f)
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
     ) {}
 }
 
@@ -88,16 +90,16 @@ private fun SheetHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = IosTypography.Headline,
-                color = IosColors.Label,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -106,14 +108,14 @@ private fun SheetHeader(
             modifier = Modifier
                 .minTouchTarget()
                 .clip(CircleShape)
-                .background(IosColors.SystemGray.copy(alpha = 0.15f))
-                .bouncyClickable(onClick = onClose),
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                .clickable(onClick = onClose),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = "关闭",
-                tint = IosColors.SecondaryLabel,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -136,7 +138,7 @@ private fun TappableChip(
     Box(
         modifier = Modifier
             .minTouchTarget()
-            .bouncyClickable(onClick = onClick),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -147,7 +149,7 @@ private fun TappableChip(
             Text(
                 text = text,
                 color = color,
-                style = IosTypography.Caption1,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
             )
@@ -176,7 +178,7 @@ fun SearchLocationDialog(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = IosColors.SecondaryGroupedBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = SheetCorner,
         dragHandle = { SheetDragHandle() }
     ) {
@@ -211,7 +213,7 @@ fun SearchLocationDialog(
                             modifier = Modifier
                                 .minTouchTarget()
                                 .clip(CircleShape)
-                                .bouncyClickable {
+                                .clickable {
                                     textInput = ""
                                     mapViewModel.clearSearch()
                                 },
@@ -220,7 +222,7 @@ fun SearchLocationDialog(
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "清空",
-                                tint = IosColors.SecondaryLabel,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -229,7 +231,7 @@ fun SearchLocationDialog(
             )
 
             // Quick Popular Shortcut Chips
-            Text("热门地点直达：", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+            Text("热门地点直达：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -250,7 +252,7 @@ fun SearchLocationDialog(
                 items(quickPois) { (name, coords) ->
                     TappableChip(
                         text = name,
-                        color = IosInfo,
+                        color = MaterialTheme.colorScheme.primary,
                         outlined = true,
                         onClick = {
                             textInput = name
@@ -260,7 +262,7 @@ fun SearchLocationDialog(
                 }
             }
 
-            HorizontalDivider(color = IosColors.Separator.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             // Search Results or Loading
             if (isSearching) {
@@ -269,9 +271,9 @@ fun SearchLocationDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = IosColors.SystemBlue, strokeWidth = 2.5.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.5.dp)
                         Spacer(Modifier.height(8.dp))
-                        Text("正在联网检索地点信息...", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                        Text("正在联网检索地点信息...", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else if (searchResults.isNotEmpty()) {
@@ -282,8 +284,8 @@ fun SearchLocationDialog(
                     items(searchResults) { item ->
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = IosColors.TertiaryGroupedBackground,
-                            border = BorderStroke(0.5.dp, IosHairlineBorder),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
                             shadowElevation = 1.dp,
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -292,15 +294,15 @@ fun SearchLocationDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Place, contentDescription = null, tint = IosInfo, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text(item.name, fontWeight = FontWeight.Bold, style = IosTypography.Subheadline, color = IosColors.Label)
+                                    Text(item.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                 }
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = item.address,
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SecondaryLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2
                                 )
                                 Spacer(Modifier.height(4.dp))
@@ -312,22 +314,22 @@ fun SearchLocationDialog(
                                 ) {
                                     TappableChip(
                                         text = "定位到此",
-                                        color = IosInfo,
+                                        color = MaterialTheme.colorScheme.primary,
                                         onClick = { onSelectLocation(item.latitude, item.longitude, item.name) }
                                     )
                                     TappableChip(
                                         text = "设为起点",
-                                        color = IosSuccess,
+                                        color = AppSemanticColors.current.success,
                                         onClick = { onSetAsOrigin(item.latitude, item.longitude) }
                                     )
                                     TappableChip(
                                         text = "设为终点",
-                                        color = IosWarning,
+                                        color = AppSemanticColors.current.warning,
                                         onClick = { onSetAsDestination(item.latitude, item.longitude) }
                                     )
                                     TappableChip(
                                         text = "即刻伪装",
-                                        color = IosDanger,
+                                        color = MaterialTheme.colorScheme.error,
                                         onClick = { onDirectMock(item.latitude, item.longitude) }
                                     )
                                 }
@@ -342,8 +344,8 @@ fun SearchLocationDialog(
                 ) {
                     Text(
                         "未找到相关地点，请尝试更通用的地名或输入坐标",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
@@ -353,8 +355,8 @@ fun SearchLocationDialog(
                 ) {
                     Text(
                         "输入地名或直接粘贴经纬度即可全网智能联想定位",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -398,7 +400,7 @@ fun RoadRouteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = IosColors.SecondaryGroupedBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = SheetCorner,
         dragHandle = { SheetDragHandle() }
     ) {
@@ -420,8 +422,8 @@ fun RoadRouteDialog(
             // 1. Origin Card
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = IosColors.TertiaryGroupedBackground,
-                border = BorderStroke(0.5.dp, IosHairlineBorder),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -432,10 +434,10 @@ fun RoadRouteDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
-                                modifier = Modifier.size(10.dp).clip(CircleShape).background(IosSuccess)
+                                modifier = Modifier.size(10.dp).clip(CircleShape).background(AppSemanticColors.current.success)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = IosTypography.Subheadline, color = IosColors.Label)
+                            Text("起点 (Origin)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                         }
                         // 组合期取快照：roadOrigin 是 collectAsState() 委托，
                         // 「清除」按钮会在点击时把它置为 null，
@@ -447,20 +449,20 @@ fun RoadRouteDialog(
                                 Box(
                                     modifier = Modifier
                                         .minTouchTarget()
-                                        .bouncyClickable {
+                                        .clickable {
                                             onNavigateToOrigin(origin.latitude, origin.longitude)
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("定位", color = IosInfo, style = IosTypography.Caption1)
+                                    Text("定位", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
                                 }
                                 Box(
                                     modifier = Modifier
                                         .minTouchTarget()
-                                        .bouncyClickable { mapViewModel.setRoadOrigin(null) },
+                                        .clickable { mapViewModel.setRoadOrigin(null) },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("清除", color = IosDanger, style = IosTypography.Caption1)
+                                    Text("清除", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
                                 }
                             }
                         }
@@ -468,30 +470,30 @@ fun RoadRouteDialog(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = roadOrigin?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置起点",
-                        style = IosTypography.Body,
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (roadOrigin != null) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (roadOrigin != null) IosColors.Label else IosColors.SecondaryLabel
+                        color = if (roadOrigin != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (selectedTapPoint != null) {
                             TappableChip(
                                 text = "使用当前选点",
-                                color = IosSuccess,
+                                color = AppSemanticColors.current.success,
                                 onClick = { mapViewModel.setRoadOrigin(WayPoint(selectedTapPoint.first, selectedTapPoint.second)) }
                             )
                         }
                         if (pointMockLocation != null) {
                             TappableChip(
                                 text = "使用模拟点",
-                                color = IosWarning,
+                                color = AppSemanticColors.current.warning,
                                 onClick = { mapViewModel.setRoadOrigin(pointMockLocation) }
                             )
                         }
                         if (realLocation != null) {
                             TappableChip(
                                 text = "使用物理位置",
-                                color = IosInfo,
+                                color = MaterialTheme.colorScheme.primary,
                                 onClick = { mapViewModel.setRoadOrigin(WayPoint(realLocation.first, realLocation.second)) }
                             )
                         }
@@ -502,8 +504,8 @@ fun RoadRouteDialog(
             // 2. Destination Card
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = IosColors.TertiaryGroupedBackground,
-                border = BorderStroke(0.5.dp, IosHairlineBorder),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -514,42 +516,42 @@ fun RoadRouteDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
-                                modifier = Modifier.size(10.dp).clip(CircleShape).background(IosWarning)
+                                modifier = Modifier.size(10.dp).clip(CircleShape).background(AppSemanticColors.current.warning)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("终点 (Destination)", fontWeight = FontWeight.Bold, style = IosTypography.Subheadline, color = IosColors.Label)
+                            Text("终点 (Destination)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (roadDestination != null) {
                             Box(
                                 modifier = Modifier
                                     .minTouchTarget()
-                                    .bouncyClickable { mapViewModel.setRoadDestination(null) },
+                                    .clickable { mapViewModel.setRoadDestination(null) },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("清除", color = IosDanger, style = IosTypography.Caption1)
+                                Text("清除", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = roadDestination?.let { "${"%.4f".format(it.latitude)}, ${"%.4f".format(it.longitude)}" } ?: "尚未设置终点",
-                        style = IosTypography.Body,
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (roadDestination != null) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (roadDestination != null) IosColors.Label else IosColors.SecondaryLabel
+                        color = if (roadDestination != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (selectedTapPoint != null) {
                             TappableChip(
                                 text = "使用当前选点",
-                                color = IosWarning,
+                                color = AppSemanticColors.current.warning,
                                 onClick = { mapViewModel.setRoadDestination(WayPoint(selectedTapPoint.first, selectedTapPoint.second)) }
                             )
                         }
                         if (roadOrigin != null && roadDestination != null) {
                             TappableChip(
                                 text = "互换起终点",
-                                color = IosColors.SystemGray,
+                                color = MaterialTheme.colorScheme.outline,
                                 onClick = {
                                     val temp = roadOrigin
                                     mapViewModel.setRoadOrigin(roadDestination)
@@ -562,11 +564,11 @@ fun RoadRouteDialog(
             }
 
             // 3. Transport Mode Selector (Segmented Control)
-            Text("出行方式 (道路拓扑权重)：", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+            Text("出行方式 (道路拓扑权重)：", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = IosColors.TertiarySystemFill
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Row(
                     modifier = Modifier
@@ -586,7 +588,7 @@ fun RoadRouteDialog(
                                 .weight(1f)
                                 .minTouchTarget()
                                 .clip(RoundedCornerShape(13.dp))
-                                .bouncyClickable { mapViewModel.setRoadMode(mode) },
+                                .clickable { mapViewModel.setRoadMode(mode) },
                             contentAlignment = Alignment.Center
                         ) {
                             Surface(
@@ -599,8 +601,8 @@ fun RoadRouteDialog(
                                     Text(
                                         text = "${mode.emoji} ${mode.label}",
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) activeTextColor else IosColors.SecondaryLabel,
-                                        style = IosTypography.Caption1
+                                        color = if (isSelected) activeTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.labelMedium
                                     )
                                 }
                             }
@@ -615,8 +617,8 @@ fun RoadRouteDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("模拟移动速度", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
-                Text("${speedSliderValue.toInt()} km/h", fontWeight = FontWeight.Bold, color = IosInfo, style = IosTypography.Caption1)
+                Text("模拟移动速度", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${speedSliderValue.toInt()} km/h", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
             }
             Slider(
                 value = speedSliderValue,
@@ -624,9 +626,9 @@ fun RoadRouteDialog(
                 valueRange = 1f..120f,
                 steps = 119,
                 colors = SliderDefaults.colors(
-                    thumbColor = IosColors.SystemBlue,
-                    activeTrackColor = IosColors.SystemBlue,
-                    inactiveTrackColor = IosGlassTrack
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
             )
 
@@ -655,22 +657,22 @@ fun RoadRouteDialog(
                 val result = calculatedRoadResult!!
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = IosSuccess.copy(alpha = 0.12f),
-                    border = BorderStroke(0.5.dp, IosSuccess.copy(alpha = 0.3f)),
+                    color = AppSemanticColors.current.success.copy(alpha = 0.12f),
+                    border = BorderStroke(0.5.dp, AppSemanticColors.current.success.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = IosSuccess, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("路线已绘制至底图", fontWeight = FontWeight.Bold, color = IosSuccess, style = IosTypography.Subheadline)
+                            Text("路线已绘制至底图", fontWeight = FontWeight.Bold, color = AppSemanticColors.current.success, style = MaterialTheme.typography.bodyMedium)
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "距离: ${"%.2f".format(result.distanceKm)} km · 预计耗时: ${"%.0f".format(result.durationMinutes)} 分钟 · 折点数: ${result.waypoints.size}",
-                            style = IosTypography.Caption1,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = IosColors.Label
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(10.dp))
                         IosPrimaryButton(
@@ -685,7 +687,7 @@ fun RoadRouteDialog(
                                 Toast.makeText(context, "已开启沿真实道路模拟运动！", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            containerColor = IosSuccess,
+                            containerColor = AppSemanticColors.current.success,
                             icon = Icons.AutoMirrored.Filled.DirectionsRun,
                             height = 50.dp
                         )

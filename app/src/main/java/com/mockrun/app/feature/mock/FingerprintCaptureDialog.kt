@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.mock
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -36,8 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.IosTypography
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -88,7 +88,7 @@ fun FingerprintCaptureDialog(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("采集环境指纹", style = IosTypography.Headline) },
+        title = { Text("采集环境指纹", style = MaterialTheme.typography.titleMedium) },
         text = {
             // 原实现没有滚动也没有 IME 避让：小屏或大字号下，
             // 键盘弹出会顶掉底部按钮，取消/开始采集点不到。
@@ -100,8 +100,8 @@ fun FingerprintCaptureDialog(
                 Text(
                     text = "请在目标地点、且已关闭虚拟定位的状态下采集。" +
                         "采集会扫描 Wi-Fi、基站与蓝牙，约需 12–15 秒。",
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (localMockActive) {
@@ -110,22 +110,22 @@ fun FingerprintCaptureDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(IosColors.SystemOrange.copy(alpha = 0.14f))
+                            .background(AppSemanticColors.current.warning.copy(alpha = 0.14f))
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.Warning,
                             contentDescription = null,
-                            tint = IosColors.SystemOrange,
+                            tint = AppSemanticColors.current.warning,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "虚拟定位正在运行，此时采集会记录伪造环境。",
-                                style = IosTypography.Caption1,
-                                color = IosColors.SystemOrange
+                                style = MaterialTheme.typography.labelMedium,
+                                color = AppSemanticColors.current.warning
                             )
                         }
                         if (onStopMock != null) {
@@ -145,8 +145,8 @@ fun FingerprintCaptureDialog(
                             ) {
                                 Text(
                                     "停止模拟",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SystemOrange
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppSemanticColors.current.warning
                                 )
                             }
                         }
@@ -180,8 +180,8 @@ fun FingerprintCaptureDialog(
                 ) {
                     Text(
                         text = "采集点坐标（WGS-84）",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (onRequestRealLocation != null) {
                         TextButton(
@@ -200,13 +200,13 @@ fun FingerprintCaptureDialog(
                                 Icons.Default.MyLocation,
                                 contentDescription = null,
                                 modifier = Modifier.size(13.dp),
-                                tint = IosColors.SystemBlue
+                                tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 "获取本机真实位置",
-                                style = IosTypography.Caption2,
-                                color = IosColors.SystemBlue
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -221,8 +221,8 @@ fun FingerprintCaptureDialog(
                         } else {
                             "来源：$currentSourceHint（建议点击右上角获取本机真实位置）"
                         },
-                        style = IosTypography.Caption2,
-                        color = if (isRealLocationSource) IosColors.SystemGreen else IosColors.SystemOrange
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isRealLocationSource) AppSemanticColors.current.success else AppSemanticColors.current.warning
                     )
                 }
 
@@ -253,8 +253,8 @@ fun FingerprintCaptureDialog(
 
                 Text(
                     text = "采集期间请留在本页，避免切换页面导致采集中断。",
-                    style = IosTypography.Caption2,
-                    color = IosColors.TertiaryLabel
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
         },

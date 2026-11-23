@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.settings
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 
 import android.content.ClipData
@@ -371,13 +373,13 @@ fun AboutScreen(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(AppShapes.icon)
-                                    .background(if (hasCustomWallpaper) IosColors.SystemGreen.copy(alpha = 0.18f) else IosColors.SystemPurple.copy(alpha = 0.18f)),
+                                    .background(if (hasCustomWallpaper) AppSemanticColors.current.success.copy(alpha = 0.18f) else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (hasCustomWallpaper) Icons.Default.AddPhotoAlternate else Icons.Default.Palette,
                                     contentDescription = null,
-                                    tint = if (hasCustomWallpaper) IosColors.SystemGreen else IosColors.SystemPurple,
+                                    tint = if (hasCustomWallpaper) AppSemanticColors.current.success else MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -386,19 +388,19 @@ fun AboutScreen(
                                     text = if (hasCustomWallpaper) "已应用自选相册壁纸" else "默认纯色背景",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.Label
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = if (hasCustomWallpaper) "选择照片作为全应用底衬，卡片将通透毛玻璃折射" else "纯黑 / 纯白纯色底衬，卡片呈通透毛玻璃折射",
                                     fontSize = 11.5.sp,
-                                    color = IosColors.SecondaryLabel
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
 
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                     // Action Buttons
                     Row(
@@ -416,14 +418,14 @@ fun AboutScreen(
                                     modifier = Modifier.heightIn(min = 48.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
-                                    Text("恢复默认", fontSize = 12.5.sp, color = IosColors.SystemRed)
+                                    Text("恢复默认", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.error)
                                 }
                             }
                             Button(
                                 onClick = { photoPickerLauncher.launch("image/*") },
                                 modifier = Modifier.heightIn(min = 48.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasCustomWallpaper) IosColors.SystemGreen else IosColors.SystemBlue
+                                    containerColor = if (hasCustomWallpaper) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary
                                 ),
                                 shape = AppShapes.button,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
@@ -449,7 +451,7 @@ fun AboutScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-                    .bouncyClickable { onNavigateToLibrary() }
+                    .clickable { onNavigateToLibrary() }
             ) {
                 Row(
                     modifier = Modifier
@@ -466,13 +468,13 @@ fun AboutScreen(
                             modifier = Modifier
                                 .size(38.dp)
                                 .clip(AppShapes.icon)
-                                .background(IosColors.SystemPurple.copy(0.18f)),
+                                .background(MaterialTheme.colorScheme.tertiary.copy(0.18f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Folder,
                                 contentDescription = null,
-                                tint = IosColors.SystemPurple,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -482,12 +484,12 @@ fun AboutScreen(
                                 text = "已收藏路线与航点库",
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "管理历史规划、导入/导出 GPX 文件",
                                 fontSize = 11.5.sp,
-                                color = IosColors.SecondaryLabel
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -495,7 +497,7 @@ fun AboutScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = IosColors.SecondaryLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -546,10 +548,10 @@ fun AboutScreen(
                                     .clip(AppShapes.icon)
                                     .background(
                                         when (sync) {
-                                            is VersionSyncStatus.HasUpdate -> IosColors.SystemOrange.copy(0.18f)
-                                            is VersionSyncStatus.UpToDate -> IosColors.SystemGreen.copy(0.18f)
-                                            is VersionSyncStatus.Error -> IosColors.SystemRed.copy(0.18f)
-                                            else -> IosColors.SystemBlue.copy(0.18f)
+                                            is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning.copy(0.18f)
+                                            is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success.copy(0.18f)
+                                            is VersionSyncStatus.Error -> MaterialTheme.colorScheme.error.copy(0.18f)
+                                            else -> MaterialTheme.colorScheme.primary.copy(0.18f)
                                         }
                                     ),
                                 contentAlignment = Alignment.Center
@@ -563,10 +565,10 @@ fun AboutScreen(
                                     },
                                     contentDescription = null,
                                     tint = when (sync) {
-                                        is VersionSyncStatus.HasUpdate -> IosColors.SystemOrange
-                                        is VersionSyncStatus.UpToDate -> IosColors.SystemGreen
-                                        is VersionSyncStatus.Error -> IosColors.SystemRed
-                                        else -> IosColors.SystemBlue
+                                        is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
+                                        is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
+                                        is VersionSyncStatus.Error -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.primary
                                     },
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -577,7 +579,7 @@ fun AboutScreen(
                                     text = "云端版本自动同步",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.Label
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
@@ -590,10 +592,10 @@ fun AboutScreen(
                                     },
                                     fontSize = 11.5.sp,
                                     color = when (sync) {
-                                        is VersionSyncStatus.HasUpdate -> IosColors.SystemOrange
-                                        is VersionSyncStatus.UpToDate -> IosColors.SystemGreen
-                                        is VersionSyncStatus.Error -> IosColors.SystemRed
-                                        else -> IosColors.SecondaryLabel
+                                        is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
+                                        is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
+                                        is VersionSyncStatus.Error -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
                                 )
                             }
@@ -603,7 +605,7 @@ fun AboutScreen(
                         Box(
                             modifier = Modifier
                                 .minTouchTarget()
-                                .bouncyClickable(enabled = !isChecking) {
+                                .clickable(enabled = !isChecking) {
                                     scope.launch {
                                         val res = VersionSyncManager.checkForUpdates(force = true)
                                         when (res) {
@@ -620,13 +622,13 @@ fun AboutScreen(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(IosColors.SystemFill),
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "刷新同步",
-                                    tint = IosColors.Label,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier
                                         .size(18.dp)
                                         .then(if (isChecking) Modifier.rotate(angle) else Modifier)
@@ -636,7 +638,7 @@ fun AboutScreen(
                     }
 
                     Spacer(Modifier.height(14.dp))
-                    HorizontalDivider(color = IosColors.Line)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(Modifier.height(12.dp))
 
                     // Version comparison matrix
@@ -649,7 +651,7 @@ fun AboutScreen(
                             Text(
                                 text = "当前安装版本",
                                 fontSize = 11.5.sp,
-                                color = IosColors.SecondaryLabel
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
@@ -657,14 +659,14 @@ fun AboutScreen(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
-                            tint = IosColors.SecondaryLabel.copy(alpha = 0.5f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(16.dp)
                         )
 
@@ -672,7 +674,7 @@ fun AboutScreen(
                             Text(
                                 text = "云端最新版本",
                                 fontSize = 11.5.sp,
-                                color = IosColors.SecondaryLabel
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(2.dp))
                             val remoteName = when (sync) {
@@ -687,9 +689,9 @@ fun AboutScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 color = when (sync) {
-                                    is VersionSyncStatus.HasUpdate -> IosColors.SystemOrange
-                                    is VersionSyncStatus.UpToDate -> IosColors.SystemGreen
-                                    else -> IosColors.SecondaryLabel
+                                    is VersionSyncStatus.HasUpdate -> AppSemanticColors.current.warning
+                                    is VersionSyncStatus.UpToDate -> AppSemanticColors.current.success
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 }
                             )
                         }
@@ -702,8 +704,8 @@ fun AboutScreen(
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = AppShapes.button,
-                            color = IosColors.SystemOrange.copy(alpha = 0.12f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, IosColors.SystemOrange.copy(alpha = 0.35f))
+                            color = AppSemanticColors.current.warning.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AppSemanticColors.current.warning.copy(alpha = 0.35f))
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
@@ -715,19 +717,19 @@ fun AboutScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(Icons.Default.Celebration, contentDescription = null, tint = IosColors.SystemOrange, modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Default.Celebration, contentDescription = null, tint = AppSemanticColors.current.warning, modifier = Modifier.size(20.dp))
                                         Text(
                                             text = "发现新版本 ${info.versionName}",
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = IosColors.Label
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                     if (info.releaseDate.isNotBlank()) {
                                         Text(
                                             text = info.releaseDate,
                                             fontSize = 11.5.sp,
-                                            color = IosColors.SecondaryLabel
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -755,8 +757,8 @@ fun AboutScreen(
                                                     .fillMaxWidth()
                                                     .height(6.dp)
                                                     .clip(RoundedCornerShape(3.dp)),
-                                                color = IosColors.SystemOrange,
-                                                trackColor = IosColors.SystemOrange.copy(alpha = 0.2f)
+                                                color = AppSemanticColors.current.warning,
+                                                trackColor = AppSemanticColors.current.warning.copy(alpha = 0.2f)
                                             )
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -767,12 +769,12 @@ fun AboutScreen(
                                                     text = "${(dl.progress * 100).toInt()}% (${formatMb(dl.downloadedBytes)} / ${formatMb(dl.totalBytes)})",
                                                     fontSize = 11.5.sp,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    color = IosColors.Label.copy(alpha = 0.9f)
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                                                 )
                                                 Text(
                                                     text = formatSpeed(dl.speedBytesPerSec),
                                                     fontSize = 11.5.sp,
-                                                    color = IosColors.SystemOrange,
+                                                    color = AppSemanticColors.current.warning,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
@@ -781,7 +783,7 @@ fun AboutScreen(
                                                 modifier = Modifier.fillMaxWidth().height(48.dp),
                                                 shape = AppShapes.button
                                             ) {
-                                                Text("取消下载", fontSize = 12.sp, color = IosColors.SystemRed)
+                                                Text("取消下载", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                                             }
                                         }
                                     }
@@ -796,11 +798,11 @@ fun AboutScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = IosColors.SystemGreen, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(16.dp))
                                                 Text(
                                                     text = "新版本已下载就绪 (${formatMb(file.length())})",
                                                     fontSize = 12.sp,
-                                                    color = IosColors.SystemGreen,
+                                                    color = AppSemanticColors.current.success,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                             }
@@ -823,7 +825,7 @@ fun AboutScreen(
                                                     },
                                                     modifier = Modifier.weight(1.3f).height(48.dp),
                                                     shape = AppShapes.button,
-                                                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemGreen)
+                                                    colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.success)
                                                 ) {
                                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                                                     Spacer(Modifier.width(4.dp))
@@ -842,7 +844,7 @@ fun AboutScreen(
                                             Text(
                                                 text = "下载失败: $errMsg",
                                                 fontSize = 11.5.sp,
-                                                color = IosColors.SystemRed
+                                                color = MaterialTheme.colorScheme.error
                                             )
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -852,7 +854,7 @@ fun AboutScreen(
                                                     onClick = { VersionSyncManager.startDownload(context, info) },
                                                     modifier = Modifier.weight(1f).height(48.dp),
                                                     shape = AppShapes.button,
-                                                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemOrange)
+                                                    colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.warning)
                                                 ) {
                                                     Text("重试在线下载", fontSize = 12.sp, color = Color.White)
                                                 }
@@ -885,7 +887,7 @@ fun AboutScreen(
                                                 },
                                                 modifier = Modifier.weight(1f).height(48.dp),
                                                 shape = AppShapes.button,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = IosColors.Label)
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                                             ) {
                                                 Text("更新说明", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                             }
@@ -896,7 +898,7 @@ fun AboutScreen(
                                                 },
                                                 modifier = Modifier.weight(1.3f).height(48.dp),
                                                 shape = AppShapes.button,
-                                                colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemOrange)
+                                                colors = ButtonDefaults.buttonColors(containerColor = AppSemanticColors.current.warning)
                                             ) {
                                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                                                 Spacer(Modifier.width(5.dp))
@@ -912,7 +914,7 @@ fun AboutScreen(
                                                 modifier = Modifier
                                                     .minTouchTarget()
                                                     .clip(AppShapes.chip)
-                                                    .bouncyClickable {
+                                                    .clickable {
                                                         try {
                                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
                                                             context.startActivity(intent)
@@ -925,7 +927,7 @@ fun AboutScreen(
                                                 Text(
                                                     text = "备用：在浏览器中直接下载",
                                                     fontSize = 11.sp,
-                                                    color = IosColors.SystemBlue
+                                                    color = MaterialTheme.colorScheme.primary
                                                 )
                                             }
                                         }
@@ -948,18 +950,18 @@ fun AboutScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(AppShapes.button)
-                                .background(IosColors.SystemGreen.copy(alpha = 0.1f))
+                                .background(AppSemanticColors.current.success.copy(alpha = 0.1f))
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = IosColors.SystemGreen, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Default.Check, contentDescription = null, tint = AppSemanticColors.current.success, modifier = Modifier.size(15.dp))
                                 Text(
                                     text = "已是最新版本 · $timeStr 已同步",
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = IosColors.SystemGreen
+                                    color = AppSemanticColors.current.success
                                 )
                             }
 
@@ -970,7 +972,7 @@ fun AboutScreen(
                                 modifier = Modifier.heightIn(min = 48.dp),
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("查看日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = IosColors.SystemBlue)
+                                Text("查看日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -982,18 +984,18 @@ fun AboutScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(AppShapes.button)
-                                .background(IosColors.SystemRed.copy(alpha = 0.1f))
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = IosColors.SystemRed, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(15.dp))
                                 Text(
                                     text = "网络离线或同步受阻",
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = IosColors.SystemRed
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
 
@@ -1004,7 +1006,7 @@ fun AboutScreen(
                                 modifier = Modifier.heightIn(min = 48.dp),
                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("本地日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = IosColors.SystemBlue)
+                                Text("本地日志", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -1030,30 +1032,30 @@ fun AboutScreen(
                     val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
 
                     DiagnosticRow(label = "设备型号", value = deviceModel)
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     DiagnosticRow(label = "系统版本", value = osInfo)
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     DiagnosticRow(label = "指令集架构", value = abi)
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     DiagnosticRow(label = "构建变体", value = "${BuildConfig.BUILD_TYPE.replaceFirstChar { it.uppercase() }} (R8 混淆优化)")
 
                     Spacer(Modifier.height(4.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = AppShapes.button,
-                        color = IosColors.SystemBlue.copy(alpha = 0.08f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                     ) {
                         Row(
                             modifier = Modifier.padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Text(
                                 text = "LSPosed 作用域先勾选「系统框架 (system)」和系统定位服务（Android/小米/OPPO fused provider）；需要分流、Mock 隐藏或步频/计步的目标应用，还必须单独勾选。仅系统框架不保证 OEM fused 或目标应用生效。",
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp,
-                                color = IosColors.SecondaryLabel
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1070,7 +1072,7 @@ fun AboutScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .md3Surface(shape = AppShapes.card, elevation = 2.dp)
-                    .bouncyClickable { showDetailsSheet = true }
+                    .clickable { showDetailsSheet = true }
             ) {
                 Row(
                     modifier = Modifier
@@ -1088,13 +1090,13 @@ fun AboutScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(AppShapes.icon)
-                                .background(IosColors.SystemBlue.copy(alpha = 0.18f)),
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                tint = IosColors.SystemBlue,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1104,12 +1106,12 @@ fun AboutScreen(
                                 text = "关于与致谢",
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "品牌介绍 · 架构特性 · 官网 · 联系 · 开源许可",
                                 fontSize = 11.5.sp,
-                                color = IosColors.SecondaryLabel
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1117,7 +1119,7 @@ fun AboutScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = IosColors.SecondaryLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -1137,7 +1139,7 @@ private fun AboutDetailsSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = IosColors.SecondaryGroupedBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
             Surface(
@@ -1145,7 +1147,7 @@ private fun AboutDetailsSheet(
                     .padding(vertical = 10.dp)
                     .size(width = 36.dp, height = 5.dp),
                 shape = CircleShape,
-                color = IosColors.SystemGray.copy(alpha = 0.4f)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
             ) {}
         }
     ) {
@@ -1167,14 +1169,14 @@ private fun AboutDetailsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "关于 FakeGPS-next",
-                        style = IosTypography.Title2,
-                        color = IosColors.Label
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = "品牌介绍 · 架构特性 · 官网 · 联系 · 开源许可",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1187,7 +1189,7 @@ private fun AboutDetailsSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.card,
-                color = IosColors.Surface2
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
@@ -1197,12 +1199,12 @@ private fun AboutDetailsSheet(
                         text = "系统框架底层分流 · 物理运动学拟真 · 动态多星座 GNSS 星历合成",
                         fontSize = 13.sp,
                         lineHeight = 19.sp,
-                        color = IosColors.Label
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "构建时间: ${BuildConfig.BUILD_TIME} · 当前版本 ${BuildConfig.VERSION_NAME}",
                         fontSize = 12.sp,
-                        color = IosColors.SecondaryLabel
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1215,7 +1217,7 @@ private fun AboutDetailsSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.card,
-                color = IosColors.Surface2
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
@@ -1223,31 +1225,31 @@ private fun AboutDetailsSheet(
                 ) {
                     FeatureItem(
                         icon = Icons.AutoMirrored.Filled.AltRoute,
-                        iconTint = IosColors.SystemBlue,
+                        iconTint = MaterialTheme.colorScheme.primary,
                         title = "多应用独立分流路由 (Multi-Target)",
                         tags = listOf("AOSP 8~15 全兼容", "多开分身支持", "零锁高频 IPC", "真实物理透传"),
                         desc = "突破全系统单点模拟限制。可为微信、钉钉、高德等单独指派独立虚拟位置与专属路线，支持多开分身 (User 999) 独立识别绑定，未添加应用自动走真实物理定位。"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     FeatureItem(
                         icon = Icons.Default.Lock,
-                        iconTint = IosColors.SystemGreen,
+                        iconTint = AppSemanticColors.current.success,
                         title = "系统内核集中拦截 (system_server Hook)",
                         tags = listOf("系统框架 + 目标应用", "需要显式 scope", "派发监听全拦截", "AOSP 丢包抑制"),
                         desc = "系统框架负责系统层路由；目标应用必须在 LSPosed scope 中单独勾选，才能稳定收到分流/隐藏/步频注入。只勾系统框架时，目标应用侧可能仍读真实值。不要把它理解成“全设备零注入”。"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     FeatureItem(
                         icon = Icons.Default.PlayArrow,
-                        iconTint = IosColors.SystemOrange,
+                        iconTint = AppSemanticColors.current.warning,
                         title = "离线运动学物理仿真 (Kinematics Pro)",
                         tags = listOf("向心加速度减速", "双峰步频微动", "高斯地形海拔起伏"),
                         desc = "结合外接圆过弯向心减速约束 (v <= sqrt(a*R)) 杜绝急转弯超速异常；步频双峰微动模型拟真人体步态；高斯地形模型生成逼真海拔曲线。"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     FeatureItem(
                         icon = Icons.Default.SatelliteAlt,
-                        iconTint = IosColors.SystemPurple,
+                        iconTint = MaterialTheme.colorScheme.tertiary,
                         title = "动态多星座 GNSS 星历合成 (Synthetic GNSS)",
                         tags = listOf("北斗/GPS/GLONASS", "16~24 动态卫星", "天顶角仰角 C/N0"),
                         desc = "合成北斗、GPS 与 GLONASS 多星座卫星分布与 24~42 dB-Hz 动态信噪比，在遮挡时叠加多径衰减，解决模拟定位开启后搜星数为 0 触发平台秒封的问题。"
@@ -1263,7 +1265,7 @@ private fun AboutDetailsSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.card,
-                color = IosColors.Surface2
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     Row(
@@ -1274,13 +1276,13 @@ private fun AboutDetailsSheet(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(AppShapes.icon)
-                                .background(IosColors.SystemFill),
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Code,
                                 contentDescription = null,
-                                tint = IosColors.Label,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -1290,13 +1292,13 @@ private fun AboutDetailsSheet(
                                 text = "项目主页与发布页",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = VersionSyncManager.HOMEPAGE_URL,
                                 fontSize = 12.sp,
-                                color = IosColors.SystemBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1320,8 +1322,8 @@ private fun AboutDetailsSheet(
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = AppShapes.button,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = IosColors.SystemFill,
-                                contentColor = IosColors.Label
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             )
                         ) {
                             Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1343,7 +1345,7 @@ private fun AboutDetailsSheet(
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = AppShapes.button,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = IosColors.SystemBlue,
+                                containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = Color.White
                             )
                         ) {
@@ -1363,7 +1365,7 @@ private fun AboutDetailsSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.card,
-                color = IosColors.Surface2
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -1374,13 +1376,13 @@ private fun AboutDetailsSheet(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(AppShapes.icon)
-                                .background(IosColors.SystemFill),
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Email,
                                 contentDescription = null,
-                                tint = IosColors.Label,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -1390,13 +1392,13 @@ private fun AboutDetailsSheet(
                                 text = "邮箱",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IosColors.Label
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = VersionSyncManager.CONTACT_EMAIL,
                                 fontSize = 12.sp,
-                                color = IosColors.SystemBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1419,8 +1421,8 @@ private fun AboutDetailsSheet(
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = AppShapes.button,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = IosColors.SystemFill,
-                                contentColor = IosColors.Label
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             )
                         ) {
                             Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1451,7 +1453,7 @@ private fun AboutDetailsSheet(
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = AppShapes.button,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = IosColors.SystemBlue,
+                                containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = Color.White
                             )
                         ) {
@@ -1471,7 +1473,7 @@ private fun AboutDetailsSheet(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.card,
-                color = IosColors.Surface2
+                color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
@@ -1483,56 +1485,56 @@ private fun AboutDetailsSheet(
                         desc = "现代化 Jetpack Compose 玻璃拟态 (Glassmorphism) 与实时毛玻璃背景模糊渲染库",
                         url = "https://github.com/chrisbanes/haze"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "OSMDroid",
                         author = "osmdroid",
                         desc = "免 Key 开源 OpenStreetMap 高速瓦片底图渲染引擎与多手势地图控制器",
                         url = "https://github.com/osmdroid/osmdroid"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "LSPosed Framework",
                         author = "LSPosed Developers",
                         desc = "现代化 ART 运行时系统级 Hook 与 Xposed API 挂载注入框架，接管系统服务分发",
                         url = "https://github.com/LSPosed/LSPosed"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "Jetpack Compose",
                         author = "Google / AOSP",
                         desc = "Android 官方现代化声明式响应式 UI 工具包与 Material 3 基础套件",
                         url = "https://github.com/androidx/androidx"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "Kotlin Coroutines & Flow",
                         author = "JetBrains",
                         desc = "高性能异步并发控制与响应式状态流调度框架，驱动网络与位置模拟引擎",
                         url = "https://github.com/Kotlin/kotlinx.coroutines"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "Dagger Hilt",
                         author = "Google",
                         desc = "Android 官方标准编译期静态依赖注入组件，构建松耦合高扩展架构",
                         url = "https://github.com/google/dagger"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "Room Database",
                         author = "Google / Android Jetpack",
                         desc = "类型安全 SQLite 对象关系映射数据库，支持自定义轨迹与路线持久化存储",
                         url = "https://developer.android.com/training/data-storage/room"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "Gson",
                         author = "Google",
                         desc = "轻量级高性能 JSON 数据序列化与反序列化解析库，处理云端版本同步与配置交换",
                         url = "https://github.com/google/gson"
                     )
-                    HorizontalDivider(color = IosColors.LineSoft)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(
                         name = "LocationSpoofer",
                         author = "HuangZhuoRui",

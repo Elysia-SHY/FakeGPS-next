@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.route
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.foundation.clickable
 
 import android.content.Context
 import android.content.Intent
@@ -135,7 +138,7 @@ fun RouteSimulationScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(IosColors.SystemGroupedBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 100.dp),
@@ -159,15 +162,15 @@ fun RouteSimulationScreen(
         ) {
             Text(
                 text = "拟真配速与多点巡航漫游",
-                style = IosTypography.Footnote,
-                color = IosColors.SecondaryLabel
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "路线模拟",
-                    style = IosTypography.Display,
-                    color = IosColors.Label,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f, fill = false)
                 )
                 Spacer(Modifier.weight(1f))
@@ -192,7 +195,7 @@ fun RouteSimulationScreen(
                     title = r.name,
                     subtitle = "共 ${r.waypoints.size} 个折点 · 总里程 ${"%.2f".format(totalDistanceKm)} km · 预计耗时约 $estTimeMinutes 分钟",
                     icon = Icons.Default.Place,
-                    iconBackground = IosColors.SystemBlue
+                    iconBackground = MaterialTheme.colorScheme.primary
                 )
 
                 IosHairlineDivider(startIndent = 58.dp)
@@ -208,18 +211,18 @@ fun RouteSimulationScreen(
                             .weight(1f)
                             .height(38.dp)
                             .clip(RoundedCornerShape(13.dp))
-                            .bouncyClickable { onNavigateToMap() },
+                            .clickable { onNavigateToMap() },
                         shape = RoundedCornerShape(13.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("地图查看", color = IosColors.SystemBlue, style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                            Text("地图查看", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
@@ -228,18 +231,18 @@ fun RouteSimulationScreen(
                             .weight(1f)
                             .height(38.dp)
                             .clip(RoundedCornerShape(13.dp))
-                            .bouncyClickable { showRoutePickerDialog = true },
+                            .clickable { showRoutePickerDialog = true },
                         shape = RoundedCornerShape(13.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("切换路线", color = IosColors.SystemBlue, style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                            Text("切换路线", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -250,14 +253,14 @@ fun RouteSimulationScreen(
                 ) {
                     Text(
                         text = "尚未载入模拟路线",
-                        style = IosTypography.Headline,
-                        color = IosColors.Label
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "请从路线库选择历史路线，或直接导入 GPX 轨迹文件",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -274,9 +277,9 @@ fun RouteSimulationScreen(
                             .weight(1.2f)
                             .height(40.dp)
                             .clip(RoundedCornerShape(13.dp))
-                            .bouncyClickable { showRoutePickerDialog = true },
+                            .clickable { showRoutePickerDialog = true },
                         shape = RoundedCornerShape(13.dp),
-                        color = IosColors.SystemBlue
+                        color = MaterialTheme.colorScheme.primary
                     ) {
                         Row(
                             modifier = Modifier.fillMaxSize(),
@@ -285,7 +288,7 @@ fun RouteSimulationScreen(
                         ) {
                             Icon(Icons.Default.Menu, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("选择已有路线 (${savedRoutes.size})", color = Color.White, style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                            Text("选择已有路线 (${savedRoutes.size})", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
@@ -294,18 +297,18 @@ fun RouteSimulationScreen(
                             .weight(0.9f)
                             .height(40.dp)
                             .clip(RoundedCornerShape(13.dp))
-                            .bouncyClickable { gpxPickerLauncher.launch(arrayOf("*/*")) },
+                            .clickable { gpxPickerLauncher.launch(arrayOf("*/*")) },
                         shape = RoundedCornerShape(13.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxSize(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("导入 GPX", color = IosColors.SystemBlue, style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                            Text("导入 GPX", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -344,14 +347,14 @@ fun RouteSimulationScreen(
                 ) {
                     Text(
                         text = if ((simState.route?.mode ?: RouteMode.ONE_WAY) == RouteMode.ONE_WAY) "路线巡航进度" else "本轮进度",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "${(simState.progressPercent * 100).toInt()}%",
-                        style = IosTypography.Subheadline,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = IosColors.SystemBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(Modifier.height(4.dp))
@@ -371,7 +374,7 @@ fun RouteSimulationScreen(
                     },
                     valueRange = 0f..1f,
                     enabled = simState.status is SimulationStatus.Running || simState.status is SimulationStatus.Paused,
-                    colors = SliderDefaults.colors(thumbColor = IosColors.SystemBlue, activeTrackColor = IosColors.SystemBlue)
+                    colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary)
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -387,7 +390,7 @@ fun RouteSimulationScreen(
                     is SimulationStatus.Idle, is SimulationStatus.Completed -> {
                         IosPrimaryButton(
                             text = if (hasValidRoute) "开始模拟路线" else "请先选定路线",
-                            containerColor = if (hasValidRoute) IosColors.SystemGreen else IosColors.SystemGray,
+                            containerColor = if (hasValidRoute) AppSemanticColors.current.success else MaterialTheme.colorScheme.outline,
                             icon = Icons.Default.PlayArrow,
                             onClick = {
                                 if (route != null && route.waypoints.size >= 2) {
@@ -406,14 +409,14 @@ fun RouteSimulationScreen(
                         ) {
                             IosPrimaryButton(
                                 text = "暂停模拟",
-                                containerColor = IosColors.SystemOrange,
+                                containerColor = AppSemanticColors.current.warning,
                                 icon = Icons.Default.PlayArrow,
                                 modifier = Modifier.weight(1f),
                                 onClick = { simulationViewModel.pauseSimulation(context) }
                             )
                             IosPrimaryButton(
                                 text = "停止模拟",
-                                containerColor = IosColors.SystemRed,
+                                containerColor = MaterialTheme.colorScheme.error,
                                 icon = Icons.Default.Close,
                                 modifier = Modifier.weight(1f),
                                 onClick = { simulationViewModel.stopSimulation(context) }
@@ -427,14 +430,14 @@ fun RouteSimulationScreen(
                         ) {
                             IosPrimaryButton(
                                 text = "继续模拟",
-                                containerColor = IosColors.SystemGreen,
+                                containerColor = AppSemanticColors.current.success,
                                 icon = Icons.Default.PlayArrow,
                                 modifier = Modifier.weight(1f),
                                 onClick = { simulationViewModel.resumeSimulation(context) }
                             )
                             IosPrimaryButton(
                                 text = "停止模拟",
-                                containerColor = IosColors.SystemRed,
+                                containerColor = MaterialTheme.colorScheme.error,
                                 icon = Icons.Default.Close,
                                 modifier = Modifier.weight(1f),
                                 onClick = { simulationViewModel.stopSimulation(context) }
@@ -444,7 +447,7 @@ fun RouteSimulationScreen(
                     is SimulationStatus.Error -> {
                         IosPrimaryButton(
                             text = "重置状态",
-                            containerColor = IosColors.SystemRed,
+                            containerColor = MaterialTheme.colorScheme.error,
                             onClick = { simulationViewModel.stopSimulation(context) }
                         )
                     }
@@ -464,16 +467,16 @@ fun RouteSimulationScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("当前配速", style = IosTypography.Headline, color = IosColors.Label)
+                    Text("当前配速", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                     Surface(
                         shape = RoundedCornerShape(13.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Text(
                             text = "${"%.1f".format(selectedSpeed)} km/h",
-                            style = IosTypography.Headline,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = IosColors.SystemBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -497,12 +500,12 @@ fun RouteSimulationScreen(
                     presetSpeeds.forEach { (speedVal, emoji, numStr) ->
                         val isSelected = kotlin.math.abs(selectedSpeed - speedVal) < 0.5f
                         val chipBg by animateColorAsState(
-                            targetValue = if (isSelected) IosColors.SystemBlue else IosColors.TertiarySystemFill.copy(alpha = 0.55f),
+                            targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
                             animationSpec = tween(180),
                             label = "speedChipBg"
                         )
                         val textColor by animateColorAsState(
-                            targetValue = if (isSelected) Color.White else IosColors.Label,
+                            targetValue = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                             animationSpec = tween(180),
                             label = "speedChipTextColor"
                         )
@@ -513,7 +516,7 @@ fun RouteSimulationScreen(
                                 .height(38.dp)
                                 .clip(RoundedCornerShape(13.dp))
                                 .background(chipBg)
-                                .bouncyClickable { applySpeed(speedVal) },
+                                .clickable { applySpeed(speedVal) },
                             contentAlignment = Alignment.Center
                         ) {
                             Row(
@@ -524,7 +527,7 @@ fun RouteSimulationScreen(
                                 Spacer(Modifier.width(3.dp))
                                 Text(
                                     text = numStr,
-                                    style = IosTypography.Caption1,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = textColor
                                 )
@@ -540,9 +543,9 @@ fun RouteSimulationScreen(
                     onValueChange = { applySpeed(it) },
                     valueRange = 1f..120f,
                     colors = SliderDefaults.colors(
-                        thumbColor = IosColors.SystemBlue,
-                        activeTrackColor = IosColors.SystemBlue,
-                        inactiveTrackColor = IosColors.TertiarySystemFill.copy(alpha = 0.6f)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f)
                     )
                 )
 
@@ -552,9 +555,9 @@ fun RouteSimulationScreen(
                         .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("1 km/h", style = IosTypography.Caption2, color = IosColors.SecondaryLabel)
-                    Text("60 km/h", style = IosTypography.Caption2, color = IosColors.SecondaryLabel)
-                    Text("120 km/h", style = IosTypography.Caption2, color = IosColors.SecondaryLabel)
+                    Text("1 km/h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("60 km/h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("120 km/h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -563,7 +566,7 @@ fun RouteSimulationScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = IosColors.TertiarySystemFill.copy(alpha = 0.45f)
+                    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -572,7 +575,7 @@ fun RouteSimulationScreen(
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = null,
-                            tint = IosColors.SystemBlue,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(8.dp))
@@ -588,8 +591,8 @@ fun RouteSimulationScreen(
                             placeholder = {
                                 Text(
                                     "输入任意精确配速 (如 12.5)",
-                                    style = IosTypography.Footnote,
-                                    color = IosColors.SecondaryLabel
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -604,12 +607,12 @@ fun RouteSimulationScreen(
                         )
                         Surface(
                             shape = RoundedCornerShape(9.dp),
-                            color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         ) {
                             Text(
                                 text = "km/h",
-                                style = IosTypography.Caption1,
-                                color = IosColors.SystemBlue,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
@@ -635,12 +638,12 @@ fun RouteSimulationScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("启用步频与计步仿真", style = IosTypography.Headline, color = IosColors.Label)
+                        Text("启用步频与计步仿真", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(Modifier.height(2.dp))
                         Text(
                             "按路线速度生成步频、步数与加速度，注入 LSPosed 作用域中勾选的目标应用；未勾选的应用收不到",
-                            style = IosTypography.Caption1,
-                            color = IosColors.SecondaryLabel
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
@@ -649,7 +652,7 @@ fun RouteSimulationScreen(
                         onCheckedChange = { simulationViewModel.setCadenceEnabled(it, selectedSpeed) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = IosColors.SystemGreen
+                            checkedTrackColor = AppSemanticColors.current.success
                         )
                     )
                 }
@@ -700,7 +703,7 @@ fun RouteSimulationScreen(
                     IosHairlineDivider()
                     Spacer(Modifier.height(14.dp))
 
-                    Text("步频拟真模式", style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold, color = IosColors.Label)
+                    Text("步频拟真模式", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(8.dp))
 
                     val modes = listOf(
@@ -718,11 +721,11 @@ fun RouteSimulationScreen(
                         modes.forEach { (mode, label) ->
                             val isSelected = sensorState.cadenceMode == mode
                             val chipBg by animateColorAsState(
-                                targetValue = if (isSelected) IosColors.SystemGreen else IosColors.TertiarySystemFill.copy(alpha = 0.55f),
+                                targetValue = if (isSelected) AppSemanticColors.current.success else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
                                 label = "cadenceChipBg"
                             )
                             val textColor by animateColorAsState(
-                                targetValue = if (isSelected) Color.White else IosColors.Label,
+                                targetValue = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                                 label = "cadenceChipTextColor"
                             )
 
@@ -732,7 +735,7 @@ fun RouteSimulationScreen(
                                     .height(36.dp)
                                     .clip(RoundedCornerShape(13.dp))
                                     .background(chipBg)
-                                    .bouncyClickable {
+                                    .clickable {
                                         val targetCadence = when (mode) {
                                             CadenceMode.WALK -> 110
                                             CadenceMode.JOG -> 160
@@ -746,7 +749,7 @@ fun RouteSimulationScreen(
                             ) {
                                 Text(
                                     text = label,
-                                    style = IosTypography.Caption1,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = textColor
                                 )
@@ -770,7 +773,7 @@ fun RouteSimulationScreen(
                                         }
                                     }
                                 },
-                                placeholder = { Text("输入步频 (如 172)", style = IosTypography.Footnote) },
+                                placeholder = { Text("输入步频 (如 172)", style = MaterialTheme.typography.bodySmall) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
@@ -781,11 +784,11 @@ fun RouteSimulationScreen(
                                 singleLine = true,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .background(IosColors.TertiarySystemFill.copy(alpha = 0.45f), RoundedCornerShape(13.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f), RoundedCornerShape(13.dp))
                                     .padding(horizontal = 10.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("SPM (步/分)", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                            Text("SPM (步/分)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
@@ -798,9 +801,9 @@ fun RouteSimulationScreen(
                         TextButton(
                             onClick = { simulationViewModel.resetSteps() }
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = IosColors.SecondaryLabel)
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(4.dp))
-                            Text("清零步数", color = IosColors.SecondaryLabel, style = IosTypography.Footnote)
+                            Text("清零步数", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -824,21 +827,21 @@ fun RouteSimulationScreen(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(IosColors.SystemGreen.copy(alpha = 0.15f)),
+                            .background(AppSemanticColors.current.success.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = IosColors.SystemGreen,
+                            tint = AppSemanticColors.current.success,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("全链路 GPS 真实感注入中", style = IosTypography.Headline, color = IosColors.Label)
+                        Text("全链路 GPS 真实感注入中", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(Modifier.height(2.dp))
-                        Text("多星定位协议 · 高斯微漂移 · 自然配速呼吸抖动", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                        Text("多星定位协议 · 高斯微漂移 · 自然配速呼吸抖动", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -854,7 +857,7 @@ fun RouteSimulationScreen(
                         value = "21 颗",
                         subtitle = "GPS+北斗+Galileo",
                         icon = Icons.Default.Star,
-                        tint = IosColors.SystemOrange
+                        tint = AppSemanticColors.current.warning
                     )
                     GpsFeatureCard(
                         modifier = Modifier.weight(1f),
@@ -862,7 +865,7 @@ fun RouteSimulationScreen(
                         value = "±1.8 m",
                         subtitle = "动态 1.5~2.5m 真实浮动",
                         icon = Icons.Default.LocationOn,
-                        tint = IosColors.SystemBlue
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -875,7 +878,7 @@ fun RouteSimulationScreen(
                         value = "±0.3 m",
                         subtitle = "Box-Muller 消除静态死点",
                         icon = Icons.Default.Refresh,
-                        tint = IosColors.SystemIndigo
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     GpsFeatureCard(
                         modifier = Modifier.weight(1f),
@@ -883,7 +886,7 @@ fun RouteSimulationScreen(
                         value = "±5%",
                         subtitle = "模拟真实跑步体力起伏",
                         icon = Icons.Default.PlayArrow,
-                        tint = IosColors.SystemGreen
+                        tint = AppSemanticColors.current.success
                     )
                 }
 
@@ -896,7 +899,7 @@ fun RouteSimulationScreen(
                         value = "${"%.1f".format(simState.currentWayPoint?.altitude ?: 25.0)} m",
                         subtitle = "真实路网地形起伏仿真",
                         icon = Icons.Default.Place,
-                        tint = IosColors.SystemTeal
+                        tint = MaterialTheme.colorScheme.secondary
                     )
                     GpsFeatureCard(
                         modifier = Modifier.weight(1f),
@@ -904,7 +907,7 @@ fun RouteSimulationScreen(
                         value = "${"%.0f".format(simState.bearing)}°",
                         subtitle = "路线转弯平滑平角过渡",
                         icon = Icons.Default.Send,
-                        tint = IosColors.SystemPurple
+                        tint = MaterialTheme.colorScheme.tertiary
                     )
                 }
             }
@@ -917,7 +920,7 @@ fun RouteSimulationScreen(
         AlertDialog(
             onDismissRequest = { showRoutePickerDialog = false },
             title = {
-                Text("选择要模拟的路线", style = IosTypography.Title3, fontWeight = FontWeight.Bold, color = IosColors.Label)
+                Text("选择要模拟的路线", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             },
             text = {
                 if (savedRoutes.isEmpty()) {
@@ -925,13 +928,13 @@ fun RouteSimulationScreen(
                         modifier = Modifier.padding(vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("路线库暂无存档", style = IosTypography.Body, color = IosColors.SecondaryLabel)
+                        Text("路线库暂无存档", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         TextButton(onClick = {
                             showRoutePickerDialog = false
                             onNavigateToMap()
                         }) {
-                            Text("前往地图绘制路线", color = IosColors.SystemBlue, style = IosTypography.Headline)
+                            Text("前往地图绘制路线", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 } else {
@@ -942,14 +945,14 @@ fun RouteSimulationScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .bouncyClickable {
+                                    .clickable {
                                         mapViewModel.selectRoute(route)
                                         showRoutePickerDialog = false
                                         Toast.makeText(context, "已载入路线: ${route.name}", Toast.LENGTH_SHORT).show()
                                     },
                                 shape = RoundedCornerShape(16.dp),
-                                color = if (selectedRoute?.id == route.id) IosColors.SystemBlue.copy(alpha = 0.12f) else IosColors.TertiarySystemFill,
-                                border = BorderStroke(0.5.dp, if (selectedRoute?.id == route.id) IosColors.SystemBlue else IosColors.Separator.copy(alpha = 0.3f))
+                                color = if (selectedRoute?.id == route.id) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
+                                border = BorderStroke(0.5.dp, if (selectedRoute?.id == route.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(12.dp),
@@ -957,11 +960,11 @@ fun RouteSimulationScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(route.name, fontWeight = FontWeight.Bold, style = IosTypography.Headline, color = IosColors.Label)
-                                        Text("${route.waypoints.size} 个折点 · ${"%.2f".format(route.totalDistanceKm)} km", style = IosTypography.Footnote, color = IosColors.SecondaryLabel)
+                                        Text(route.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("${route.waypoints.size} 个折点 · ${"%.2f".format(route.totalDistanceKm)} km", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     if (selectedRoute?.id == route.id) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -975,15 +978,15 @@ fun RouteSimulationScreen(
                         showRoutePickerDialog = false
                         onNavigateToLibrary()
                     }) {
-                        Text("路线库管理", color = IosColors.SystemBlue, fontWeight = FontWeight.SemiBold)
+                        Text("路线库管理", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
                     TextButton(onClick = { showRoutePickerDialog = false }) {
-                        Text("取消", color = IosColors.SecondaryLabel)
+                        Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
             shape = RoundedCornerShape(16.dp),
-            containerColor = IosColors.SecondaryGroupedBackground
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     }
 }
@@ -994,11 +997,11 @@ fun RouteSimulationScreen(
 @Composable
 private fun StatusBadge(status: SimulationStatus) {
     val (text, color) = when (status) {
-        is SimulationStatus.Idle -> "待机" to IosColors.SecondaryLabel
-        is SimulationStatus.Running -> "模拟运行中" to IosColors.SystemGreen
-        is SimulationStatus.Paused -> "已暂停" to IosColors.SystemOrange
-        is SimulationStatus.Completed -> "模拟完成" to IosColors.SystemBlue
-        is SimulationStatus.Error -> "异常" to IosColors.SystemRed
+        is SimulationStatus.Idle -> "待机" to MaterialTheme.colorScheme.onSurfaceVariant
+        is SimulationStatus.Running -> "模拟运行中" to AppSemanticColors.current.success
+        is SimulationStatus.Paused -> "已暂停" to AppSemanticColors.current.warning
+        is SimulationStatus.Completed -> "模拟完成" to MaterialTheme.colorScheme.primary
+        is SimulationStatus.Error -> "异常" to MaterialTheme.colorScheme.error
     }
 
     Surface(
@@ -1008,7 +1011,7 @@ private fun StatusBadge(status: SimulationStatus) {
         Text(
             text = text,
             color = color,
-            style = IosTypography.Chip,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
@@ -1018,9 +1021,9 @@ private fun StatusBadge(status: SimulationStatus) {
 @Composable
 private fun MetricItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = IosTypography.Title2, fontWeight = FontWeight.Bold, color = IosColors.Label)
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(2.dp))
-        Text(label, style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1036,18 +1039,18 @@ private fun GpsFeatureCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = IosColors.TertiarySystemFill.copy(alpha = 0.4f)
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(title, style = IosTypography.Caption2, color = IosColors.SecondaryLabel)
+                Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(4.dp))
-            Text(value, style = IosTypography.Subheadline, fontWeight = FontWeight.Bold, color = IosColors.Label)
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))
-            Text(subtitle, style = IosTypography.Caption2, color = IosColors.SecondaryLabel.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

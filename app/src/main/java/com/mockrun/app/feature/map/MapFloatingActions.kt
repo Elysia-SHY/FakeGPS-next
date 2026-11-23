@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.map
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.clickable
 
 import android.content.Context
 import android.widget.Toast
@@ -17,8 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.CoordinateConverter
-import com.mockrun.app.core.designsystem.IosBlue
-import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import org.osmdroid.util.GeoPoint
@@ -53,7 +53,7 @@ fun MapFloatingActions(
                 modifier = Modifier
                     .size(54.dp)
                     .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
-                    .bouncyClickable {
+                    .clickable {
                         val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                         val points = drawnWaypoints.map { wp ->
                             if (isGcj) CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude) else (wp.latitude to wp.longitude)
@@ -69,7 +69,7 @@ fun MapFloatingActions(
                 color = Color.Transparent
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = IosBlue, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.CenterFocusStrong, contentDescription = "全览路线", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -79,7 +79,7 @@ fun MapFloatingActions(
             modifier = Modifier
                 .size(54.dp)
                 .liquidGlass(isLiquidGlass = isLiquidGlass, shape = CircleShape, elevation = 14.dp)
-                .bouncyClickable {
+                .clickable {
                     if (isPointMockActive) simulationViewModel.stopPointMock(context)
                     if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
                     CoordinateConverter.clearSavedRealLocation(context)
@@ -118,7 +118,7 @@ fun MapFloatingActions(
             color = Color.Transparent
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = IosBlue, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.MyLocation, contentDescription = "真机物理定位", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             }
         }
     }

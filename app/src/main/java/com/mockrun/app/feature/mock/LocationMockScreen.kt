@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.mock
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.ui.text.font.FontFamily
 
 
 import android.content.ClipData
@@ -325,7 +328,7 @@ fun LocationMockScreen(
                 title = "微信/打卡软件仍显示真实位置？",
                 subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
                 icon = Icons.Default.Info,
-                iconBackground = IosColors.SystemOrange,
+                iconBackground = AppSemanticColors.current.warning,
                 trailingText = if (showTroubleshootHint) "收起" else "排查",
                 showChevron = !showTroubleshootHint,
                 onClick = { showTroubleshootHint = !showTroubleshootHint }
@@ -339,13 +342,13 @@ fun LocationMockScreen(
                             text = "若目标应用仍读取到真实位置，通常是系统级 Wi‑Fi / 蓝牙背景扫描" +
                                 "仍在回传真实周边环境。可在下方「系统防护与保活状态」中开启 " +
                                 "Root 注入模式，由系统底层关闭扫描并分发虚拟坐标。",
-                            style = IosTypography.Footnote,
-                            color = IosColors.SecondaryLabel
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(10.dp))
                         IosPrimaryButton(
                             text = "查看完整排查指南",
-                            containerColor = IosColors.SystemOrange,
+                            containerColor = AppSemanticColors.current.warning,
                             icon = Icons.Default.Build,
                             onClick = { showWeChatGuideSheet = true }
                         )
@@ -370,7 +373,7 @@ fun LocationMockScreen(
                 Surface(
                     modifier = Modifier.size(36.dp),
                     shape = RoundedCornerShape(9.dp),
-                    color = IosColors.SystemRed
+                    color = MaterialTheme.colorScheme.error
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Icon(Icons.Default.Place, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -380,16 +383,16 @@ fun LocationMockScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = currentAddress,
-                        style = IosTypography.Headline,
-                        color = IosColors.Label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = "WGS-84: ${"%.6f".format(activeLat)}, ${"%.6f".format(activeLon)}",
-                        style = IosTypography.Mono13,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(2.dp))
                     // 标明这个坐标从哪来。它不是装饰性元数据 —— 环境指纹回放时
@@ -402,13 +405,13 @@ fun LocationMockScreen(
                             realLocationCoord != null -> "来源：真机物理定位"
                             else -> "来源：默认坐标（未获取到定位）"
                         },
-                        style = IosTypography.Caption2,
+                        style = MaterialTheme.typography.labelSmall,
                         color = if (realLocationCoord == null && pointMockLocation == null &&
                             joystickLocation == null && selectedTargetLocation == null
                         ) {
-                            IosColors.SystemOrange
+                            AppSemanticColors.current.warning
                         } else {
-                            IosColors.TertiaryLabel
+                            MaterialTheme.colorScheme.outline
                         }
                     )
                 }
@@ -421,7 +424,7 @@ fun LocationMockScreen(
                     // 原为 30dp，低于 48dp 最小触区
                     modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "复制坐标", tint = IosColors.SystemBlue, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = "复制坐标", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -431,7 +434,7 @@ fun LocationMockScreen(
             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 IosPrimaryButton(
                     text = if (isMockOn) "停止虚拟定位" else "开启虚拟定位",
-                    containerColor = if (isMockOn) IosColors.SystemRed else IosColors.SystemBlue,
+                    containerColor = if (isMockOn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     icon = if (isMockOn) Icons.Default.Close else Icons.Default.PlayArrow,
                     onClick = {
                         if (isMockOn) {
@@ -464,7 +467,7 @@ fun LocationMockScreen(
                 title = "地图精准选点",
                 subtitle = "在交互式底图上任意点选或手绘连线",
                 icon = Icons.Default.LocationOn,
-                iconBackground = IosColors.SystemBlue,
+                iconBackground = MaterialTheme.colorScheme.primary,
                 showChevron = true,
                 onClick = onNavigateToMap
             )
@@ -476,7 +479,7 @@ fun LocationMockScreen(
                 title = "重置为真机物理位置",
                 subtitle = "复位并跳转至地图显示当前真实 GPS 定位",
                 icon = Icons.Default.Refresh,
-                iconBackground = IosColors.SystemBlue,
+                iconBackground = MaterialTheme.colorScheme.primary,
                 showChevron = true,
                 onClick = {
                     if (isPointMockActive) {
@@ -519,23 +522,23 @@ fun LocationMockScreen(
                     text = "在目标地点实地采集周边的 Wi-Fi、基站、蓝牙快照，" +
                         "之后在这些地点启用虚拟定位时按距离回放，" +
                         "让周边环境与虚拟坐标自洽。",
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(Modifier.height(10.dp))
 
                 Text(
                     text = "采集时请先关闭虚拟定位，并站在目标地点。",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SystemOrange
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AppSemanticColors.current.warning
                 )
 
                 Spacer(Modifier.height(12.dp))
 
                 IosPrimaryButton(
                     text = "采集当前地点",
-                    containerColor = IosColors.SystemBlue,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     icon = Icons.Filled.Wifi,
                     loading = isCapturingFingerprint,
                     loadingText = "采集中…",
@@ -568,14 +571,14 @@ fun LocationMockScreen(
                     ) {
                         Text(
                             text = "还没有采集过环境指纹",
-                            style = IosTypography.Headline,
-                            color = IosColors.Label
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "站在目标地点、关闭虚拟定位后点上方按钮开始采集。",
-                            style = IosTypography.Footnote,
-                            color = IosColors.SecondaryLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -585,8 +588,8 @@ fun LocationMockScreen(
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = "已保存 (${fingerprintIds.size})".uppercase(),
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(6.dp))
@@ -599,7 +602,7 @@ fun LocationMockScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (isActiveFp) IosColors.SystemBlue.copy(alpha = 0.12f)
+                                    if (isActiveFp) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                                     else Color.Transparent
                                 )
                                 .padding(horizontal = 10.dp, vertical = 8.dp)
@@ -608,8 +611,8 @@ fun LocationMockScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = fid,
-                                        style = IosTypography.Footnote,
-                                        color = IosColors.Label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -620,8 +623,8 @@ fun LocationMockScreen(
                                         Text(
                                             text = formatCapturedAt(fp.capturedAt) +
                                                 " · ${"%.5f".format(fp.originLat)}, ${"%.5f".format(fp.originLon)}",
-                                            style = IosTypography.Mono13,
-                                            color = IosColors.TertiaryLabel,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                            color = MaterialTheme.colorScheme.outline,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -630,8 +633,8 @@ fun LocationMockScreen(
                                         Spacer(Modifier.height(2.dp))
                                         Text(
                                             text = it,
-                                            style = IosTypography.Caption2,
-                                            color = IosColors.SecondaryLabel
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -678,7 +681,7 @@ fun LocationMockScreen(
 
                                 IosGhostButton(
                                     text = "删除",
-                                    contentColor = IosColors.SystemRed,
+                                    contentColor = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.weight(1f),
                                     height = 48.dp,
                                     onClick = {
@@ -718,23 +721,23 @@ fun LocationMockScreen(
                 ) {
                     Text(
                         text = "暂无独立分流应用",
-                        style = IosTypography.Headline,
-                        color = IosColors.Label
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "所有调用定位的应用默认走上方的主控模拟位置。添加应用后可让钉钉、微信等分别驻留不同位置，未添加的应用可选择使用硬件真实定位。",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SecondaryLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { showAppPickerSheet = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(13.dp)
                     ) {
-                        Text("+ 添加分流应用", style = IosTypography.Subheadline, fontWeight = FontWeight.SemiBold)
+                        Text("+ 添加分流应用", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     }
                 }
             } else {
@@ -773,7 +776,7 @@ fun LocationMockScreen(
                 title = "桌面万向悬浮摇杆",
                 subtitle = "常驻桌面浮窗，八方向实时移动",
                 icon = Icons.Default.ThumbUp,
-                iconBackground = IosColors.SystemOrange,
+                iconBackground = AppSemanticColors.current.warning,
                 trailingContent = {
                     IosSwitch(
                         checked = isJoystickRunning,
@@ -809,11 +812,11 @@ fun LocationMockScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("摇杆盘体尺寸", style = IosTypography.Body, color = IosColors.Label)
+                            Text("摇杆盘体尺寸", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                             Text(
                                 text = "${joystickSizeDp.toInt()} dp",
-                                style = IosTypography.Headline,
-                                color = IosColors.SystemBlue
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Spacer(Modifier.height(8.dp))
@@ -826,7 +829,7 @@ fun LocationMockScreen(
                             // 与服务端 FloatingJoystickService 的 coerceIn(80, 240) 对齐。
                             // 原上限 220 会让存过 240 的用户在界面上被卡在 220，拖不回原值。
                             valueRange = 80f..240f,
-                            colors = SliderDefaults.colors(thumbColor = IosColors.SystemBlue, activeTrackColor = IosColors.SystemBlue)
+                            colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary)
                         )
                     }
                 }
@@ -855,7 +858,7 @@ fun LocationMockScreen(
                     else -> "未勾选 · 点击前往【开发者选项】勾选"
                 },
                 icon = Icons.Default.Settings,
-                iconBackground = if (isDevMockLocationEnabled) IosColors.SystemGreen else IosColors.SystemOrange,
+                iconBackground = if (isDevMockLocationEnabled) AppSemanticColors.current.success else AppSemanticColors.current.warning,
                 trailingText = if (isDevMockLocationEnabled) "已勾选" else "未勾选",
                 showChevron = !isDevMockLocationEnabled && !isRootMode,
                 onClick = {
@@ -887,7 +890,7 @@ fun LocationMockScreen(
                 title = "Root 注入模式",
                 subtitle = if (isRootMode) "已开启：自动配置模拟权限与硬件高精度定位" else "免 Root：仅依赖开发者选项模拟位置，不调用 Root",
                 icon = Icons.Default.Lock,
-                iconBackground = if (isRootMode) IosColors.SystemGreen else IosColors.SystemOrange,
+                iconBackground = if (isRootMode) AppSemanticColors.current.success else AppSemanticColors.current.warning,
                 trailingContent = {
                     IosSwitch(
                         checked = isRootMode,
@@ -932,7 +935,7 @@ fun LocationMockScreen(
                     "模块未激活 · 请在 LSPosed 中勾选系统框架、系统定位服务和目标应用并重启手机"
                 },
                 icon = Icons.Default.Build,
-                iconBackground = if (isLsposedHookActive) IosColors.SystemPurple else IosColors.SystemGray,
+                iconBackground = if (isLsposedHookActive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
                 trailingText = if (isLsposedHookActive) "已接管系统框架" else "未勾选",
                 showChevron = true,
                 onClick = {
@@ -956,7 +959,7 @@ fun LocationMockScreen(
                     else -> "免 Root 模式 · 仅开发者选项模拟位置"
                 },
                 icon = Icons.Default.CheckCircle,
-                iconBackground = if (isRootMode && isRootAvailable) IosColors.SystemGreen else IosColors.SystemOrange,
+                iconBackground = if (isRootMode && isRootAvailable) AppSemanticColors.current.success else AppSemanticColors.current.warning,
                 trailingText = when {
                     isRootMode && isRootAvailable -> "已授权"
                     isRootMode && !isRootAvailable -> "未检测到"
@@ -993,8 +996,8 @@ fun LocationMockScreen(
                 },
                 icon = Icons.Default.Tune,
                 iconBackground = when (hookChannel) {
-                    HookChannel.LSPOSED -> IosColors.SystemPurple
-                    HookChannel.PROVIDER, HookChannel.AUTO -> IosColors.SystemOrange
+                    HookChannel.LSPOSED -> MaterialTheme.colorScheme.tertiary
+                    HookChannel.PROVIDER, HookChannel.AUTO -> AppSemanticColors.current.warning
                 },
                 trailingText = HookChannelPrefs.shortLabel(hookChannel),
                 showChevron = true,
@@ -1024,7 +1027,7 @@ fun LocationMockScreen(
                 title = "常驻前台通知",
                 subtitle = if (areNotificationsEnabled) "通知已允许 · 可提升后台留存" else "未开启通知保护 (易被系统清理)",
                 icon = Icons.Default.Notifications,
-                iconBackground = if (areNotificationsEnabled) IosColors.SystemBlue else IosColors.SystemRed,
+                iconBackground = if (areNotificationsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 trailingText = if (areNotificationsEnabled) "已允许" else "去开启",
                 showChevron = !areNotificationsEnabled,
                 onClick = {
@@ -1049,7 +1052,7 @@ fun LocationMockScreen(
                 title = "电池优化策略",
                 subtitle = if (isBatteryIgnoring) "已豁免系统省电策略，保障持续注入" else "建议加入白名单避免被系统挂起",
                 icon = Icons.Default.Favorite,
-                iconBackground = if (isBatteryIgnoring) IosColors.SystemGreen else IosColors.SystemYellow,
+                iconBackground = if (isBatteryIgnoring) AppSemanticColors.current.success else AppSemanticColors.current.warning,
                 trailingText = if (isBatteryIgnoring) "已加入白名单" else "申请豁免",
                 showChevron = !isBatteryIgnoring,
                 onClick = {
@@ -1061,8 +1064,8 @@ fun LocationMockScreen(
         // Background Keep-Alive & Anti-Kill Management
         Text(
             text = "后台保活与防杀配置 · ${KeepAliveHelper.getDeviceBrandName()}".uppercase(),
-            style = IosTypography.Footnote,
-            color = IosColors.SecondaryLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
         )
@@ -1071,7 +1074,7 @@ fun LocationMockScreen(
                 title = "应用自启动管理",
                 subtitle = "跳转当前系统启动管理，允许 Fake GPS 自启动与关联启动",
                 icon = Icons.Default.PlayArrow,
-                iconBackground = IosColors.SystemIndigo,
+                iconBackground = MaterialTheme.colorScheme.primary,
                 trailingText = "去设置",
                 showChevron = true,
                 onClick = {
@@ -1088,7 +1091,7 @@ fun LocationMockScreen(
                 title = "多任务卡片加锁保护",
                 subtitle = "防止在多任务列表划掉或一键清理时被系统误杀",
                 icon = Icons.Default.Lock,
-                iconBackground = IosColors.SystemTeal,
+                iconBackground = MaterialTheme.colorScheme.secondary,
                 trailingText = "查看指南",
                 showChevron = true,
                 onClick = {
@@ -1102,7 +1105,7 @@ fun LocationMockScreen(
                 title = "系统应用详情与权限",
                 subtitle = "管理悬浮窗、通知与后台高耗电权限",
                 icon = Icons.Default.Settings,
-                iconBackground = IosColors.SystemGray,
+                iconBackground = MaterialTheme.colorScheme.outline,
                 trailingText = "打开设置",
                 showChevron = true,
                 onClick = {
@@ -1117,7 +1120,7 @@ fun LocationMockScreen(
                 title = "恢复系统高精度定位",
                 subtitle = if (isRootMode && isRootAvailable) "配置模拟权限与 Wi-Fi/蓝牙辅助定位" else "免 Root 模式：可在系统设置中管理扫描与模拟位置",
                 icon = Icons.Default.Build,
-                iconBackground = if (isRootMode && isRootAvailable) IosColors.SystemGreen else IosColors.SystemBlue,
+                iconBackground = if (isRootMode && isRootAvailable) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
                 trailingText = if (isRootMode && isRootAvailable) "立即配置" else "使用指南",
                 showChevron = true,
                 onClick = {
@@ -1137,8 +1140,8 @@ fun LocationMockScreen(
 
         Text(
             text = "提示：在 LSPosed 管理器中开启模块并勾选【系统框架 (Android)】；目标应用还需要单独加入 scope，才能稳定收到分发坐标/步频。",
-            style = IosTypography.Footnote,
-            color = IosColors.SecondaryLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
         )
         Spacer(Modifier.height(20.dp))
@@ -1273,13 +1276,13 @@ fun LocationMockScreen(
     pendingDeleteFingerprintId?.let { fid ->
         AlertDialog(
             onDismissRequest = { pendingDeleteFingerprintId = null },
-            title = { Text("删除环境指纹", style = IosTypography.Headline) },
+            title = { Text("删除环境指纹", style = MaterialTheme.typography.titleMedium) },
             text = {
                 Text(
                     text = "确定删除「$fid」吗？删除后该地点的 Wi-Fi / 基站 / 蓝牙快照" +
                         "会一并移除，无法撤销。",
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -1295,12 +1298,12 @@ fun LocationMockScreen(
                     pendingDeleteFingerprintId = null
                     Toast.makeText(context, "已删除 $fid", Toast.LENGTH_SHORT).show()
                 }) {
-                    Text("删除", color = IosColors.SystemRed, fontWeight = FontWeight.Bold)
+                    Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteFingerprintId = null }) {
-                    Text("取消", color = IosColors.SecondaryLabel)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )

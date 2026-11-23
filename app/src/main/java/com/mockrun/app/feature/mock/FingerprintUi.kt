@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.mock
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.ui.text.font.FontFamily
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +29,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.location.fingerprint.EnvironmentFingerprint
 import com.mockrun.app.core.location.fingerprint.FingerprintCoordinator
 import com.mockrun.app.core.location.fingerprint.SourceState
@@ -256,10 +257,10 @@ fun FingerprintResultCard(
     onRetry: () -> Unit
 ) {
     val accent = when (result.severity) {
-        FeedbackSeverity.SUCCESS -> IosColors.SystemGreen
-        FeedbackSeverity.PARTIAL -> IosColors.SystemOrange
-        FeedbackSeverity.WARNING -> IosColors.SystemOrange
-        FeedbackSeverity.ERROR -> IosColors.SystemRed
+        FeedbackSeverity.SUCCESS -> AppSemanticColors.current.success
+        FeedbackSeverity.PARTIAL -> AppSemanticColors.current.warning
+        FeedbackSeverity.WARNING -> AppSemanticColors.current.warning
+        FeedbackSeverity.ERROR -> MaterialTheme.colorScheme.error
     }
     val icon = when (result.severity) {
         FeedbackSeverity.SUCCESS -> Icons.Default.CheckCircle
@@ -280,7 +281,7 @@ fun FingerprintResultCard(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = result.title,
-                style = IosTypography.Subheadline,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
                 modifier = Modifier.weight(1f)
@@ -289,7 +290,7 @@ fun FingerprintResultCard(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "关闭结果提示",
-                    tint = IosColors.SecondaryLabel,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -299,8 +300,8 @@ fun FingerprintResultCard(
 
         Text(
             text = result.detail,
-            style = IosTypography.Footnote,
-            color = IosColors.SecondaryLabel
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         if (result.sourceLines.isNotEmpty()) {
@@ -308,8 +309,8 @@ fun FingerprintResultCard(
             result.sourceLines.forEach { line ->
                 Text(
                     text = line,
-                    style = IosTypography.Mono13,
-                    color = IosColors.Label
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
             }
@@ -322,7 +323,7 @@ fun FingerprintResultCard(
             TextButton(onClick = onRetry) {
                 Text(
                     text = "重新采集",
-                    style = IosTypography.ButtonSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = accent
                 )

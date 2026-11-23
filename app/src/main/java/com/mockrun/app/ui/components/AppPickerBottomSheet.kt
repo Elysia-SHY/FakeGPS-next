@@ -1,4 +1,6 @@
 package com.mockrun.app.ui.components
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import android.graphics.drawable.Drawable
 import androidx.compose.animation.AnimatedVisibility
@@ -118,7 +120,7 @@ fun AppPickerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = IosColors.SecondaryGroupedBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Surface(
@@ -126,7 +128,7 @@ fun AppPickerBottomSheet(
                     .padding(vertical = 10.dp)
                     .size(width = 36.dp, height = 5.dp),
                 shape = CircleShape,
-                color = IosColors.SystemGray.copy(alpha = 0.4f)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
             ) {}
         }
     ) {
@@ -147,27 +149,27 @@ fun AppPickerBottomSheet(
                 Column {
                     Text(
                         text = "添加独立分流应用",
-                        style = IosTypography.Headline,
-                        color = IosColors.Label
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "指定应用将拥有独立的虚拟坐标，不影响其他应用",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Box(
                     modifier = Modifier
                         .minTouchTarget()
                         .clip(CircleShape)
-                        .background(IosColors.SystemGray.copy(alpha = 0.15f))
-                        .bouncyClickable(onClick = onDismissRequest),
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        .clickable(onClick = onDismissRequest),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "关闭",
-                        tint = IosColors.SecondaryLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -176,7 +178,7 @@ fun AppPickerBottomSheet(
             // User Profile / Dual App Selector
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = IosColors.TertiaryGroupedBackground,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
@@ -192,11 +194,11 @@ fun AppPickerBottomSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(9.dp))
-                            .bouncyClickable {
+                            .clickable {
                                 isCustomUserId = false
                                 selectedUserId = 0
                             },
-                        color = if (!isCustomUserId && selectedUserId == 0) IosColors.SecondaryGroupedBackground else Color.Transparent,
+                        color = if (!isCustomUserId && selectedUserId == 0) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
                         shadowElevation = if (!isCustomUserId && selectedUserId == 0) 2.dp else 0.dp
                     ) {
                         Box(
@@ -205,9 +207,9 @@ fun AppPickerBottomSheet(
                         ) {
                             Text(
                                 text = "主空间 (User 0)",
-                                style = IosTypography.Subheadline,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (!isCustomUserId && selectedUserId == 0) FontWeight.Bold else FontWeight.Normal,
-                                color = if (!isCustomUserId && selectedUserId == 0) IosColors.SystemBlue else IosColors.SecondaryLabel
+                                color = if (!isCustomUserId && selectedUserId == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -217,11 +219,11 @@ fun AppPickerBottomSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(9.dp))
-                            .bouncyClickable {
+                            .clickable {
                                 isCustomUserId = false
                                 selectedUserId = 999
                             },
-                        color = if (!isCustomUserId && selectedUserId == 999) IosColors.SecondaryGroupedBackground else Color.Transparent,
+                        color = if (!isCustomUserId && selectedUserId == 999) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
                         shadowElevation = if (!isCustomUserId && selectedUserId == 999) 2.dp else 0.dp
                     ) {
                         Box(
@@ -230,9 +232,9 @@ fun AppPickerBottomSheet(
                         ) {
                             Text(
                                 text = "应用分身 (User 999)",
-                                style = IosTypography.Subheadline,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = if (!isCustomUserId && selectedUserId == 999) FontWeight.Bold else FontWeight.Normal,
-                                color = if (!isCustomUserId && selectedUserId == 999) IosColors.SystemBlue else IosColors.SecondaryLabel
+                                color = if (!isCustomUserId && selectedUserId == 999) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -242,7 +244,7 @@ fun AppPickerBottomSheet(
             // Category Filter: 用户应用 / 全部应用 / 系统应用
             Surface(
                 shape = RoundedCornerShape(13.dp),
-                color = IosColors.TertiaryGroupedBackground,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 10.dp)
@@ -264,8 +266,8 @@ fun AppPickerBottomSheet(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(9.dp))
-                                .bouncyClickable { selectedCategory = cat },
-                            color = if (isSelected) IosColors.SecondaryGroupedBackground else Color.Transparent,
+                                .clickable { selectedCategory = cat },
+                            color = if (isSelected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
                             shadowElevation = if (isSelected) 2.dp else 0.dp
                         ) {
                             Box(
@@ -274,9 +276,9 @@ fun AppPickerBottomSheet(
                             ) {
                                 Text(
                                     text = "${cat.label} ($count)",
-                                    style = IosTypography.Caption1,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) IosColors.SystemBlue else IosColors.SecondaryLabel
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -303,14 +305,14 @@ fun AppPickerBottomSheet(
                     modifier = Modifier
                         .minTouchTarget()
                         .clip(CircleShape)
-                        .bouncyClickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
+                        .clickable(enabled = searchQuery.isNotEmpty()) { searchQuery = "" },
                     contentAlignment = Alignment.Center
                 ) {
                     if (searchQuery.isNotEmpty()) {
                         Icon(
                             Icons.Default.Clear,
                             contentDescription = "清除搜索",
-                            tint = IosColors.SecondaryLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -327,14 +329,14 @@ fun AppPickerBottomSheet(
             ) {
                 Text(
                     text = "已筛选 ${filteredApps.size} 个应用",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Row(
                     modifier = Modifier
                         .minTouchTarget()
                         .clip(RoundedCornerShape(13.dp))
-                        .bouncyClickable {
+                        .clickable {
                             manualPkgInput = searchQuery.trim()
                             showManualInputDialog = true
                         },
@@ -343,14 +345,14 @@ fun AppPickerBottomSheet(
                     Icon(
                         Icons.Default.Add,
                         contentDescription = null,
-                        tint = IosColors.SystemBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(3.dp))
                     Text(
                         text = "手动输入包名",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SystemBlue,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -372,7 +374,7 @@ fun AppPickerBottomSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = IosColors.SystemBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -389,8 +391,8 @@ fun AppPickerBottomSheet(
                     ) {
                         Text(
                             text = "未找到匹配应用",
-                            style = IosTypography.Subheadline,
-                            color = IosColors.SecondaryLabel
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (searchQuery.isNotBlank()) {
                             Button(
@@ -400,8 +402,8 @@ fun AppPickerBottomSheet(
                                 },
                                 modifier = Modifier.minTouchTarget(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = IosColors.SystemBlue.copy(alpha = 0.15f),
-                                    contentColor = IosColors.SystemBlue
+                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    contentColor = MaterialTheme.colorScheme.primary
                                 ),
                                 shape = RoundedCornerShape(9.dp)
                             ) {
@@ -461,13 +463,13 @@ fun AppPickerBottomSheet(
     if (showManualInputDialog) {
         AlertDialog(
             onDismissRequest = { showManualInputDialog = false },
-            containerColor = IosColors.SecondaryGroupedBackground,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(24.dp),
             title = {
                 Text(
                     text = "手动指定应用包名",
-                    style = IosTypography.Headline,
-                    color = IosColors.Label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -475,8 +477,8 @@ fun AppPickerBottomSheet(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "适用于隐藏应用、分身容器或未在列表展示的应用。输入包名后将直接按目标接管其位置。",
-                        style = IosTypography.Caption1,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = manualPkgInput,
@@ -496,8 +498,8 @@ fun AppPickerBottomSheet(
                     )
                     Text(
                         text = "生效目标: ${if (finalUserId == 0) "主空间 (User 0)" else "应用分身 (User $finalUserId)"}",
-                        style = IosTypography.Caption2,
-                        color = IosColors.SystemOrange
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppSemanticColors.current.warning
                     )
                 }
             },
@@ -526,7 +528,7 @@ fun AppPickerBottomSheet(
                     enabled = manualPkgInput.isNotBlank(),
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("确认添加", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                    Text("确认添加", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -534,7 +536,7 @@ fun AppPickerBottomSheet(
                     onClick = { showManualInputDialog = false },
                     modifier = Modifier.minTouchTarget()
                 ) {
-                    Text("取消", color = IosColors.SecondaryLabel)
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -562,7 +564,7 @@ val bitmap = remember(item.icon) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = !isAlreadyAdded, onClick = onSelect),
-        color = if (isAlreadyAdded) IosColors.SystemGray.copy(alpha = 0.08f) else Color.Transparent
+        color = if (isAlreadyAdded) MaterialTheme.colorScheme.outline.copy(alpha = 0.08f) else Color.Transparent
     ) {
         Row(
             modifier = Modifier
@@ -583,13 +585,13 @@ val bitmap = remember(item.icon) {
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = RoundedCornerShape(9.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.15f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = item.appName.take(1),
-                            style = IosTypography.Headline,
-                            color = IosColors.SystemBlue
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -602,8 +604,8 @@ val bitmap = remember(item.icon) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = item.appName,
-                        style = IosTypography.Headline,
-                        color = if (isAlreadyAdded) IosColors.SecondaryLabel else IosColors.Label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isAlreadyAdded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -611,12 +613,12 @@ val bitmap = remember(item.icon) {
                         Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = IosColors.SystemGray.copy(alpha = 0.15f)
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                         ) {
                             Text(
                                 text = "系统",
-                                style = IosTypography.Caption2,
-                                color = IosColors.SecondaryLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -625,13 +627,13 @@ val bitmap = remember(item.icon) {
                         Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = IosColors.SystemOrange.copy(alpha = 0.15f)
+                            color = AppSemanticColors.current.warning.copy(alpha = 0.15f)
                         ) {
                             Text(
                                 text = "分身 $userId",
-                                style = IosTypography.Caption2,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = IosColors.SystemOrange,
+                                color = AppSemanticColors.current.warning,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -640,8 +642,8 @@ val bitmap = remember(item.icon) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = item.packageName,
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -653,7 +655,7 @@ val bitmap = remember(item.icon) {
             if (isAlreadyAdded) {
                 Surface(
                     shape = RoundedCornerShape(13.dp),
-                    color = IosColors.SystemGreen.copy(alpha = 0.12f)
+                    color = AppSemanticColors.current.success.copy(alpha = 0.12f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -662,28 +664,28 @@ val bitmap = remember(item.icon) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            tint = IosColors.SystemGreen,
+                            tint = AppSemanticColors.current.success,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(3.dp))
                         Text(
                             text = "已分流",
-                            style = IosTypography.Caption1,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = IosColors.SystemGreen
+                            color = AppSemanticColors.current.success
                         )
                     }
                 }
             } else {
                 Surface(
                     shape = RoundedCornerShape(13.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.1f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 ) {
                     Text(
                         text = "+ 添加",
-                        style = IosTypography.Caption1,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = IosColors.SystemBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     )
                 }

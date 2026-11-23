@@ -1,4 +1,5 @@
-﻿package com.mockrun.app.ui.components
+package com.mockrun.app.ui.components
+import androidx.compose.foundation.clickable
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -23,7 +24,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.bouncyClickable
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -120,7 +120,7 @@ fun AndroidFloatingBottomBar(
                             .weight(1f)
                             .fillMaxHeight()
                             .clip(AppShapes.pill)
-                            .bouncyClickable {
+                            .clickable {
                                 onTabSelected(index)
                             },
                         contentAlignment = Alignment.Center

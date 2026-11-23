@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.map.tabs
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.ui.text.font.FontFamily
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -41,11 +44,9 @@ import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.IosColors
 import com.mockrun.app.core.designsystem.IosGlassDock
 import com.mockrun.app.core.designsystem.IosSearchField
 import com.mockrun.app.core.designsystem.IosSearchFieldStyle
-import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.designsystem.ScreenInsets
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
@@ -208,7 +209,7 @@ fun LocationControlPanel(
 
             // 2. Master Action & Search Rows
             if (activeRule != null) {
-                val defaultRuleColor = IosColors.SystemBlue
+                val defaultRuleColor = MaterialTheme.colorScheme.primary
                 val activeRuleColor = remember(activeRule.colorHex) {
                     runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
                         .logFailure("LocationControlPanel", "parse rule color", Diag.Level.DEBUG)
@@ -244,7 +245,7 @@ fun LocationControlPanel(
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "清除搜索内容",
-                                    tint = if (isDark) Color.White.copy(0.85f) else IosColors.SecondaryLabel,
+                                    tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
@@ -276,7 +277,7 @@ fun LocationControlPanel(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(9.dp),
-                                color = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemGray,
+                                color = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -301,13 +302,13 @@ fun LocationControlPanel(
                                     )
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else IosColors.SystemGray.copy(alpha = 0.2f)
+                                        color = if (activeRule.isEnabled) activeRuleColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                     ) {
                                         Text(
                                             text = if (activeRule.isEnabled) "分流运行中" else "分流已暂停",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = if (activeRule.isEnabled) activeRuleColor else IosColors.SecondaryLabel,
+                                            color = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                         )
                                     }
@@ -315,7 +316,7 @@ fun LocationControlPanel(
                                 Text(
                                     text = if (activeRule.isEnabled) "独立虚拟定位生效中" else "暂停后使用全局或物理定位",
                                     fontSize = 10.5.sp,
-                                    color = IosColors.SecondaryLabel
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -349,7 +350,7 @@ fun LocationControlPanel(
                                 isLiquidGlass = isLiquidGlass,
                                 shape = RoundedCornerShape(24.dp),
                                 elevation = 8.dp,
-                                containerColor = if (activeRule.isEnabled) activeRuleColor else IosColors.SystemBlue
+                                containerColor = if (activeRule.isEnabled) activeRuleColor else MaterialTheme.colorScheme.primary
                             )
                             .clickable {
                                 onSetTargetLocation?.invoke(activeRule)
@@ -403,7 +404,7 @@ fun LocationControlPanel(
                                 text = "切回全局",
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = IosColors.SystemBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1
                             )
                         }
@@ -447,7 +448,7 @@ fun LocationControlPanel(
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "清除搜索内容",
-                                        tint = if (isDark) Color.White.copy(0.85f) else IosColors.SecondaryLabel,
+                                        tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
@@ -469,7 +470,7 @@ fun LocationControlPanel(
                                         isLiquidGlass = isLiquidGlass,
                                         shape = RoundedCornerShape(16.dp),
                                         elevation = 12.dp,
-                                        containerColor = IosColors.SystemBlue
+                                        containerColor = MaterialTheme.colorScheme.primary
                                     )
                                     .clickable { onStartMock() },
                                 shape = RoundedCornerShape(16.dp),
@@ -506,7 +507,7 @@ fun LocationControlPanel(
                                         isLiquidGlass = isLiquidGlass,
                                         shape = RoundedCornerShape(16.dp),
                                         elevation = 12.dp,
-                                        containerColor = IosColors.SystemRed
+                                        containerColor = MaterialTheme.colorScheme.error
                                     )
                                     .clickable { onStopMock() },
                                 shape = RoundedCornerShape(16.dp),
@@ -544,7 +545,7 @@ fun LocationControlPanel(
                                     isLiquidGlass = isLiquidGlass,
                                     shape = RoundedCornerShape(16.dp),
                                     elevation = 12.dp,
-                                    containerColor = IosColors.SystemBlue
+                                    containerColor = MaterialTheme.colorScheme.primary
                                 )
                                 .clickable { onStartMock() },
                             shape = RoundedCornerShape(16.dp),
@@ -608,7 +609,7 @@ fun LocationControlPanel(
                                 Icon(
                                     Icons.Default.Place,
                                     contentDescription = null,
-                                    tint = IosColors.SystemBlue,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(10.dp))
@@ -617,14 +618,14 @@ fun LocationControlPanel(
                                         text = item.name,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
-                                        color = if (isDark) Color.White else IosColors.Label,
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = item.address,
                                         fontSize = 12.sp,
-                                        color = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel,
+                                        color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -672,13 +673,13 @@ fun LocationControlPanel(
                             Surface(
                                 modifier = Modifier.size(44.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                color = if (isMockActive) IosColors.SystemGreen.copy(0.2f) else IosColors.SystemBlue.copy(0.16f)
+                                color = if (isMockActive) AppSemanticColors.current.success.copy(0.2f) else MaterialTheme.colorScheme.primary.copy(0.16f)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Place,
                                         contentDescription = null,
-                                        tint = if (isMockActive) IosColors.SystemGreen else IosColors.BrandSoft,
+                                        tint = if (isMockActive) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -705,7 +706,7 @@ fun LocationControlPanel(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 17.sp,
                                         lineHeight = 23.sp,
-                                        color = if (isDark) Color.White else IosColors.Label,
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                                         maxLines = if (addressExpanded) Int.MAX_VALUE else 2,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
@@ -714,7 +715,7 @@ fun LocationControlPanel(
                                     Icon(
                                         imageVector = if (addressExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                         contentDescription = null,
-                                        tint = IosColors.SecondaryLabel,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier
                                             .padding(top = 3.dp)
                                             .size(18.dp)
@@ -723,8 +724,8 @@ fun LocationControlPanel(
                                 Spacer(Modifier.height(5.dp))
                                 Text(
                                     text = "WGS-84 · ${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}",
-                                    style = IosTypography.Mono,
-                                    color = if (isDark) Color.White.copy(0.7f) else IosColors.SecondaryLabel
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -761,9 +762,9 @@ fun LocationControlPanel(
                                 shape = RoundedCornerShape(16.dp),
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
-                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = IosColors.SystemOrange)
+                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(15.dp), tint = AppSemanticColors.current.warning)
                                 Spacer(Modifier.width(5.dp))
-                                Text("真机复位", fontSize = 12.5.sp, color = IosColors.SystemOrange, maxLines = 1)
+                                Text("真机复位", fontSize = 12.5.sp, color = AppSemanticColors.current.warning, maxLines = 1)
                             }
 
                             // Bookmark button —— 明确是「地点」收藏，与路线收藏区分
@@ -773,7 +774,7 @@ fun LocationControlPanel(
                                     .weight(1f)
                                     .height(48.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
                                 Icon(Icons.Default.BookmarkBorder, null, modifier = Modifier.size(15.dp))
@@ -821,7 +822,7 @@ fun LocationControlPanel(
                                 Text(
                                     "暂无收藏：在地图上选点后点「收藏地点」，或规划航线后点「收藏路线」",
                                     fontSize = 12.sp,
-                                    color = if (isDark) Color.White.copy(0.6f) else IosColors.SecondaryLabel
+                                    color = if (isDark) Color.White.copy(0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         } else {
@@ -829,13 +830,13 @@ fun LocationControlPanel(
                                 text = "⭐ 收藏地点 (${savedLocations.size})",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp,
-                                color = if (isDark) Color.White else IosColors.Label
+                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                             )
                             if (savedLocations.isEmpty()) {
                                 Text(
                                     text = "暂无地点收藏",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.TertiaryLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             } else {
@@ -865,13 +866,13 @@ fun LocationControlPanel(
                                 text = "🧭 收藏路线 (${savedTracks.size})",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp,
-                                color = if (isDark) Color.White else IosColors.Label
+                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                             )
                             if (savedTracks.isEmpty()) {
                                 Text(
                                     text = "暂无路线收藏",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.TertiaryLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.outline,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             } else {
@@ -921,7 +922,7 @@ private fun SavedEntryRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = IosColors.SystemBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(16.dp)
         )
         Spacer(Modifier.width(8.dp))
@@ -929,7 +930,7 @@ private fun SavedEntryRow(
             text = name,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
-            color = if (isDark) Color.White else IosColors.Label,
+            color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -937,8 +938,8 @@ private fun SavedEntryRow(
         Spacer(Modifier.width(8.dp))
         Text(
             text = trailing,
-            style = IosTypography.Mono,
-            color = IosColors.SecondaryLabel,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
     }

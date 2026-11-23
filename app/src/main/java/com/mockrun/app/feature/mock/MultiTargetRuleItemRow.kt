@@ -1,4 +1,6 @@
-﻿package com.mockrun.app.feature.mock
+package com.mockrun.app.feature.mock
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -29,7 +31,7 @@ fun MultiTargetRuleItemRow(
     onModeChange: (TargetMockMode) -> Unit,
     onDelete: () -> Unit
 ) {
-    val defaultRuleColor = IosColors.SystemBlue
+    val defaultRuleColor = MaterialTheme.colorScheme.primary
     val ruleColor = remember(rule.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
             .logFailure("LocationMockScreen", "parse rule color", Diag.Level.DEBUG)
@@ -56,7 +58,7 @@ fun MultiTargetRuleItemRow(
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = rule.appName.take(1),
-                        style = IosTypography.Headline,
+                        style = MaterialTheme.typography.titleMedium,
                         color = ruleColor
                     )
                 }
@@ -68,8 +70,8 @@ fun MultiTargetRuleItemRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = rule.appName,
-                        style = IosTypography.Headline,
-                        color = if (rule.isEnabled) IosColors.Label else IosColors.SecondaryLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (rule.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -77,13 +79,13 @@ fun MultiTargetRuleItemRow(
                         Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = IosColors.SystemOrange.copy(alpha = 0.15f)
+                            color = AppSemanticColors.current.warning.copy(alpha = 0.15f)
                         ) {
                             Text(
                                 text = "分身 · UID ${rule.userId}",
-                                style = IosTypography.Caption2,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = IosColors.SystemOrange,
+                                color = AppSemanticColors.current.warning,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
@@ -92,8 +94,8 @@ fun MultiTargetRuleItemRow(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = rule.packageName,
-                    style = IosTypography.Footnote,
-                    color = IosColors.SecondaryLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -122,8 +124,8 @@ fun MultiTargetRuleItemRow(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = "${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -135,12 +137,12 @@ fun MultiTargetRuleItemRow(
                     Surface(
                         shape = RoundedCornerShape(9.dp),
                         color = when (rule.mode) {
-                            TargetMockMode.REAL_PASSTHROUGH -> IosColors.SystemGray.copy(alpha = 0.15f)
-                            else -> IosColors.SystemBlue.copy(alpha = 0.12f)
+                            TargetMockMode.REAL_PASSTHROUGH -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                            else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         },
                         modifier = Modifier
                             .minTouchTarget()
-                            .bouncyClickable { showModeMenu = true }
+                            .clickable { showModeMenu = true }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -151,11 +153,11 @@ fun MultiTargetRuleItemRow(
                                     TargetMockMode.REAL_PASSTHROUGH -> "物理透传 ▾"
                                     else -> "独立定点 ▾"
                                 },
-                                style = IosTypography.Caption2,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = when (rule.mode) {
-                                    TargetMockMode.REAL_PASSTHROUGH -> IosColors.SecondaryLabel
-                                    else -> IosColors.SystemBlue
+                                    TargetMockMode.REAL_PASSTHROUGH -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    else -> MaterialTheme.colorScheme.primary
                                 }
                             )
                         }
@@ -184,11 +186,11 @@ fun MultiTargetRuleItemRow(
 
                 Surface(
                     shape = RoundedCornerShape(9.dp),
-                    color = IosColors.SystemBlue.copy(alpha = 0.12f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                     // 原触区只有 8dp 内距 + 13dp 图标 ≈ 26dp 高，拇指难以命中
                     modifier = Modifier
                         .minTouchTarget()
-                        .bouncyClickable { onSetLocationOnMap() }
+                        .clickable { onSetLocationOnMap() }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -197,15 +199,15 @@ fun MultiTargetRuleItemRow(
                         Icon(
                             Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = IosColors.SystemBlue,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = "地图选点",
-                            style = IosTypography.Caption2,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = IosColors.SystemBlue
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -218,7 +220,7 @@ fun MultiTargetRuleItemRow(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除规则",
-                        tint = IosColors.SystemRed,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(17.dp)
                     )
                 }

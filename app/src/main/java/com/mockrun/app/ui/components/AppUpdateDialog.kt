@@ -1,4 +1,6 @@
-﻿package com.mockrun.app.ui.components
+package com.mockrun.app.ui.components
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import android.content.Intent
 import android.net.Uri
@@ -35,11 +37,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.RemoteReleaseInfo
 import com.mockrun.app.core.data.repository.VersionSyncManager
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.IosDanger
-import com.mockrun.app.core.designsystem.IosSuccess
-import com.mockrun.app.core.designsystem.IosTypography
-import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.util.Diag
@@ -138,13 +135,13 @@ fun AppUpdateDialog(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = IosColors.SystemBlue.copy(alpha = 0.15f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                     ) {
                         Text(
                             text = info.tagName,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = IosColors.SystemBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
@@ -157,7 +154,7 @@ fun AppUpdateDialog(
                             Text(
                                 text = info.publishedAt,
                                 fontSize = 11.sp,
-                                color = IosColors.SecondaryLabel,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
@@ -171,7 +168,7 @@ fun AppUpdateDialog(
                     text = "更新日志",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = IosColors.SecondaryLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 6.dp)
@@ -216,7 +213,7 @@ fun AppUpdateDialog(
                                 .height(48.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = IosColors.SystemBlue
+                                containerColor = MaterialTheme.colorScheme.primary
                             )
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -244,14 +241,14 @@ fun AppUpdateDialog(
                                 },
                                 modifier = Modifier.minTouchTarget()
                             ) {
-                                Text("浏览器下载", fontSize = 12.5.sp, color = IosColors.SecondaryLabel)
+                                Text("浏览器下载", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             TextButton(
                                 onClick = onDismiss,
                                 modifier = Modifier.minTouchTarget()
                             ) {
-                                Text("稍后提醒", fontSize = 13.sp, color = IosColors.SecondaryLabel)
+                                Text("稍后提醒", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -275,7 +272,7 @@ fun AppUpdateDialog(
                                     text = state.currentSource,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = IosColors.SystemBlue
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     text = "${(state.progress * 100).toInt()}%",
@@ -293,7 +290,7 @@ fun AppUpdateDialog(
                                     .fillMaxWidth()
                                     .height(8.dp)
                                     .clip(RoundedCornerShape(4.dp)),
-                                color = IosColors.SystemBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 trackColor = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
                             )
 
@@ -307,13 +304,13 @@ fun AppUpdateDialog(
                                 Text(
                                     text = "${formatMb(state.downloadedBytes)} / ${formatMb(state.totalBytes)}",
                                     fontSize = 11.5.sp,
-                                    color = IosColors.SecondaryLabel
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = formatSpeed(state.speedBytesPerSec),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.SystemGreen
+                                    color = AppSemanticColors.current.success
                                 )
                             }
 
@@ -326,7 +323,7 @@ fun AppUpdateDialog(
                                     .height(48.dp),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
-                                Text("取消下载", fontSize = 13.5.sp, color = IosColors.SecondaryLabel)
+                                Text("取消下载", fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -343,14 +340,14 @@ fun AppUpdateDialog(
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = IosSuccess,
+                                    tint = AppSemanticColors.current.success,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
                                     text = "安装包下载完成并已通过安全校验",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = IosSuccess
+                                    color = AppSemanticColors.current.success
                                 )
                             }
 
@@ -377,7 +374,7 @@ fun AppUpdateDialog(
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = IosSuccess
+                                        containerColor = AppSemanticColors.current.success
                                     )
                                 ) {
                                     Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -400,20 +397,20 @@ fun AppUpdateDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .minTouchTarget()
-                                    .bouncyClickable { errorExpanded = !errorExpanded },
+                                    .clickable { errorExpanded = !errorExpanded },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
                                     Icons.Default.ErrorOutline,
                                     contentDescription = null,
-                                    tint = IosDanger,
+                                    tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
                                     text = state.message,
                                     fontSize = 12.5.sp,
-                                    color = IosDanger,
+                                    color = MaterialTheme.colorScheme.error,
                                     maxLines = if (errorExpanded) Int.MAX_VALUE else 2,
                                     overflow = if (errorExpanded) TextOverflow.Visible else TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
@@ -421,7 +418,7 @@ fun AppUpdateDialog(
                                 Icon(
                                     imageVector = if (errorExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                     contentDescription = if (errorExpanded) "收起错误详情" else "展开错误详情",
-                                    tint = IosDanger,
+                                    tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -449,7 +446,7 @@ fun AppUpdateDialog(
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = IosColors.SystemBlue
+                                        containerColor = MaterialTheme.colorScheme.primary
                                     )
                                 ) {
                                     Text("重试下载", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)

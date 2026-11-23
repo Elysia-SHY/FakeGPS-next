@@ -1,4 +1,6 @@
-﻿package com.mockrun.app.feature.map
+package com.mockrun.app.feature.map
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.clickable
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -85,7 +87,7 @@ fun IosVerticalZoomControl(
             .width(56.dp)
             .height(renderedCapsuleHeight)
             .clip(RoundedCornerShape(22.dp))
-            .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(22.dp))
+            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp))
             .bouncyScale(isDragging, pressedScale = 0.97f),
         shape = RoundedCornerShape(22.dp),
         color = IosFrostedCapsule,
@@ -103,13 +105,13 @@ fun IosVerticalZoomControl(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .bouncyClickable { onZoomIn() },
+                    .clickable { onZoomIn() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "放大地图",
-                    tint = IosBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -165,7 +167,7 @@ fun IosVerticalZoomControl(
                         .width(6.dp)
                         .fillMaxHeight(animatedFill)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(IosBlue)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
 
                 // Tactile Pill Thumb Indicator
@@ -180,8 +182,8 @@ fun IosVerticalZoomControl(
                             .width(22.dp)
                             .height(5.dp)
                             .clip(RoundedCornerShape(2.5.dp))
-                            .background(IosBlue)
-                            .border(0.5.dp, IosHairlineBorder, RoundedCornerShape(2.5.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.5.dp))
                     )
                 }
             }
@@ -191,13 +193,13 @@ fun IosVerticalZoomControl(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .bouncyClickable { onZoomOut() },
+                    .clickable { onZoomOut() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Remove,
                     contentDescription = "缩小地图",
-                    tint = IosBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -249,21 +251,21 @@ fun MapSearchState(
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
-                    color = IosColors.SystemBlue
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
-                    tint = IosColors.TertiaryLabel,
+                    tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(16.dp)
                 )
             }
             Spacer(Modifier.width(10.dp))
             Text(
                 text = if (isSearching) loadingText else emptyText,
-                style = IosTypography.Caption1,
-                color = if (isDark) Color.White.copy(alpha = 0.7f) else IosColors.SecondaryLabel
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

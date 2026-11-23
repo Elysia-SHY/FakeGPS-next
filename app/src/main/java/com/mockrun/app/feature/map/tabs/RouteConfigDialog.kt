@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.map.tabs
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,12 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.core.designsystem.IosColors
 import com.mockrun.app.core.designsystem.IosPrimaryButton
-import com.mockrun.app.core.designsystem.IosSuccess
-import com.mockrun.app.core.designsystem.IosWarning
-import com.mockrun.app.core.designsystem.IosTypography
-import com.mockrun.app.core.designsystem.bouncyClickable
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RouteSimulator
@@ -99,9 +97,9 @@ fun RouteConfigDialog(
         title = {
             Text(
                 text = "巡航参数配置",
-                style = IosTypography.Headline,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = IosColors.Label
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -115,8 +113,8 @@ fun RouteConfigDialog(
                 // Presets
                 Text(
                     text = "快速预设配速",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -131,12 +129,12 @@ fun RouteConfigDialog(
                                 .weight(1f)
                                 .height(64.dp)
                                 .clip(RoundedCornerShape(13.dp))
-                                .bouncyClickable {
+                                .clickable {
                                     speedVal = p.speed
                                     onSpeedChange(p.speed)
                                 },
                             shape = RoundedCornerShape(13.dp),
-                            color = if (isSelected) IosColors.SystemBlue else IosColors.TertiarySystemFill
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize(),
@@ -146,15 +144,15 @@ fun RouteConfigDialog(
                                 Icon(
                                     imageVector = p.icon,
                                     contentDescription = null,
-                                    tint = if (isSelected) Color.White else IosColors.SecondaryLabel,
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.height(3.dp))
                                 Text(
                                     text = p.label,
-                                    style = IosTypography.Caption2,
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else IosColors.Label,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1
                                 )
                             }
@@ -169,12 +167,12 @@ fun RouteConfigDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("自定义模拟配速", style = IosTypography.Subheadline, color = IosColors.Label)
+                        Text("自定义模拟配速", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             text = "${"%.1f".format(speedVal)} km/h",
                             fontWeight = FontWeight.Bold,
-                            color = IosColors.SystemBlue,
-                            style = IosTypography.Subheadline
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     Slider(
@@ -185,15 +183,15 @@ fun RouteConfigDialog(
                         },
                         valueRange = 1f..80f,
                         colors = SliderDefaults.colors(
-                            thumbColor = IosColors.SystemBlue,
-                            activeTrackColor = IosColors.SystemBlue
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
                         )
                     )
                 }
 
                 // ── 运行方式（v2.4.1：从路线库菜单提到「参数设置」首屏）──
                 Column {
-                    Text("运行方式", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                    Text("运行方式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -210,15 +208,15 @@ fun RouteConfigDialog(
                                     .weight(1f)
                                     .height(58.dp)
                                     .clip(RoundedCornerShape(13.dp))
-                                    .bouncyClickable(enabled = !loopBlocked) {
+                                    .clickable(enabled = !loopBlocked) {
                                         modeVal = m
                                         onModeChange(m)
                                     },
                                 shape = RoundedCornerShape(13.dp),
                                 color = when {
-                                    selected -> IosColors.SystemBlue
-                                    loopBlocked -> IosColors.TertiarySystemFill.copy(alpha = 0.4f)
-                                    else -> IosColors.TertiarySystemFill
+                                    selected -> MaterialTheme.colorScheme.primary
+                                    loopBlocked -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f)
+                                    else -> MaterialTheme.colorScheme.surfaceContainer
                                 }
                             ) {
                                 Column(
@@ -230,9 +228,9 @@ fun RouteConfigDialog(
                                 ) {
                                     Text(
                                         text = m.label,
-                                        style = IosTypography.Caption1,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (selected) Color.White else IosColors.Label,
+                                        color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1
                                     )
                                     Spacer(Modifier.height(2.dp))
@@ -242,8 +240,8 @@ fun RouteConfigDialog(
                                             RouteMode.PING_PONG -> "原路折返"
                                             RouteMode.LOOP -> "首尾相连"
                                         },
-                                        style = IosTypography.Caption2,
-                                        color = if (selected) Color.White.copy(alpha = 0.85f) else IosColors.SecondaryLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
                                     )
                                 }
@@ -254,7 +252,7 @@ fun RouteConfigDialog(
 
                 // ── 步频模式（v2.4.1：地图页也能直接设自定义步频）──
                 Column {
-                    Text("步频模式", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                    Text("步频模式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -269,12 +267,12 @@ fun RouteConfigDialog(
                                     .weight(1f)
                                     .height(42.dp)
                                     .clip(RoundedCornerShape(11.dp))
-                                    .bouncyClickable {
+                                    .clickable {
                                         cadenceModeVal = cm
                                         onCadenceConfigChange(cm, customVal.roundToInt())
                                     },
                                 shape = RoundedCornerShape(11.dp),
-                                color = if (selected) IosColors.SystemBlue else IosColors.TertiarySystemFill
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
@@ -285,9 +283,9 @@ fun RouteConfigDialog(
                                             CadenceMode.RUN -> "跑马 180"
                                             CadenceMode.CUSTOM -> "自定义"
                                         },
-                                        style = IosTypography.Caption1,
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selected) Color.White else IosColors.Label,
+                                        color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1
                                     )
                                 }
@@ -302,12 +300,12 @@ fun RouteConfigDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("自定义步频", style = IosTypography.Caption1, color = IosColors.SecondaryLabel)
+                            Text("自定义步频", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 text = "${customVal.roundToInt()} SPM",
-                                style = IosTypography.Caption1,
+                                style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = IosColors.SystemBlue
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Slider(
@@ -318,14 +316,14 @@ fun RouteConfigDialog(
                             },
                             valueRange = 40f..300f,
                             colors = SliderDefaults.colors(
-                                thumbColor = IosColors.SystemBlue,
-                                activeTrackColor = IosColors.SystemBlue
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
                 }
 
-                HorizontalDivider(color = IosColors.Separator)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 // Cadence Toggle
                 Row(
@@ -336,9 +334,9 @@ fun RouteConfigDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "步频与计步仿真",
-                            style = IosTypography.Subheadline,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isRootAvailable) IosColors.Label else IosColors.SecondaryLabel
+                            color = if (isRootAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -347,8 +345,8 @@ fun RouteConfigDialog(
                             } else {
                                 "需 Root 授权后生成步数、加速度"
                             },
-                            style = IosTypography.Caption1,
-                            color = if (isRootAvailable) IosColors.SecondaryLabel else IosWarning
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isRootAvailable) MaterialTheme.colorScheme.onSurfaceVariant else AppSemanticColors.current.warning
                         )
                     }
                     Box(
@@ -366,7 +364,7 @@ fun RouteConfigDialog(
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = IosSuccess
+                                checkedTrackColor = AppSemanticColors.current.success
                             )
                         )
                     }
@@ -380,7 +378,7 @@ fun RouteConfigDialog(
                 height = 48.dp
             )
         },
-        containerColor = IosColors.SecondaryGroupedBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(24.dp)
     )
 }

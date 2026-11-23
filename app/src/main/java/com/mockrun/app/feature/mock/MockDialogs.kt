@@ -1,4 +1,6 @@
 package com.mockrun.app.feature.mock
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
 
 import android.content.Context
 import android.content.Intent
@@ -15,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.location.RootSuBridge
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.util.logFailure
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -34,9 +34,9 @@ fun UsageGuideDialog(
         title = {
             Text(
                 text = "防闪回与使用指南",
-                style = IosTypography.Title3,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = IosColors.Label
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -49,53 +49,53 @@ fun UsageGuideDialog(
                 Column {
                     Text(
                         "【LSPosed 勾选「系统框架」+ 目标应用】",
-                        style = IosTypography.Headline,
-                        color = IosColors.SystemBlue
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "请在 LSPosed 作用域中勾选【系统框架 (Android 系统)】、【系统定位服务】（如 com.android.location.fused / com.xiaomi.location.fused / com.oplus.location，按设备实际存在的选）；如果要对某个目标应用生效（位置分流、Mock 隐藏、步频/计步），还必须把该目标应用本身也勾选。只勾系统框架时，OEM fused 链路和目标应用侧可能仍读真实值或收不到合成传感器。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Column {
                     Text(
                         "【彻底关闭 Wi-Fi 与蓝牙硬件扫描】",
-                        style = IosTypography.Headline,
-                        color = IosColors.SystemOrange
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AppSemanticColors.current.warning
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "高版本系统即使关闭 Wi-Fi，仍会允许周边基站与探针进行后台硬件定位扫描。请前往系统【设置 - 定位服务 - 提高精确度】，彻底关闭「Wi-Fi 扫描」和「蓝牙扫描」。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Column {
                     Text(
                         "【电池优化与后台运行无限制】",
-                        style = IosTypography.Headline,
-                        color = IosColors.SystemGreen
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AppSemanticColors.current.success
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "请将本应用及目标软件加入电池白名单（无限制后台运行），并在最近任务视图中对本应用执行「应用加锁」，防止底层前台服务被系统杀后台导致复位。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         },
         shape = RoundedCornerShape(16.dp),
-        containerColor = IosColors.SecondaryGroupedBackground
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     )
 }
 
@@ -123,9 +123,9 @@ fun WeChatTroubleshootDialog(
         title = {
             Text(
                 text = "💬 微信显示真实位置排查指南",
-                style = IosTypography.Title3,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = IosColors.Label
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -137,24 +137,24 @@ fun WeChatTroubleshootDialog(
             ) {
                 Surface(
                     shape = RoundedCornerShape(13.dp),
-                    color = IosColors.SystemOrange.copy(alpha = 0.12f)
+                    color = AppSemanticColors.current.warning.copy(alpha = 0.12f)
                 ) {
                     Text(
                         text = "💡 原理说明：微信内嵌腾讯定位 SDK。即便模拟了 GPS，微信默认仍会在后台扫描您周边的 Wi-Fi 路由器 MAC 地址（BSSID）上报给腾讯服务器反查真实经纬度；若检测到 Mock 标记则会直接舍弃 GPS 回退到 Wi-Fi 定位。",
-                        style = IosTypography.Footnote,
-                        color = IosColors.SystemOrange,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppSemanticColors.current.warning,
                         modifier = Modifier.padding(10.dp)
                     )
                 }
 
                 Column {
-                    Text("处理方式（Root 功能）", style = IosTypography.Headline, color = IosColors.SystemPurple)
+                    Text("处理方式（Root 功能）", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "点击下方按钮将关闭 WLAN 始终扫描、蓝牙始终扫描，并直接关闭 Wi-Fi 与蓝牙射频，让微信 / 打卡软件无法通过周边路由器 MAC 或蓝牙信标反查真实经纬度。\n" +
                         "未获取 Root 时，按钮会跳转到系统定位设置，请手动关闭「WLAN 扫描」与「蓝牙扫描」开关。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -182,12 +182,12 @@ fun WeChatTroubleshootDialog(
                         }
                     },
                     shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemPurple),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         if (isRootMode && isRootAvailable) "一键关闭蓝牙 / Wi-Fi 与背景扫描" else "去系统设置关闭扫描开关",
-                        style = IosTypography.Caption1,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -195,11 +195,11 @@ fun WeChatTroubleshootDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         },
         shape = RoundedCornerShape(16.dp),
-        containerColor = IosColors.SecondaryGroupedBackground
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     )
 }
 
@@ -217,9 +217,9 @@ fun KeepAliveGuideDialog(
         title = {
             Text(
                 text = "🛡️ 后台保活与防掉进程指南",
-                style = IosTypography.Title3,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = IosColors.Label
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -230,12 +230,12 @@ fun KeepAliveGuideDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Column {
-                    Text("1. 忽略电池激进优化 (必须)", style = IosTypography.Headline, color = IosColors.SystemGreen)
+                    Text("1. 忽略电池激进优化 (必须)", style = MaterialTheme.typography.titleMedium, color = AppSemanticColors.current.success)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "系统低电量或熄屏时会冻结未加白名单的后台进程，导致虚拟定位掉线闪回。点击下方快速加入白名单。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(6.dp))
                     Button(
@@ -244,47 +244,47 @@ fun KeepAliveGuideDialog(
                         },
                         shape = RoundedCornerShape(13.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isIgnoringBattery) IosColors.SystemGreen else IosColors.SystemBlue
+                            containerColor = if (isIgnoringBattery) AppSemanticColors.current.success else MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             if (isIgnoringBattery) "✓ 已加入电池优化白名单" else "前往设置电池白名单 (无限制)",
-                            style = IosTypography.Caption1,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
                 Column {
-                    Text("2. 多任务视图锁定应用 (关键)", style = IosTypography.Headline, color = IosColors.SystemOrange)
+                    Text("2. 多任务视图锁定应用 (关键)", style = MaterialTheme.typography.titleMedium, color = AppSemanticColors.current.warning)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "• 从屏幕底部上滑悬停进入「最近任务 (多任务卡片)」视图\n" +
                         "• 长按本应用卡片（或下滑卡片），点击「加锁 (锁定图标)」\n" +
                         "• 锁定后「一键清理后台」时不会误杀虚拟定位常驻服务",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Column {
-                    Text("3. 自启动与后台关联启动", style = IosTypography.Headline, color = IosColors.SystemBlue)
+                    Text("3. 自启动与后台关联启动", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "在小米/OPPO/vivo/华为等国内深度定制系统中，请在【系统设置 - 应用管理 - 自启动管理】中允许本应用「允许后台自启动」和「允许关联启动」。",
-                        style = IosTypography.Callout,
-                        color = IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("我知道了", color = IosColors.SystemBlue, fontWeight = FontWeight.Bold)
+                Text("我知道了", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         },
         shape = RoundedCornerShape(16.dp),
-        containerColor = IosColors.SecondaryGroupedBackground
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     )
 }

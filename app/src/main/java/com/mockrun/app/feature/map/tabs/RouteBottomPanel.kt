@@ -1,4 +1,7 @@
 package com.mockrun.app.feature.map.tabs
+import androidx.compose.material3.MaterialTheme
+import com.mockrun.app.core.designsystem.AppSemanticColors
+import androidx.compose.ui.text.font.FontFamily
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -29,11 +32,8 @@ import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.SearchResultItem
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.IosDanger
 import com.mockrun.app.core.designsystem.IosPrimaryButton
 import com.mockrun.app.core.designsystem.IosSearchField
-import com.mockrun.app.core.designsystem.IosTypography
 import com.mockrun.app.core.designsystem.ScreenInsets
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
@@ -70,13 +70,13 @@ private fun RouteStageIndicator(
             val active = step == stage
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = if (active) IosColors.SystemBlue.copy(alpha = 0.20f) else Color.Transparent
+                color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f) else Color.Transparent
             ) {
                 Text(
                     text = label,
                     fontSize = 11.sp,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) IosColors.SystemBlue else IosColors.TertiaryLabel,
+                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                 )
             }
@@ -86,7 +86,7 @@ private fun RouteStageIndicator(
 
 /**
  * 巡航数字区单元 —— 标签在上，等宽数字在下。
- * 坐标与关键数字统一走 [IosTypography.MonoValue] 等宽样式，避免数字跳动时宽度抖动。
+ * 坐标与关键数字统一走 [MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace)] 等宽样式，避免数字跳动时宽度抖动。
  */
 @Composable
 private fun RouteMetric(
@@ -99,14 +99,14 @@ private fun RouteMetric(
     Column(modifier = modifier) {
         Text(
             text = label,
-            style = IosTypography.Caption2,
-            color = IosColors.SecondaryLabel
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(3.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = value,
-                style = IosTypography.MonoValue,
+                style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace),
                 color = tint,
                 maxLines = 1
             )
@@ -114,8 +114,8 @@ private fun RouteMetric(
                 Spacer(Modifier.width(3.dp))
                 Text(
                     text = unit,
-                    style = IosTypography.Caption2,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -142,7 +142,7 @@ private fun RouteResultCard(
     modifier: Modifier = Modifier
 ) {
     val isError = status is SimulationStatus.Error
-    val accent = if (isError) IosColors.SystemRed else IosColors.SystemBlue
+    val accent = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val distanceKm = simState.distanceTraveledMeters / 1000.0
 
     Surface(
@@ -167,7 +167,7 @@ private fun RouteResultCard(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (isError) "本次巡航异常结束" else "本次巡航已完成",
-                    style = IosTypography.RowTitle,
+                    style = MaterialTheme.typography.titleSmall,
                     color = accent
                 )
             }
@@ -175,8 +175,8 @@ private fun RouteResultCard(
             if (isError) {
                 Text(
                     text = (status as SimulationStatus.Error).message,
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Row(
@@ -187,21 +187,21 @@ private fun RouteResultCard(
                         label = "已跑距离",
                         value = "%.2f".format(distanceKm),
                         unit = "km",
-                        tint = IosColors.Label,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                     RouteMetric(
                         label = "用时",
                         value = simState.formattedElapsedTime,
                         unit = null,
-                        tint = IosColors.Label,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                     RouteMetric(
                         label = "巡航配速",
                         value = "%.1f".format(simState.speedKmh),
                         unit = "km/h",
-                        tint = IosColors.Label,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -219,8 +219,8 @@ private fun RouteResultCard(
             if (!canRestart) {
                 Text(
                     text = "航点不足 2 个，先在「选点」阶段补齐起终点后再重新开始",
-                    style = IosTypography.Caption1,
-                    color = IosColors.SecondaryLabel
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -347,7 +347,7 @@ fun RouteBottomPanel(
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = "清除搜索内容",
-                                tint = if (isDark) Color.White.copy(0.85f) else IosColors.SecondaryLabel,
+                                tint = if (isDark) Color.White.copy(0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(12.dp)
                             )
                         }
@@ -386,7 +386,7 @@ fun RouteBottomPanel(
                                 Icon(
                                     Icons.Default.Place,
                                     contentDescription = null,
-                                    tint = IosColors.SystemBlue,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(10.dp))
@@ -403,7 +403,7 @@ fun RouteBottomPanel(
                                         Text(
                                             item.address,
                                             fontSize = 11.5.sp,
-                                            color = if (isDark) Color.White.copy(0.6f) else IosColors.SecondaryLabel,
+                                            color = if (isDark) Color.White.copy(0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -459,8 +459,8 @@ fun RouteBottomPanel(
                                 RouteStageIndicator(stage = stage)
                                 Text(
                                     text = "${waypoints.size} 个航点",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SecondaryLabel
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
@@ -495,14 +495,14 @@ fun RouteBottomPanel(
                                             Icons.Default.DeleteOutline,
                                             null,
                                             modifier = Modifier.size(16.dp),
-                                            tint = IosColors.SystemRed
+                                            tint = MaterialTheme.colorScheme.error
                                         )
                                         Spacer(Modifier.width(5.dp))
-                                        Text("清空全部", fontSize = 13.sp, color = IosColors.SystemRed, maxLines = 1)
+                                        Text("清空全部", fontSize = 13.sp, color = MaterialTheme.colorScheme.error, maxLines = 1)
                                     }
                                 }
 
-                                HorizontalDivider(color = IosColors.Separator.copy(alpha = 0.45f))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                             }
 
                             // Main action buttons: +添加路点 与 完成规划
@@ -517,7 +517,7 @@ fun RouteBottomPanel(
                                         .weight(1.2f)
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue)
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
                                     Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
@@ -536,7 +536,7 @@ fun RouteBottomPanel(
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = IosColors.SystemGreen,
+                                        containerColor = AppSemanticColors.current.success,
                                         disabledContainerColor = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
                                     )
                                 ) {
@@ -560,8 +560,8 @@ fun RouteBottomPanel(
                                     } else {
                                         "还差 ${2 - waypoints.size} 个航点才能完成规划（至少需要 2 个）"
                                     },
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SystemOrange
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppSemanticColors.current.warning
                                 )
                             }
                         }
@@ -588,16 +588,16 @@ fun RouteBottomPanel(
                                             .minTouchTarget(minWidth = 48.dp, minHeight = 48.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .clickable { onOpenConfig() },
-                                        color = IosColors.SystemBlue.copy(0.12f),
+                                        color = MaterialTheme.colorScheme.primary.copy(0.12f),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Tune, null, tint = IosColors.SystemBlue, modifier = Modifier.size(15.dp))
+                                            Icon(Icons.Default.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
                                             Spacer(Modifier.width(5.dp))
-                                            Text("参数设置", fontSize = 12.5.sp, color = IosColors.SystemBlue, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                            Text("参数设置", fontSize = 12.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1)
                                         }
                                     }
                                 }
@@ -605,8 +605,8 @@ fun RouteBottomPanel(
 
                             Text(
                                 text = "✅ 路线已就绪 · ${waypoints.size} 折点 · ${"%.1f".format(selectedSpeed)} km/h",
-                                style = IosTypography.Caption1,
-                                color = if (isDark) Color.White.copy(0.75f) else IosColors.SecondaryLabel
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isDark) Color.White.copy(0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Row(
@@ -652,7 +652,7 @@ fun RouteBottomPanel(
                                         .weight(1.4f)
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemBlue),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
                                     Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
@@ -664,8 +664,8 @@ fun RouteBottomPanel(
                             if (waypoints.size < 2) {
                                 Text(
                                     text = "航点不足 2 个，无法启动巡航：请先回到「选点」阶段补齐起终点",
-                                    style = IosTypography.Caption1,
-                                    color = IosColors.SystemOrange
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AppSemanticColors.current.warning
                                 )
                             }
                         }
@@ -692,7 +692,7 @@ fun RouteBottomPanel(
                                             .size(10.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (isPaused) IosColors.SystemOrange else IosColors.SystemGreen.copy(alpha = pulseAlpha)
+                                                if (isPaused) AppSemanticColors.current.warning else AppSemanticColors.current.success.copy(alpha = pulseAlpha)
                                             )
                                     )
                                     Spacer(Modifier.width(8.dp))
@@ -700,7 +700,7 @@ fun RouteBottomPanel(
                                         text = if (isPaused) "已暂停" else "巡航中",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
-                                        color = if (isDark) Color.White else IosColors.Label
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -714,21 +714,21 @@ fun RouteBottomPanel(
                                     label = "当前配速",
                                     value = "%.1f".format(simState.speedKmh),
                                     unit = "km/h",
-                                    tint = if (isPaused) IosColors.SystemOrange else IosColors.SystemGreen,
+                                    tint = if (isPaused) AppSemanticColors.current.warning else AppSemanticColors.current.success,
                                     modifier = Modifier.weight(1f)
                                 )
                                 RouteMetric(
                                     label = "已跑距离",
                                     value = "%.2f".format(simState.distanceTraveledMeters / 1000.0),
                                     unit = "km",
-                                    tint = IosColors.Label,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 RouteMetric(
                                     label = "已用时间",
                                     value = simState.formattedElapsedTime,
                                     unit = null,
-                                    tint = IosColors.Label,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -744,14 +744,14 @@ fun RouteBottomPanel(
                                         .weight(1f)
                                         .height(6.dp)
                                         .clip(RoundedCornerShape(3.dp)),
-                                    color = if (isPaused) IosColors.SystemOrange else IosColors.SystemGreen,
-                                    trackColor = IosColors.Separator.copy(alpha = 0.5f)
+                                    color = if (isPaused) AppSemanticColors.current.warning else AppSemanticColors.current.success,
+                                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
                                     text = "${(simState.progressPercent.coerceIn(0f, 1f) * 100).toInt()}%",
-                                    style = IosTypography.Mono13,
-                                    color = IosColors.SecondaryLabel
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
@@ -782,7 +782,7 @@ fun RouteBottomPanel(
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isPaused) IosColors.SystemGreen else IosColors.SystemOrange
+                                        containerColor = if (isPaused) AppSemanticColors.current.success else AppSemanticColors.current.warning
                                     )
                                 ) {
                                     Icon(
@@ -800,7 +800,7 @@ fun RouteBottomPanel(
                                         .weight(1.2f)
                                         .height(48.dp),
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = IosColors.SystemRed)
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                                 ) {
                                     Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(4.dp))
