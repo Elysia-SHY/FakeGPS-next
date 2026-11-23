@@ -3,11 +3,14 @@
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -15,18 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.IosColors
-import com.mockrun.app.core.designsystem.LocalIosColors
 import com.mockrun.app.core.designsystem.bouncyClickable
-import com.mockrun.app.core.designsystem.liquidGlass
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -38,7 +35,7 @@ data class FloatingTabItem(
 )
 
 /**
- * Floating Capsule Bottom Navigation Bar with real-time gesture & screen translation synchronization.
+ * Material 3 navigation bar with real-time gesture and screen translation synchronization.
  * Driven by [currentPosition] (Float from 0.0 to tabCount - 1).
  */
 @Composable
@@ -46,36 +43,32 @@ fun AndroidFloatingBottomBar(
     modifier: Modifier = Modifier,
     tabs: List<FloatingTabItem>,
     currentPosition: Float,
-    isLiquidGlass: Boolean,
     onDragStart: () -> Unit = {},
     onDragDelta: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onTabSelected: (Int) -> Unit
 ) {
-    val palette = LocalIosColors.current
-    val isDark = palette.isDark
+    val scheme = MaterialTheme.colorScheme
     val tabCount = tabs.size.coerceAtLeast(1)
 
-    // 设计稿 .tabbar —— 72dp 高 / r36 浮空玻璃药丸 / 左右 14dp / 底距 6dp
-    Box(
+    Surface(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 6.dp)
             .widthIn(max = 480.dp)
             .fillMaxWidth()
-            .height(72.dp)
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = AppShapes.bar,
-                elevation = 18.dp,
-                containerColor = IosColors.GlassBgBar
-            )
+            .height(72.dp),
+        shape = AppShapes.bar,
+        color = scheme.surfaceContainer,
+        contentColor = scheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.dp, scheme.outlineVariant)
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(6.dp)
-                // Real-time horizontal drag gesture tracking
+                .padding(4.dp)
                 .pointerInput(tabCount) {
                     detectHorizontalDragGestures(
                         onDragStart = { onDragStart() },
@@ -100,37 +93,33 @@ fun AndroidFloatingBottomBar(
                     .offset(x = indicatorOffset)
                     .width(tabWidth)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(
-                        if (isLiquidGlass) IosColors.SystemBlue.copy(alpha = 0.14f)
-                        else IosColors.SystemBlue.copy(alpha = 0.10f)
-                    )
+                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                    .clip(AppShapes.pill)
+                    .background(scheme.primaryContainer)
             )
 
-            // 2. Tab Items with real-time linear interpolation
-            Row(
+            // 2. NavigationBar items retain the continuous selection interpolation.
+            NavigationBar(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
+                containerColor = Color.Transparent,
+                contentColor = scheme.onSurface,
+                tonalElevation = 0.dp,
+                windowInsets = WindowInsets(0, 0, 0, 0)
             ) {
                 tabs.forEachIndexed { index, tab ->
                     val distance = abs(clampedPosition - index)
                     val selectProgress = (1.0f - distance).coerceIn(0f, 1f)
-
-                    // 设计稿：未选 --t3 #646E85，选中 --brand-soft #6BA5FF
-                    // 浅色主题下底栏是白色玻璃：--t3 的半透明灰（#8894A8 @50%）与浅蓝
-                    // --brand-soft（#6BA5FF）在白底上对比度都不足，分别换成 .text2 与 --brand。
-                    // 深色主题两个取值与原来完全一致，观感零变化。
-                    val unselectedColor = if (isDark) IosColors.TertiaryLabel else IosColors.SecondaryLabel
-                    val activeColor = palette.brandSoft
-                    val currentColor = lerp(unselectedColor, activeColor, selectProgress)
-                    val currentScale = 1.0f + 0.10f * selectProgress
+                    val currentColor = lerp(
+                        scheme.onSurfaceVariant,
+                        scheme.onPrimaryContainer,
+                        selectProgress
+                    )
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(26.dp))
+                            .clip(AppShapes.pill)
                             .bouncyClickable {
                                 onTabSelected(index)
                             },
@@ -144,20 +133,14 @@ fun AndroidFloatingBottomBar(
                                 imageVector = tab.icon,
                                 contentDescription = tab.title,
                                 tint = currentColor,
-                                modifier = Modifier
-                                    .size(23.dp)
-                                    .graphicsLayer {
-                                        scaleX = currentScale
-                                        scaleY = currentScale
-                                    }
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(Modifier.height(3.dp))
+                            Spacer(Modifier.height(2.dp))
                             Text(
                                 text = tab.title,
-                                fontSize = 10.5.sp,
-                                lineHeight = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = currentColor
+                                style = MaterialTheme.typography.labelMedium,
+                                color = currentColor,
+                                maxLines = 1
                             )
                         }
                     }
@@ -175,7 +158,6 @@ fun AndroidFloatingBottomBar(
     modifier: Modifier = Modifier,
     tabs: List<FloatingTabItem>,
     currentRoute: String?,
-    isLiquidGlass: Boolean,
     onTabSelected: (String) -> Unit
 ) {
     val selectedIndex = remember(currentRoute, tabs) {
@@ -198,7 +180,6 @@ fun AndroidFloatingBottomBar(
         modifier = modifier,
         tabs = tabs,
         currentPosition = animatedPosition.value,
-        isLiquidGlass = isLiquidGlass,
         onDragDelta = { delta ->
             scope.launch {
                 val next = (animatedPosition.value + delta).coerceIn(0f, (tabs.size - 1).toFloat())

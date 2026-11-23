@@ -8,12 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.mockrun.app.ui.navigation.AppNavigation
+import com.mockrun.app.core.designsystem.AppAppearancePreferences
 import com.mockrun.app.core.designsystem.MockRunTheme
 import com.mockrun.app.feature.disclaimer.DisclaimerGateScreen
 import com.mockrun.app.feature.disclaimer.DisclaimerPrefs
@@ -31,9 +35,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        AppAppearancePreferences.initialize(this)
 
         setContent {
-            MockRunTheme {
+            val darkTheme = isSystemInDarkTheme()
+            val dynamicColor by AppAppearancePreferences.dynamicColorEnabled
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
+            MockRunTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
                 // 免责声明门禁：未接受过当前版本声明的用户，先看全屏条款页面，
                 // 必须滚动到底部并手动输入确认短语才能进入主界面。
                 // 用 rememberSaveable 记住本次会话的接受状态，避免配置变更后重复显示。

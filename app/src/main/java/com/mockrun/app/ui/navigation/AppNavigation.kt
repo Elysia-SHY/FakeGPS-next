@@ -28,11 +28,8 @@ import com.mockrun.app.feature.mock.LocationMockScreen
 import com.mockrun.app.feature.map.MapScreen
 import com.mockrun.app.feature.map.MapTab
 import com.mockrun.app.feature.route.RouteLibraryScreen
+import com.mockrun.app.core.designsystem.AppAppearancePreferences
 import com.mockrun.app.core.designsystem.BackgroundThemeManager
-import com.mockrun.app.core.designsystem.LiquidGlassDefaults
-import com.mockrun.app.core.designsystem.LocalHazeState
-import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
-import com.mockrun.app.core.designsystem.hazeSource
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.core.data.repository.VersionSyncManager
@@ -64,18 +61,10 @@ fun AppNavigation(
     val isTablet = configuration.screenWidthDp >= 600
     val coroutineScope = rememberCoroutineScope()
 
-    var isLiquidGlassEnabled by remember {
-        mutableStateOf(LiquidGlassDefaults.isEnabled(context))
-    }
+    val dynamicColorEnabled by AppAppearancePreferences.dynamicColorEnabled
 
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // 设计稿：Tab 栏 72dp + 底距 22dp
     val bottomBarPadding = navBarBottom + 94.dp
-
-    // 全局模糊源：整个内容区（含地图页 Aurora 雾面层）会被捕获，供底部玻璃 Tab 栏采样。
-    // 地图页的原生 MapView 无法被 Haze 捕获，但地图页内已铺一层 Compose 绘制的
-    // Aurora 雾面，因此这里录到的内容非空，底栏能拿到真实模糊而不是空图层。
-    val chromeHaze = remember { dev.chrisbanes.haze.HazeState() }
 
     val navigationTabs = remember {
         listOf(
@@ -109,28 +98,13 @@ fun AppNavigation(
         }
     }
 
-    CompositionLocalProvider(
-        LocalLiquidGlassEnabled provides isLiquidGlassEnabled
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
             // Main Sliding Multi-Screen View (Driven by tabPosition in real-time)
             //
-            // 关键修复（解决功能页 / 关于页滑动卡片时毛玻璃模糊突然消失的根因）：
-            //  1. 页面横向位移改用 Layout Placement 阶段的 Modifier.offset { IntOffset(...) }
-            //     而非 graphicsLayer { translationX = ... }。graphicsLayer 只修改 RenderNode
-            //     变换矩阵而不触发 Layout 阶段，导致切换动画结束后 AppBackground 的
-            //     HazeNode.onGloballyPositioned 不再触发，pageHaze.positionOnScreen 卡在
-            //     动画中途的屏幕外旧坐标；一旦用户上下滚动卡片触发 HazeChildNode 重算
-            //     positionInContent = cardPos - pageHaze.positionOnScreen，就会把背景图层
-            //     平移出卡片裁剪框之外，使模糊瞬间消失只剩半透明遮罩。
-            //     改为 Modifier.offset 后，Placement 阶段自动同步更新源层与卡片坐标，误差为 0。
-            //  2. 该容器同时作为底部悬浮 Tab 栏的模糊源（chromeHaze）。过去这里不挂源，
-            //     理由是地图页的 AndroidView 录出来是空图层；现在地图页内已铺 Aurora 雾面
-            //     （Compose 绘制），录制内容非空，底栏因此能获得真实背景模糊。
+            // Keep placement-stage offsets so the map AndroidView and hit testing stay
+            // synchronized with the continuously dragged tab position.
             BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .hazeSource(chromeHaze)
+                modifier = Modifier.fillMaxSize()
             ) {
                 val density = LocalDensity.current
                 val widthPx = with(density) { maxWidth.toPx() }
@@ -150,7 +124,7 @@ fun AppNavigation(
                             mapViewModel = mapViewModel,
                             simulationViewModel = simulationViewModel,
                             initialTab = mapTab,
-                            isLiquidGlass = isLiquidGlassEnabled,
+                            isLiquidGlass = false,
                             isTablet = isTablet,
                             bottomBarPadding = bottomBarPadding,
                             onNavigateToLibrary = { showLibrarySubScreen = true }
@@ -190,9 +164,11 @@ fun AppNavigation(
                             }
                     ) {
                         AboutScreen(
-                            isLiquidGlass = isLiquidGlassEnabled,
+                            dynamicColor = dynamicColorEnabled,
                             isTablet = isTablet,
-                            onToggleLiquidGlass = { isLiquidGlassEnabled = it },
+                            onToggleDynamicColor = {
+                                AppAppearancePreferences.setDynamicColorEnabled(context, it)
+                            },
                             onNavigateToLibrary = { showLibrarySubScreen = true }
                         )
                     }
@@ -218,41 +194,35 @@ fun AppNavigation(
 
             // Floating Bottom Bar (Synchronized with tabPosition in real-time)
             //
-            // 底栏接页面容器录制的 chromeHaze：内容区在它下方，模糊采样即页面真实内容
-            // （地图页为 Aurora 雾面 + 地图边缘、其余页为极光底衬），因此得到与 iOS
-            // 系统 Tab 栏同类的通透悬浮玻璃，而不是一块纯色不透明板。
             if (!showLibrarySubScreen) {
-                CompositionLocalProvider(LocalHazeState provides chromeHaze) {
-                    AndroidFloatingBottomBar(
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        tabs = navigationTabs,
-                        currentPosition = tabPosition.value,
-                        isLiquidGlass = isLiquidGlassEnabled,
-                        onDragDelta = { delta ->
-                            coroutineScope.launch {
-                                val next = (tabPosition.value + delta).coerceIn(0f, (navigationTabs.size - 1).toFloat())
-                                tabPosition.snapTo(next)
-                            }
-                        },
-                        onDragEnd = {
-                            val target = tabPosition.value.roundToInt().coerceIn(0, navigationTabs.size - 1)
-                            coroutineScope.launch {
-                                tabPosition.animateTo(
-                                    targetValue = target.toFloat(),
-                                    animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
-                                )
-                            }
-                        },
-                        onTabSelected = { targetIndex ->
-                            coroutineScope.launch {
-                                tabPosition.animateTo(
-                                    targetValue = targetIndex.toFloat(),
-                                    animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
-                                )
-                            }
+                AndroidFloatingBottomBar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    tabs = navigationTabs,
+                    currentPosition = tabPosition.value,
+                    onDragDelta = { delta ->
+                        coroutineScope.launch {
+                            val next = (tabPosition.value + delta).coerceIn(0f, (navigationTabs.size - 1).toFloat())
+                            tabPosition.snapTo(next)
                         }
-                    )
-                }
+                    },
+                    onDragEnd = {
+                        val target = tabPosition.value.roundToInt().coerceIn(0, navigationTabs.size - 1)
+                        coroutineScope.launch {
+                            tabPosition.animateTo(
+                                targetValue = target.toFloat(),
+                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
+                    },
+                    onTabSelected = { targetIndex ->
+                        coroutineScope.launch {
+                            tabPosition.animateTo(
+                                targetValue = targetIndex.toFloat(),
+                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
+                    }
+                )
             }
 
             // In-app Update Prompt Dialog
@@ -271,10 +241,8 @@ fun AppNavigation(
             if (showUpdatePrompt && statusSnapshot is VersionSyncStatus.HasUpdate) {
                 AppUpdateDialog(
                     info = statusSnapshot.info,
-                    isLiquidGlass = isLiquidGlassEnabled,
                     onDismiss = { VersionSyncManager.dismissUpdatePrompt() }
                 )
             }
-        }
     }
 }

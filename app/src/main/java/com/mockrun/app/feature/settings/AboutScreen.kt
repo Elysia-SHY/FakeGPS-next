@@ -87,13 +87,14 @@ private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.2.0 更新日志】
 
 @Composable
 fun AboutScreen(
-    isLiquidGlass: Boolean,
+    dynamicColor: Boolean,
     isTablet: Boolean = false,
-    onToggleLiquidGlass: (Boolean) -> Unit,
+    onToggleDynamicColor: (Boolean) -> Unit,
     onNavigateToLibrary: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     val syncState by VersionSyncManager.status
     val downloadState by VersionSyncManager.downloadStatus
@@ -158,15 +159,11 @@ fun AboutScreen(
         AboutDetailsSheet(onDismiss = { showDetailsSheet = false })
     }
 
-    // 本页专属模糊源：AppBackground 铺底当源层，卡片玻璃采样它 ——
-    // 两者是同一个 Box 下的兄弟节点，不会自引用。
-    val pageHaze = remember { dev.chrisbanes.haze.HazeState() }
-
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        AppBackground(hazeState = pageHaze)
+        AppBackground()
         Column(
             modifier = Modifier
                 .widthIn(max = 680.dp)
@@ -183,12 +180,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -197,44 +189,31 @@ fun AboutScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
+                    Surface(
                         modifier = Modifier
                             .size(64.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        IosColors.SystemBlue,
-                                        Color(0xFF5A6BFF),
-                                        IosColors.Violet
-                                    )
-                                )
-                            )
-                            .border(
-                                1.5.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.White.copy(alpha = 0.65f),
-                                        Color.White.copy(alpha = 0.15f)
-                                    )
-                                ),
-                                RoundedCornerShape(20.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                            .clip(AppShapes.iconLg),
+                        shape = AppShapes.iconLg,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Place,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "FakeGPS-next",
-                            style = IosTypography.Title2,
-                            color = IosColors.Label
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(6.dp))
                         Row(
@@ -243,19 +222,21 @@ fun AboutScreen(
                         ) {
                             Surface(
                                 shape = AppShapes.pill,
-                                color = IosColors.SystemBlue.copy(alpha = 0.12f)
+                                color = MaterialTheme.colorScheme.secondaryContainer
                             ) {
                                 Text(
                                     text = BuildConfig.VERSION_NAME,
-                                    style = IosTypography.Mono13,
-                                    color = IosColors.BrandSoft,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.dp)
                                 )
                             }
                             Text(
                                 text = "构建时间: ${BuildConfig.BUILD_TIME}",
-                                fontSize = 11.sp,
-                                color = IosColors.SecondaryLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -267,17 +248,12 @@ fun AboutScreen(
             // =====================================================================
             // 2. 视觉渲染风格
             // =====================================================================
-            IosSectionHeader("视觉渲染风格")
+            IosSectionHeader("外观与色彩")
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     Row(
@@ -295,64 +271,75 @@ fun AboutScreen(
                                     .size(42.dp)
                                     .clip(AppShapes.button)
                                     .background(
-                                        if (isLiquidGlass) IosColors.SystemBlue.copy(0.18f) else IosColors.SystemFill
+                                        if (dynamicColor) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (isLiquidGlass) Icons.Default.WaterDrop else Icons.Default.BlurOff,
+                                    imageVector = Icons.Default.Palette,
                                     contentDescription = null,
-                                    tint = if (isLiquidGlass) IosColors.SystemBlue else IosColors.SecondaryLabel,
+                                    tint = if (dynamicColor) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
 
                             Column {
                                 Text(
-                                    text = "液态毛玻璃渲染效果",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = IosColors.Label
+                                    text = "动态取色",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    text = if (isLiquidGlass) "半透明磨砂 · 镜面光泽 · 柔和环境光" else "纯色材质 · 超低 GPU 负荷 · 极致省电",
-                                    fontSize = 11.5.sp,
-                                    color = IosColors.SecondaryLabel
+                                    text = when {
+                                        !supportsDynamicColor -> "当前系统不支持动态取色（需 Android 12 及以上）"
+                                        dynamicColor -> "跟随壁纸生成协调的 Material 3 色彩"
+                                        else -> "使用 FakeGPS-next 品牌蓝配色"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
                         Switch(
-                            checked = isLiquidGlass,
+                            checked = dynamicColor,
+                            enabled = supportsDynamicColor,
                             onCheckedChange = { next ->
-                                LiquidGlassDefaults.setEnabled(context, next)
-                                onToggleLiquidGlass(next)
+                                onToggleDynamicColor(next)
                                 Toast.makeText(
                                     context,
-                                    if (next) "💧 已开启液态毛玻璃视觉效果" else "⬛ 已切换为经典纯色节能模式",
+                                    if (next) "已开启动态取色" else "已切换为品牌配色",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = IosColors.SystemBlue
-                            )
+                            colors = SwitchDefaults.colors()
                         )
                     }
 
                     Spacer(Modifier.height(10.dp))
                     HorizontalDivider(
-                        color = IosColors.Line,
-                        thickness = 0.8.dp
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        thickness = 1.dp
                     )
                     Spacer(Modifier.height(10.dp))
 
                     Text(
-                        text = "💡 视觉设计参考了 LocationSpoofer 与 Orb 的折射高光光泽。在开启状态下，浮动底栏与抽屉将呈现通透细腻的质感。",
-                        fontSize = 11.5.sp,
-                        lineHeight = 16.sp,
-                        color = IosColors.SecondaryLabel
+                        text = if (supportsDynamicColor) {
+                            "Material 3 会从系统壁纸提取主色，并同步应用到按钮、选中状态与强调信息。"
+                        } else {
+                            "Android 12 以下继续使用品牌蓝配色，开关不可用。"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -365,12 +352,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
@@ -466,12 +448,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
                     .bouncyClickable { onNavigateToLibrary() }
             ) {
                 Row(
@@ -532,12 +509,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(AppSpacing.s4)) {
                     val isChecking = sync is VersionSyncStatus.Checking
@@ -1047,12 +1019,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(AppSpacing.s4),
@@ -1102,12 +1069,7 @@ fun AboutScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .liquidGlass(
-                        isLiquidGlass = isLiquidGlass,
-                        shape = AppShapes.card,
-                        elevation = 8.dp,
-                        hazeState = pageHaze
-                    )
+                    .md3Surface(shape = AppShapes.card, elevation = 2.dp)
                     .bouncyClickable { showDetailsSheet = true }
             ) {
                 Row(

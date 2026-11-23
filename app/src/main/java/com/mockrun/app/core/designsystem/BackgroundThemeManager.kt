@@ -7,10 +7,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -122,17 +122,17 @@ object BackgroundThemeManager {
 }
 
 /**
- * Renders the global app background.
- * If user set a custom photo, display the photo with a subtle scrim.
- * Otherwise, paint a flat solid color: pure black in dark mode, pure white in light mode.
+ * Renders the global Material 3 background.
+ * A custom photo receives a strong surface scrim so foreground text keeps AA contrast.
  */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun AppBackground(
     modifier: Modifier = Modifier,
     hazeState: dev.chrisbanes.haze.HazeState? = null
 ) {
     val context = LocalContext.current
-    val isDark = LocalIosColors.current.isDark
+    val scheme = MaterialTheme.colorScheme
     val isCustom by BackgroundThemeManager.hasCustomWallpaper
     val timestamp by BackgroundThemeManager.customWallpaperTimestamp
 
@@ -167,12 +167,7 @@ fun AppBackground(
 
     val baseModifier = modifier
         .fillMaxSize()
-        .hazeSource(hazeState)
-        .drawBehind {
-            if (customBitmap == null) {
-                drawRect(if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF))
-            }
-        }
+        .background(scheme.background)
 
     Box(modifier = baseModifier) {
         if (customBitmap != null) {
@@ -182,13 +177,17 @@ fun AppBackground(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            // 降低壁纸遮罩浓度，保留壁纸高频纹理细节供毛玻璃卡片高斯模糊折射
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        if (isDark) Color.Black.copy(alpha = 0.12f)
-                        else Color.White.copy(alpha = 0.08f)
+                        Brush.verticalGradient(
+                            listOf(
+                                scheme.surface.copy(alpha = 0.90f),
+                                scheme.surface.copy(alpha = 0.78f),
+                                scheme.surface.copy(alpha = 0.84f)
+                            )
+                        )
                     )
             )
         }
