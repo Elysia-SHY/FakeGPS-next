@@ -1,113 +1,86 @@
-﻿package com.mockrun.app.core.designsystem
+package com.mockrun.app.core.designsystem
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// =============================================================================
-// Design Token · v1.7.0
-// 参考稿：FakeGPS-next · UI 重设计规范 v1.7.0
-//   「Apple 式大圆角 + 连续曲率 + 充足呼吸感」
-// 三层结构：
-//   ① 原始 token（DesignTokens）—— 设计稿的精确数值，不随明暗切换
-//   ② 语义 palette（IosColorPalette）—— 按 isDark 提供两组值
-//   ③ 访问器（IosColors）—— 向后兼容的公开 API
-// =============================================================================
-
-// -----------------------------------------------------------------------------
-// ① 原始 Token · 设计稿精确数值
-// -----------------------------------------------------------------------------
+/**
+ * Legacy design-token aliases.
+ *
+ * Pages still reference the historical Ios* names while the UI is migrated. The
+ * semantic palette below resolves those names through Material Design 3 so the
+ * old API and the new theme cannot drift into two independent color systems.
+ */
 object DesignTokens {
-    // 背景层级
-    val Bg0 = Color(0xFF05070D)
-    val Bg1 = Color(0xFF0B1020)
-    val Surface = Color(0xFF151B2B)
-    val Surface2 = Color(0xFF1C2437)
-    val Surface3 = Color(0xFF252E44)
-    val Line = Color(0x12FFFFFF)      // rgba(255,255,255,.07)
-    val LineSoft = Color(0x0BFFFFFF)  // rgba(255,255,255,.045)
+    val Bg0 = Color(0xFF111318)
+    val Bg1 = Color(0xFF191C20)
+    val Surface = Color(0xFF1D2024)
+    val Surface2 = Color(0xFF282A2F)
+    val Surface3 = Color(0xFF33353A)
+    val Line = Color(0xFF44474E)
+    val LineSoft = Color(0xFF37393E)
 
-    // 语义色（iOS 系统色系）
-    val Brand = Color(0xFF2F7BFF)
-    val BrandPress = Color(0xFF1E63E6)
-    val BrandSoft = Color(0xFF6BA5FF)
-    val Ok = Color(0xFF30D158)
-    val Warn = Color(0xFFFF9F0A)
-    val Danger = Color(0xFFFF453A)
-    val Violet = Color(0xFF7C4DFF)    // 品牌渐变第二色 / 极光紫
+    val Brand = BrandSeed
+    val BrandPress = Color(0xFF005AC1)
+    val BrandSoft = Color(0xFFADC6FF)
+    val Ok = Color(0xFF7DDA95)
+    val Warn = Color(0xFFFFB95C)
+    val Danger = Color(0xFFFFB4AB)
+    val Violet = Color(0xFFC8BFFF)
 
-    // 文字
-    val T1 = Color(0xFFF5F7FB)
-    val T2 = Color(0xFF98A2B8)
-    val T3 = Color(0xFF646E85)
+    val T1 = Color(0xFFE1E2E8)
+    val T2 = Color(0xFFC4C6D0)
+    val T3 = Color(0xFF8E9099)
 
-    // 毛玻璃（暗色模式：降低遮罩不透明度以增强背景模糊通透感与层次感，提升高光边缘）
-    val GlassBg = Color(0x78121829)        // rgba(18,24,41,.47)  通透深蓝宝石玻璃底板
-    val GlassBgBar = Color(0x88161D2E)     // rgba(22,29,46,.53)  底部 Tab 栏
-    val GlassLine = Color(0x2BFFFFFF)      // rgba(255,255,255,.17) 晶体外边缘
-    val GlassHighlight = Color(0x42FFFFFF) // inset 0 1px 0 rgba(255,255,255,.26) 顶部镜面高光
+    // Kept only for source compatibility; these roles are no longer rendered as glass.
+    val GlassBg = Color(0xFF1D2024)
+    val GlassBgBar = Color(0xFF282A2F)
+    val GlassLine = Color(0xFF44474E)
+    val GlassHighlight = Color.Transparent
+    val GlassBgOpaque = Color(0xFF1D2024)
+    val GlassBgBarOpaque = Color(0xFF282A2F)
 
-    /**
-     * 无可用模糊源时的**不透明磨砂底板**（如 OSMDroid 原生地图层之上的浮层）。
-     */
-    val GlassBgOpaque = Color(0xEC141B2D)
-    val GlassBgBarOpaque = Color(0xF01B2234)
-
-    // 明色档（亮色模式：解决白色毛玻璃过白、不透明、缺乏模糊层次的问题）
-    val LBg0 = Color(0xFFEEF2F9)
-    val LBg1 = Color(0xFFF8FAFF)
+    val LBg0 = Color(0xFFF8F9FF)
+    val LBg1 = Color(0xFFF2F3F9)
     val LSurface = Color(0xFFFFFFFF)
-    val LSurface2 = Color(0xFFF0F4FA)
-    val LSurface3 = Color(0xFFE4EAF3)
-    val LLine = Color(0x140F172A)
-    val LLineSoft = Color(0x0C0F172A)
-    val LGlassBg = Color(0x72FFFFFF)       // rgba(255,255,255,.45) 冰晶通透白玻璃
-    val LGlassBgBar = Color(0x85F8FAFF)    // rgba(248,250,255,.52) 底部 Tab 栏
-    val LGlassLine = Color(0x80FFFFFF)     // 亮色玻璃晶亮白内边（配合外层微阴影轮廓）
-    val LGlassHighlight = Color(0xE6FFFFFF)
-    val LGlassBgOpaque = Color(0xF2FFFFFF)
-    val LGlassBgBarOpaque = Color(0xF5F8FAFF)
+    val LSurface2 = Color(0xFFECEEF4)
+    val LSurface3 = Color(0xFFE1E2E8)
+    val LLine = Color(0xFFC4C6D0)
+    val LLineSoft = Color(0xFFE0E2EC)
+    val LGlassBg = Color(0xFFFFFFFF)
+    val LGlassBgBar = Color(0xFFF2F3F9)
+    val LGlassLine = Color(0xFFC4C6D0)
+    val LGlassHighlight = Color.Transparent
+    val LGlassBgOpaque = Color(0xFFFFFFFF)
+    val LGlassBgBarOpaque = Color(0xFFF2F3F9)
 
-    // 地图图钉上方提示条底板（压在地图瓦片上，需高不透明以保证可读）
-    val LPinTipBg = Color(0xE6FFFFFF)   // rgba(255,255,255,.90)
-    val DPinTipBg = Color(0xDB0A0D16)   // rgba(10,13,22,.86)
+    val LPinTipBg = Color(0xFFFFFFFF)
+    val DPinTipBg = Color(0xFF282A2F)
 }
 
-// -----------------------------------------------------------------------------
-// ② 语义 Palette
-// -----------------------------------------------------------------------------
 data class IosColorPalette(
     val isDark: Boolean,
-
-    // Dynamic Text Hierarchy (Labels)
     val label: Color,
     val secondaryLabel: Color,
     val tertiaryLabel: Color,
     val quaternaryLabel: Color,
-
-    // Grouped System Backgrounds
     val systemGroupedBackground: Color,
     val secondaryGroupedBackground: Color,
     val tertiaryGroupedBackground: Color,
-
-    // System Fills
     val systemFill: Color,
     val secondarySystemFill: Color,
     val tertiarySystemFill: Color,
     val quaternarySystemFill: Color,
-
-    // Separators
     val separator: Color,
     val opaqueSeparator: Color,
-
-    // Materials & Blur Tints
     val ultraThinMaterial: Color,
     val thinMaterial: Color,
     val frostedCapsule: Color,
     val hairlineBorder: Color,
     val glassTrack: Color,
-
-    // ---- v1.7.0 新增：层级 / 描边 / 玻璃 ----
     val bg1: Color,
     val surface2: Color,
     val surface3: Color,
@@ -118,298 +91,408 @@ data class IosColorPalette(
     val glassBg: Color,
     val glassLine: Color,
     val glassHighlight: Color,
-    /** 底部 Tab 栏玻璃底板（bar 比普通浮层略亮一档） */
     val glassBgBar: Color,
-    /** 地图中心图钉上方的提示条底板（压在瓦片上，需高不透明） */
-    val pinTipBg: Color,
+    val pinTipBg: Color
+)
+
+fun ColorScheme.toIosColorPalette(isDark: Boolean) = IosColorPalette(
+    isDark = isDark,
+    label = onSurface,
+    secondaryLabel = onSurfaceVariant,
+    tertiaryLabel = outline,
+    quaternaryLabel = outlineVariant,
+    systemGroupedBackground = background,
+    secondaryGroupedBackground = surfaceContainer,
+    tertiaryGroupedBackground = surfaceContainerHigh,
+    systemFill = surfaceContainerHighest,
+    secondarySystemFill = surfaceContainerHigh,
+    tertiarySystemFill = surfaceContainer,
+    quaternarySystemFill = surfaceContainerLow,
+    separator = outlineVariant,
+    opaqueSeparator = outline,
+    ultraThinMaterial = surfaceContainerLow,
+    thinMaterial = surfaceContainer,
+    frostedCapsule = surfaceContainerHigh,
+    hairlineBorder = outlineVariant,
+    glassTrack = surfaceContainerHighest,
+    bg1 = surfaceContainerLow,
+    surface2 = surfaceContainer,
+    surface3 = surfaceContainerHigh,
+    line = outlineVariant,
+    lineSoft = outlineVariant,
+    brandPress = onPrimaryContainer,
+    brandSoft = primary,
+    glassBg = surfaceContainer,
+    glassLine = outlineVariant,
+    glassHighlight = Color.Transparent,
+    glassBgBar = surfaceContainerHigh,
+    pinTipBg = inverseSurface
 )
 
 val LightIosColorPalette = IosColorPalette(
     isDark = false,
-    label = Color(0xFF0B1020),
-    secondaryLabel = Color(0xB35A6478),
-    tertiaryLabel = Color(0x808894A8),
-    quaternaryLabel = Color(0x4D8894A8),
-    systemGroupedBackground = DesignTokens.LBg0,
-    secondaryGroupedBackground = DesignTokens.LSurface,
-    tertiaryGroupedBackground = DesignTokens.LSurface2,
-    systemFill = Color(0x33787880),
-    secondarySystemFill = Color(0x29787880),
-    tertiarySystemFill = Color(0x1F767680),
-    quaternarySystemFill = Color(0x14747480),
-    separator = Color(0x1F000000),
-    opaqueSeparator = Color(0xFFC6C6C8),
-    ultraThinMaterial = Color(0xE6F8F8F9),
-    thinMaterial = Color(0xF2FFFFFF),
-    frostedCapsule = Color(0xF2FFFFFF),
-    hairlineBorder = DesignTokens.LGlassLine,
-    glassTrack = Color(0x1A000000),
-    bg1 = DesignTokens.LBg1,
-    surface2 = DesignTokens.LSurface2,
-    surface3 = DesignTokens.LSurface3,
-    line = DesignTokens.LLine,
-    lineSoft = DesignTokens.LLineSoft,
-    brandPress = DesignTokens.BrandPress,
-    brandSoft = DesignTokens.Brand,
-    glassBg = DesignTokens.LGlassBg,
-    glassLine = DesignTokens.LGlassLine,
-    glassHighlight = DesignTokens.LGlassHighlight,
-    glassBgBar = DesignTokens.LGlassBgBar,
-    pinTipBg = DesignTokens.LPinTipBg,
+    label = Color(0xFF191C20),
+    secondaryLabel = Color(0xFF44474E),
+    tertiaryLabel = Color(0xFF74777F),
+    quaternaryLabel = Color(0xFFC4C6D0),
+    systemGroupedBackground = Color(0xFFF8F9FF),
+    secondaryGroupedBackground = Color(0xFFECEEF4),
+    tertiaryGroupedBackground = Color(0xFFE6E8EE),
+    systemFill = Color(0xFFE1E2E8),
+    secondarySystemFill = Color(0xFFE6E8EE),
+    tertiarySystemFill = Color(0xFFECEEF4),
+    quaternarySystemFill = Color(0xFFF2F3F9),
+    separator = Color(0xFFC4C6D0),
+    opaqueSeparator = Color(0xFF74777F),
+    ultraThinMaterial = Color(0xFFF2F3F9),
+    thinMaterial = Color(0xFFECEEF4),
+    frostedCapsule = Color(0xFFE6E8EE),
+    hairlineBorder = Color(0xFFC4C6D0),
+    glassTrack = Color(0xFFE1E2E8),
+    bg1 = Color(0xFFF2F3F9),
+    surface2 = Color(0xFFECEEF4),
+    surface3 = Color(0xFFE6E8EE),
+    line = Color(0xFFC4C6D0),
+    lineSoft = Color(0xFFE0E2EC),
+    brandPress = Color(0xFF001A41),
+    brandSoft = Color(0xFF005AC1),
+    glassBg = Color(0xFFECEEF4),
+    glassLine = Color(0xFFC4C6D0),
+    glassHighlight = Color.Transparent,
+    glassBgBar = Color(0xFFE6E8EE),
+    pinTipBg = Color(0xFF2E3036)
 )
 
 val DarkIosColorPalette = IosColorPalette(
     isDark = true,
-    label = DesignTokens.T1,
-    secondaryLabel = DesignTokens.T2,
-    tertiaryLabel = DesignTokens.T3,
-    quaternaryLabel = Color(0x4D646E85),
-    systemGroupedBackground = DesignTokens.Bg0,
-    secondaryGroupedBackground = DesignTokens.Surface,
-    tertiaryGroupedBackground = DesignTokens.Surface2,
-    systemFill = Color(0x5C787880),
-    secondarySystemFill = Color(0x52787880),
-    tertiarySystemFill = Color(0x3D767680),
-    quaternarySystemFill = Color(0x2E747480),
-    separator = DesignTokens.Line,
-    opaqueSeparator = DesignTokens.Surface3,
-    ultraThinMaterial = Color(0xD9141A2A),
-    thinMaterial = Color(0xF2151B2B),
-    frostedCapsule = DesignTokens.GlassBg,
-    hairlineBorder = DesignTokens.GlassLine,
-    glassTrack = Color(0x29FFFFFF),
-    bg1 = DesignTokens.Bg1,
-    surface2 = DesignTokens.Surface2,
-    surface3 = DesignTokens.Surface3,
-    line = DesignTokens.Line,
-    lineSoft = DesignTokens.LineSoft,
-    brandPress = DesignTokens.BrandPress,
-    brandSoft = DesignTokens.BrandSoft,
-    glassBg = DesignTokens.GlassBg,
-    glassLine = DesignTokens.GlassLine,
-    glassHighlight = DesignTokens.GlassHighlight,
-    glassBgBar = DesignTokens.GlassBgBar,
-    pinTipBg = DesignTokens.DPinTipBg,
+    label = Color(0xFFE1E2E8),
+    secondaryLabel = Color(0xFFC4C6D0),
+    tertiaryLabel = Color(0xFF8E9099),
+    quaternaryLabel = Color(0xFF44474E),
+    systemGroupedBackground = Color(0xFF111318),
+    secondaryGroupedBackground = Color(0xFF1D2024),
+    tertiaryGroupedBackground = Color(0xFF282A2F),
+    systemFill = Color(0xFF33353A),
+    secondarySystemFill = Color(0xFF282A2F),
+    tertiarySystemFill = Color(0xFF1D2024),
+    quaternarySystemFill = Color(0xFF191C20),
+    separator = Color(0xFF44474E),
+    opaqueSeparator = Color(0xFF8E9099),
+    ultraThinMaterial = Color(0xFF191C20),
+    thinMaterial = Color(0xFF1D2024),
+    frostedCapsule = Color(0xFF282A2F),
+    hairlineBorder = Color(0xFF44474E),
+    glassTrack = Color(0xFF33353A),
+    bg1 = Color(0xFF191C20),
+    surface2 = Color(0xFF1D2024),
+    surface3 = Color(0xFF282A2F),
+    line = Color(0xFF44474E),
+    lineSoft = Color(0xFF37393E),
+    brandPress = Color(0xFFD8E2FF),
+    brandSoft = Color(0xFFADC6FF),
+    glassBg = Color(0xFF1D2024),
+    glassLine = Color(0xFF44474E),
+    glassHighlight = Color.Transparent,
+    glassBgBar = Color(0xFF282A2F),
+    pinTipBg = Color(0xFFE1E2E8)
 )
 
 val LocalIosColors = staticCompositionLocalOf { LightIosColorPalette }
 
-// -----------------------------------------------------------------------------
-// ③ 访问器
-// -----------------------------------------------------------------------------
 object IosColors {
-    // 1. System Accent Colors —— v1.7.0 重标定
-    val SystemBlue = DesignTokens.Brand          // #007AFF -> #2F7BFF
-    val SystemGreen = DesignTokens.Ok            // #34C759 -> #30D158
-    val SystemRed = DesignTokens.Danger          // #FF3B30 -> #FF453A
-    val SystemOrange = DesignTokens.Warn         // #FF9500 -> #FF9F0A
-    val SystemYellow = Color(0xFFFFD60A)
-    val SystemPurple = DesignTokens.Violet       // #AF52DE -> #7C4DFF
-    val SystemTeal = Color(0xFF64D2FF)
-    val SystemIndigo = Color(0xFF5E5CE6)
-    val SystemPink = Color(0xFFFF375F)
-    val SystemMint = Color(0xFF63E6E2)
-    val SystemCyan = Color(0xFF64D2FF)
+    val current: IosColorPalette
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalIosColors.current
 
-    // 1b. v1.7.0 品牌扩展
-    val BrandPress = DesignTokens.BrandPress
-    val BrandSoft = DesignTokens.BrandSoft
-    val Violet = DesignTokens.Violet
+    val SystemBlue: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.primary
 
-    // 2. Grays
-    val SystemGray = Color(0xFF8E8E93)
-    val SystemGray2 = Color(0xFFAEAEB2)
-    val SystemGray3 = Color(0xFFC7C7CC)
-    val SystemGray4 = Color(0xFFD1D1D6)
-    val SystemGray5 = Color(0xFFE5E5EA)
-    val SystemGray6 = Color(0xFFF2F2F7)
+    val SystemGreen: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = AppSemanticColors.current.success
 
-    // 3. Dynamic Text Hierarchy (Labels)
+    val SystemRed: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.error
+
+    val SystemOrange: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = AppSemanticColors.current.warning
+
+    val SystemYellow: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = AppSemanticColors.current.warning
+
+    val SystemPurple: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.tertiary
+
+    val SystemTeal: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.secondary
+
+    val SystemIndigo: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.primary
+
+    val SystemPink: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.tertiary
+
+    val SystemMint: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = AppSemanticColors.current.success
+
+    val SystemCyan: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.secondary
+
+    val BrandPress: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.primaryContainer
+
+    val BrandSoft: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.primary
+
+    val Violet: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.tertiary
+
+    val SystemGray: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.outline
+
+    val SystemGray2: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.outlineVariant
+
+    val SystemGray3: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.surfaceVariant
+
+    val SystemGray4: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    val SystemGray5: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.surfaceContainer
+
+    val SystemGray6: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.surfaceContainerLow
+
     val Label: Color
         @Composable
-        get() = LocalIosColors.current.label
+        @ReadOnlyComposable
+        get() = IosColors.current.label
 
     val SecondaryLabel: Color
         @Composable
-        get() = LocalIosColors.current.secondaryLabel
+        @ReadOnlyComposable
+        get() = IosColors.current.secondaryLabel
 
     val TertiaryLabel: Color
         @Composable
-        get() = LocalIosColors.current.tertiaryLabel
+        @ReadOnlyComposable
+        get() = IosColors.current.tertiaryLabel
 
     val QuaternaryLabel: Color
         @Composable
-        get() = LocalIosColors.current.quaternaryLabel
+        @ReadOnlyComposable
+        get() = IosColors.current.quaternaryLabel
 
-    // 4. Grouped System Backgrounds
     val SystemGroupedBackground: Color
         @Composable
-        get() = LocalIosColors.current.systemGroupedBackground
+        @ReadOnlyComposable
+        get() = IosColors.current.systemGroupedBackground
 
     val SecondaryGroupedBackground: Color
         @Composable
-        get() = LocalIosColors.current.secondaryGroupedBackground
+        @ReadOnlyComposable
+        get() = IosColors.current.secondaryGroupedBackground
 
     val TertiaryGroupedBackground: Color
         @Composable
-        get() = LocalIosColors.current.tertiaryGroupedBackground
+        @ReadOnlyComposable
+        get() = IosColors.current.tertiaryGroupedBackground
 
-    // 5. System Fills
     val SystemFill: Color
         @Composable
-        get() = LocalIosColors.current.systemFill
+        @ReadOnlyComposable
+        get() = IosColors.current.systemFill
 
     val SecondarySystemFill: Color
         @Composable
-        get() = LocalIosColors.current.secondarySystemFill
+        @ReadOnlyComposable
+        get() = IosColors.current.secondarySystemFill
 
     val TertiarySystemFill: Color
         @Composable
-        get() = LocalIosColors.current.tertiarySystemFill
+        @ReadOnlyComposable
+        get() = IosColors.current.tertiarySystemFill
 
     val QuaternarySystemFill: Color
         @Composable
-        get() = LocalIosColors.current.quaternarySystemFill
+        @ReadOnlyComposable
+        get() = IosColors.current.quaternarySystemFill
 
-    // 6. Separators
     val Separator: Color
         @Composable
-        get() = LocalIosColors.current.separator
+        @ReadOnlyComposable
+        get() = IosColors.current.separator
 
     val OpaqueSeparator: Color
         @Composable
-        get() = LocalIosColors.current.opaqueSeparator
+        @ReadOnlyComposable
+        get() = IosColors.current.opaqueSeparator
 
-    // 7. Materials & Blur Tints
     val UltraThinMaterial: Color
         @Composable
-        get() = LocalIosColors.current.ultraThinMaterial
+        @ReadOnlyComposable
+        get() = IosColors.current.ultraThinMaterial
 
     val ThinMaterial: Color
         @Composable
-        get() = LocalIosColors.current.thinMaterial
+        @ReadOnlyComposable
+        get() = IosColors.current.thinMaterial
 
-    // 8. ---- v1.7.0 层级 / 描边 / 玻璃 ----
-    /** 页面次级底色 #0B1020 */
     val Bg1: Color
         @Composable
-        get() = LocalIosColors.current.bg1
+        @ReadOnlyComposable
+        get() = IosColors.current.bg1
 
-    /** 卡片内嵌套面 #1C2437 */
     val Surface2: Color
         @Composable
-        get() = LocalIosColors.current.surface2
+        @ReadOnlyComposable
+        get() = IosColors.current.surface2
 
-    /** 高一级嵌套面 #252E44 */
     val Surface3: Color
         @Composable
-        get() = LocalIosColors.current.surface3
+        @ReadOnlyComposable
+        get() = IosColors.current.surface3
 
-    /** rgba(255,255,255,.07) 常规描边 */
     val Line: Color
         @Composable
-        get() = LocalIosColors.current.line
+        @ReadOnlyComposable
+        get() = IosColors.current.line
 
-    /** rgba(255,255,255,.045) 行分隔线 */
     val LineSoft: Color
         @Composable
-        get() = LocalIosColors.current.lineSoft
+        @ReadOnlyComposable
+        get() = IosColors.current.lineSoft
 
-    /** rgba(20,26,42,.72) 玻璃底板 */
     val GlassBg: Color
         @Composable
-        get() = LocalIosColors.current.glassBg
+        @ReadOnlyComposable
+        get() = IosColors.current.glassBg
 
-    /** rgba(255,255,255,.08) 玻璃 1px 描边 */
     val GlassLine: Color
         @Composable
-        get() = LocalIosColors.current.glassLine
+        @ReadOnlyComposable
+        get() = IosColors.current.glassLine
 
-    /** inset 0 1px 0 rgba(255,255,255,.07) 内高光 */
     val GlassHighlight: Color
         @Composable
-        get() = LocalIosColors.current.glassHighlight
+        @ReadOnlyComposable
+        get() = IosColors.current.glassHighlight
 
-    /** 底部 Tab 栏玻璃底板（暗 #1E2330 / 明 #FFFFFF） */
     val GlassBgBar: Color
         @Composable
-        get() = LocalIosColors.current.glassBgBar
+        @ReadOnlyComposable
+        get() = IosColors.current.glassBgBar
 
-    /** 地图图钉上方提示条底板（暗 rgba(10,13,22,.86) / 明 rgba(255,255,255,.90)） */
     val PinTipBg: Color
         @Composable
-        get() = LocalIosColors.current.pinTipBg
+        @ReadOnlyComposable
+        get() = IosColors.current.pinTipBg
 
-    /**
-     * 玻璃面上的强调色（选中态）。
-     * 暗色用 --brand-soft #6BA5FF（在深玻璃上更亮），明色用 --brand #2F7BFF
-     * —— 浅蓝 #6BA5FF 在白色底栏上对比度不足，必须换成饱和蓝。
-     */
     val BrandOnGlass: Color
         @Composable
-        get() = LocalIosColors.current.brandSoft
+        @ReadOnlyComposable
+        get() = MaterialTheme.colorScheme.primary
 }
 
-// =============================================================================
-// Top-Level Backward-Compatible Aliases
-// =============================================================================
-val IosBlue = IosColors.SystemBlue
-val IosGreen = IosColors.SystemGreen
-val IosRed = IosColors.SystemRed
-val IosOrange = IosColors.SystemOrange
-val IosYellow = IosColors.SystemYellow
-val IosPurple = IosColors.SystemPurple
-val IosTeal = IosColors.SystemTeal
-val IosIndigo = IosColors.SystemIndigo
-val IosGray = IosColors.SystemGray
-val IosGray2 = IosColors.SystemGray2
-val IosGray3 = IosColors.SystemGray3
-val IosGray4 = IosColors.SystemGray4
-val IosGray5 = IosColors.SystemGray5
-val IosGray6 = IosColors.SystemGray6
+val IosBlue = BrandSeed
+val IosGreen = Color(0xFF30D158)
+val IosRed = Color(0xFFFF453A)
+val IosOrange = Color(0xFFFF9F0A)
+val IosYellow = Color(0xFFFFD60A)
+val IosPurple = Color(0xFF7C4DFF)
+val IosTeal = Color(0xFF64D2FF)
+val IosIndigo = Color(0xFF5E5CE6)
+val IosGray = Color(0xFF8E8E93)
+val IosGray2 = Color(0xFFAEAEB2)
+val IosGray3 = Color(0xFFC7C7CC)
+val IosGray4 = Color(0xFFD1D1D6)
+val IosGray5 = Color(0xFFE5E5EA)
+val IosGray6 = Color(0xFFF2F2F7)
 
-// Surfaces & Backgrounds
 val IosSystemBackground: Color
     @Composable
-    get() = LocalIosColors.current.systemGroupedBackground
+    @ReadOnlyComposable
+    get() = IosColors.SystemGroupedBackground
 
 val IosCardBackground: Color
     @Composable
-    get() = LocalIosColors.current.secondaryGroupedBackground
+    @ReadOnlyComposable
+    get() = IosColors.SecondaryGroupedBackground
 
-/** v1.7.0: #151B2B（原 #1C1C1E） */
 val IosCardBackgroundDark = DesignTokens.Surface
-
-// Frosted Glass Translucent Materials
-val IosFrostedLight = Color(0xEBFFFFFF)
-val IosFrostedDark = Color(0xEB1C1C1E)
+val IosFrostedLight = Color(0xFFFFFFFF)
+val IosFrostedDark = Color(0xFF1D2024)
 
 val IosFrostedCapsule: Color
     @Composable
-    get() = LocalIosColors.current.frostedCapsule
+    @ReadOnlyComposable
+    get() = IosColors.current.frostedCapsule
 
 val IosFrostedDarkCapsule = DesignTokens.GlassBg
-val IosFrostedPill = Color(0xE0F2F2F7)
+val IosFrostedPill = Color(0xFFF2F3F9)
 
 val IosHairlineBorder: Color
     @Composable
-    get() = LocalIosColors.current.hairlineBorder
+    @ReadOnlyComposable
+    get() = IosColors.current.hairlineBorder
 
 val IosHairlineBorderDark = DesignTokens.GlassLine
 
 val IosGlassTrack: Color
     @Composable
-    get() = LocalIosColors.current.glassTrack
+    @ReadOnlyComposable
+    get() = IosColors.current.glassTrack
 
-val IosGlassTrackLight = Color(0x33FFFFFF)
+val IosGlassTrackLight = Color(0xFFE1E2E8)
 
 val IosSeparator: Color
     @Composable
-    get() = LocalIosColors.current.separator
+    @ReadOnlyComposable
+    get() = IosColors.current.separator
 
-val IosSubtleHighlight = Color(0x40FFFFFF)
-
-/** 非 Composable 场景直接取暗色玻璃底板（如 Canvas / Modifier.composed 外部） */
+val IosSubtleHighlight = Color.Transparent
 val IosGlassBgDark = DesignTokens.GlassBg
 val IosGlassLineDark = DesignTokens.GlassLine
 val IosGlassHighlightDark = DesignTokens.GlassHighlight
@@ -424,80 +507,25 @@ val IosText1Dark = DesignTokens.T1
 val IosText2Dark = DesignTokens.T2
 val IosText3Dark = DesignTokens.T3
 
-// =============================================================================
-// v1.7.1 语义色补齐 —— 只增不改，现有常量一律保留原值
-// =============================================================================
-//
-// 问题：错误红有两套来源 —— feature/settings/AboutScreen.kt:301/318/345/725/731/736
-// 硬编码 Color(0xFFFF3B30)，而 IosColors.SystemRed / DesignTokens.Danger 是 #FF453A。
-// 两者在同一屏幕上并存时肉眼可见色差（#FF3B30 更偏纯红、#FF453A 略偏珊瑚）。
-// 下面补齐一组带容器色与深/浅档的语义色，页面统一从这里取，不再各自写死十六进制。
-
-/**
- * 语义色 · 状态。默认取暗色档（与 DesignTokens 现有取值一致）。
- *
- * ```
- * Icon(Icons.Default.Warning, tint = IosSemanticColors.Danger)
- * Box(Modifier.background(IosSemanticColors.DangerContainer))
- * ```
- */
 object IosSemanticColors {
-    /** 危险 / 错误 —— 暗色档 #FF453A（= DesignTokens.Danger） */
-    val Danger = Color(0xFFFF453A)
-
-    /** 危险 / 错误 —— 明色档，在浅底上对比度更高 #D70015 */
-    val DangerLight = Color(0xFFD70015)
-
-    /** 危险底容器 —— 暗色档，红 15% 覆盖在深底上 */
-    val DangerContainer = Color(0x26FF453A)
-
-    /** 危险底容器 —— 明色档 */
-    val DangerContainerLight = Color(0x1FD70015)
-
-    /** 警告 —— 暗色档 #FF9F0A（= DesignTokens.Warn） */
-    val Warning = Color(0xFFFF9F0A)
-
-    /** 警告 —— 明色档 #B25000 */
-    val WarningLight = Color(0xFFB25000)
-
-    /** 警告底容器 —— 暗色档 */
-    val WarningContainer = Color(0x26FF9F0A)
-
-    /** 警告底容器 —— 明色档 */
-    val WarningContainerLight = Color(0x1FB25000)
-
-    /** 成功 —— 暗色档 #30D158（= DesignTokens.Ok） */
-    val Success = Color(0xFF30D158)
-
-    /** 成功 —— 明色档 #248A3D */
-    val SuccessLight = Color(0xFF248A3D)
-
-    /** 成功底容器 —— 暗色档 */
-    val SuccessContainer = Color(0x2630D158)
-
-    /** 成功底容器 —— 明色档 */
-    val SuccessContainerLight = Color(0x1F248A3D)
-
-    /** 提示 / 信息 —— 暗色档 #2F7BFF（= DesignTokens.Brand） */
-    val Info = Color(0xFF2F7BFF)
-
-    /** 提示 / 信息 —— 明色档 #0066CC */
-    val InfoLight = Color(0xFF0066CC)
-
-    /** 提示底容器 —— 暗色档 */
-    val InfoContainer = Color(0x262F7BFF)
-
-    /** 提示底容器 —— 明色档 */
-    val InfoContainerLight = Color(0x1F0066CC)
+    val Danger = Color(0xFFFFB4AB)
+    val DangerLight = Color(0xFFBA1A1A)
+    val DangerContainer = Color(0xFF93000A)
+    val DangerContainerLight = Color(0xFFFFDAD6)
+    val Warning = Color(0xFFFFB95C)
+    val WarningLight = Color(0xFF8A5100)
+    val WarningContainer = Color(0xFF6B3A00)
+    val WarningContainerLight = Color(0xFFFFDDB8)
+    val Success = Color(0xFF7DDA95)
+    val SuccessLight = Color(0xFF146C2E)
+    val SuccessContainer = Color(0xFF005322)
+    val SuccessContainerLight = Color(0xFFA6F4B8)
+    val Info = Color(0xFFADC6FF)
+    val InfoLight = Color(0xFF005AC1)
+    val InfoContainer = Color(0xFF004494)
+    val InfoContainerLight = Color(0xFFD8E2FF)
 }
 
-/**
- * 按明暗取语义色。
- *
- * ```
- * val danger = IosSemanticColors.forDark(LocalIosColors.current.isDark).danger
- * ```
- */
 data class IosSemanticPalette(
     val danger: Color,
     val dangerContainer: Color,
@@ -509,7 +537,6 @@ data class IosSemanticPalette(
     val infoContainer: Color
 )
 
-/** 暗色档语义色组 */
 val DarkSemanticPalette = IosSemanticPalette(
     danger = IosSemanticColors.Danger,
     dangerContainer = IosSemanticColors.DangerContainer,
@@ -521,7 +548,6 @@ val DarkSemanticPalette = IosSemanticPalette(
     infoContainer = IosSemanticColors.InfoContainer
 )
 
-/** 明色档语义色组 */
 val LightSemanticPalette = IosSemanticPalette(
     danger = IosSemanticColors.DangerLight,
     dangerContainer = IosSemanticColors.DangerContainerLight,
@@ -533,30 +559,19 @@ val LightSemanticPalette = IosSemanticPalette(
     infoContainer = IosSemanticColors.InfoContainerLight
 )
 
-/** 按明暗开关取对应语义色组 */
 fun IosSemanticColors.forDark(isDark: Boolean): IosSemanticPalette =
     if (isDark) DarkSemanticPalette else LightSemanticPalette
 
-// ---- 顶层语义别名，供 `import ...IosDanger` 后直接使用（默认暗色档）----
-
-/** 危险 / 错误（默认暗色档 #FF453A） */
 val IosDanger = IosSemanticColors.Danger
-
-/** 警告（默认暗色档 #FF9F0A） */
 val IosWarning = IosSemanticColors.Warning
-
-/** 成功（默认暗色档 #30D158） */
 val IosSuccess = IosSemanticColors.Success
-
-/** 提示 / 信息（默认暗色档 #2F7BFF） */
 val IosInfo = IosSemanticColors.Info
 
-// Legacy Fallbacks
 val PrimaryGreen = IosGreen
-val PrimaryGreenDark = Color(0xFF28A745)
+val PrimaryGreenDark = Color(0xFF146C2E)
 val AccentOrange = IosOrange
 val SurfaceDark = IosCardBackgroundDark
 val BackgroundDark = DesignTokens.Bg0
 val Purple80 = IosPurple
 val PurpleGrey80 = IosGray2
-val Pink80 = IosColors.SystemPink
+val Pink80 = Color(0xFFFF375F)

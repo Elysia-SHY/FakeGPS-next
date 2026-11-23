@@ -208,10 +208,11 @@ fun LocationControlPanel(
 
             // 2. Master Action & Search Rows
             if (activeRule != null) {
+                val defaultRuleColor = IosColors.SystemBlue
                 val activeRuleColor = remember(activeRule.colorHex) {
                     runCatching { Color(android.graphics.Color.parseColor(activeRule.colorHex)) }
                         .logFailure("LocationControlPanel", "parse rule color", Diag.Level.DEBUG)
-                        .getOrDefault(IosColors.SystemBlue)
+                        .getOrDefault(defaultRuleColor)
                 }
 
                 // A. Search Box (Full Width) —— 统一走设计系统 IosSearchField（STANDARD 52dp / r18）

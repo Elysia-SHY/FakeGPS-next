@@ -1278,10 +1278,11 @@ fun MapScreen(
                             key = { r: MultiTargetRule -> r.key }
                         ) { rule ->
                             val isSelected = activeTargetKey == rule.key
+                            val defaultRuleColor = IosColors.SystemBlue
                             val ruleColor = remember(rule.colorHex) {
                                 runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
                                     .logFailure("MapScreen", "parse rule color chip", Diag.Level.DEBUG)
-                                    .getOrDefault(IosColors.SystemBlue)
+                                    .getOrDefault(defaultRuleColor)
                             }
                             Surface(
                                 shape = AppShapes.pill,

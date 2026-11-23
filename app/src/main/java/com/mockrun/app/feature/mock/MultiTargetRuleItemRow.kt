@@ -29,10 +29,11 @@ fun MultiTargetRuleItemRow(
     onModeChange: (TargetMockMode) -> Unit,
     onDelete: () -> Unit
 ) {
+    val defaultRuleColor = IosColors.SystemBlue
     val ruleColor = remember(rule.colorHex) {
         runCatching { Color(android.graphics.Color.parseColor(rule.colorHex)) }
             .logFailure("LocationMockScreen", "parse rule color", Diag.Level.DEBUG)
-            .getOrDefault(IosColors.SystemBlue)
+            .getOrDefault(defaultRuleColor)
     }
 
     var showModeMenu by remember { mutableStateOf(false) }
