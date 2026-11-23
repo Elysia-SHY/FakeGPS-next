@@ -1,13 +1,9 @@
 package com.mockrun.app.core.designsystem
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,69 +18,65 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeState
 
 // =============================================================================
-// 行图标色调 —— 对应设计稿 .row__icon / .row__icon.brand / .danger / .ok
+// Row tones
 // =============================================================================
+
 enum class IosRowTone {
-    /** 中性：rgba 白 6% 底 + 次文字色 */
     NEUTRAL,
-
-    /** 品牌：16% 品牌蓝底 + brand-soft 图标 */
     BRAND,
-
-    /** 危险：16% 红底 + 红图标 */
     DANGER,
-
-    /** 成功：16% 绿底 + 绿图标 */
     OK,
-
-    /** 警告：16% 橙底 + 橙图标 */
     WARN
 }
 
 @Composable
-private fun toneBackground(tone: IosRowTone): Color = when (tone) {
-    IosRowTone.NEUTRAL -> IosColors.Surface2
-    IosRowTone.BRAND -> IosColors.SystemBlue.copy(alpha = 0.16f)
-    IosRowTone.DANGER -> IosColors.SystemRed.copy(alpha = 0.16f)
-    IosRowTone.OK -> IosColors.SystemGreen.copy(alpha = 0.16f)
-    IosRowTone.WARN -> IosColors.SystemOrange.copy(alpha = 0.16f)
+private fun toneBackground(tone: IosRowTone): Color {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    return when (tone) {
+        IosRowTone.NEUTRAL -> scheme.surfaceContainerHighest
+        IosRowTone.BRAND -> scheme.primaryContainer
+        IosRowTone.DANGER -> scheme.errorContainer
+        IosRowTone.OK -> semantic.successContainer
+        IosRowTone.WARN -> semantic.warningContainer
+    }
 }
 
 @Composable
-private fun toneForeground(tone: IosRowTone): Color = when (tone) {
-    IosRowTone.NEUTRAL -> IosColors.SecondaryLabel
-    IosRowTone.BRAND -> IosColors.BrandSoft
-    IosRowTone.DANGER -> IosColors.SystemRed
-    IosRowTone.OK -> IosColors.SystemGreen
-    IosRowTone.WARN -> IosColors.SystemOrange
+private fun toneForeground(tone: IosRowTone): Color {
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    return when (tone) {
+        IosRowTone.NEUTRAL -> scheme.onSurfaceVariant
+        IosRowTone.BRAND -> scheme.onPrimaryContainer
+        IosRowTone.DANGER -> scheme.onErrorContainer
+        IosRowTone.OK -> semantic.onSuccessContainer
+        IosRowTone.WARN -> semantic.onWarningContainer
+    }
 }
 
 // =============================================================================
-// 分组标题
+// Group headers
 // =============================================================================
 
-/**
- * 分组标题（简化版）。
- * 设计稿 .group__title —— 16 / 700，不再强制大写。
- */
 @Composable
 fun IosSectionHeader(
     text: String,
@@ -92,16 +84,17 @@ fun IosSectionHeader(
 ) {
     Text(
         text = text,
-        style = IosTypography.GroupTitle,
-        color = IosColors.Label,
-        modifier = modifier.padding(start = AppSpacing.pageH + 4.dp, end = 16.dp, top = 4.dp, bottom = 10.dp)
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(
+            start = AppSpacing.pageH + 4.dp,
+            end = AppSpacing.pageH,
+            top = 8.dp,
+            bottom = 8.dp
+        )
     )
 }
 
-/**
- * 完整分组头：标题 + 计数 + 右侧链接。
- * 设计稿 .group__head
- */
 @Composable
 fun IosGroupHeader(
     title: String,
@@ -109,65 +102,52 @@ fun IosGroupHeader(
     count: Int? = null,
     linkText: String? = null,
     onLinkClick: (() -> Unit)? = null,
-    /**
-     * 右侧链接的前置图标。
-     *
-     * 默认 [Icons.Default.Add] 保持原有「+ 添加」语义不变；
-     * 传 null 表示纯文字链接（如「使用指南」这类非新增动作），
-     * 避免给非新增操作也挂一个加号造成误读。
-     */
     linkIcon: ImageVector? = Icons.Default.Add
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = AppSpacing.pageH + 4.dp, end = AppSpacing.pageH, top = 4.dp, bottom = 10.dp),
+            .padding(
+                start = AppSpacing.pageH + 4.dp,
+                end = AppSpacing.pageH,
+                top = 4.dp,
+                bottom = 8.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = title,
-            style = IosTypography.GroupTitle,
-            color = IosColors.Label
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (count != null) {
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "($count)",
-                style = IosTypography.Mono13,
-                color = IosColors.TertiaryLabel
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         if (linkText != null && onLinkClick != null) {
             Spacer(Modifier.weight(1f))
-            Row(
-                modifier = Modifier
-                    .minTouchTarget()
-                    .clip(AppShapes.chip)
-                    .bouncyClickable(onClick = onLinkClick)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            TextButton(onClick = onLinkClick) {
                 if (linkIcon != null) {
                     Icon(
-                        linkIcon,
+                        imageVector = linkIcon,
                         contentDescription = null,
-                        tint = IosColors.BrandSoft,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(6.dp))
                 }
                 Text(
                     text = linkText,
-                    style = IosTypography.ButtonSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IosColors.BrandSoft
+                    style = MaterialTheme.typography.labelLarge
                 )
             }
         }
     }
 }
 
-/** 分组副标题（设计稿 .group__sub） */
 @Composable
 fun IosGroupSub(
     text: String,
@@ -175,57 +155,46 @@ fun IosGroupSub(
 ) {
     Text(
         text = text,
-        style = IosTypography.RowSub,
-        color = IosColors.TertiaryLabel,
-        modifier = modifier.padding(start = AppSpacing.pageH + 4.dp, end = 16.dp, bottom = 10.dp)
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(
+            start = AppSpacing.pageH + 4.dp,
+            end = AppSpacing.pageH,
+            bottom = 8.dp
+        )
     )
 }
 
 // =============================================================================
-// 卡片
+// Cards and surfaces
 // =============================================================================
 
-/**
- * 分组卡片 —— **毛玻璃卡**。
- *
- * 设计稿 .card 给的是实色 `--surface:#151B2B`，但那个稿子页面底下没有氛围层。
- * 本项目滚动页铺了 [AppBackground] 的极光氛围渐变，把卡片做成玻璃之后：
- *   - 氛围光晕会从卡片下柔和透出，玻璃质感才立得住；
- *   - 卡片与背景之间拉开明确层次，不再是一块块纯色板。
- *
- * ⚠️ 接线约束：卡片必须与 [AppBackground] 处于**同一个 HazeState 的兄弟节点**关系 ——
- * 页面根 Box 里先放 `AppBackground(hazeState = pageHaze)` 当模糊源，
- * 再把 [hazeState] 传给卡片。否则玻璃会自引用。若未传源，
- * [liquidGlass] 会退化为不透明磨砂板，不会崩。
- */
 @Composable
 fun IosInsetGroupCard(
     modifier: Modifier = Modifier,
     isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current,
     shape: Shape = AppShapes.card,
     elevation: Dp = 10.dp,
-    hazeState: dev.chrisbanes.haze.HazeState? = null,
+    hazeState: HazeState? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Box(
+    @Suppress("UNUSED_PARAMETER")
+    val compatibilityMaterial = Triple(isLiquidGlass, hazeState, elevation)
+    OutlinedCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = AppSpacing.pageH)
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = shape,
-                elevation = elevation,
-                hazeState = hazeState
-            )
+            .padding(horizontal = AppSpacing.pageH),
+        shape = shape,
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(content = content)
     }
 }
 
-/**
- * 玻璃浮空卡（地图页浮层 / 底部抽屉专用）。
- * 这是设计稿里真正做 `backdrop-filter: blur(30px)` 的那一类容器。
- */
 @Composable
 fun IosGlassDock(
     modifier: Modifier = Modifier,
@@ -234,39 +203,37 @@ fun IosGlassDock(
     elevation: Dp = 14.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .liquidGlass(isLiquidGlass = isLiquidGlass, shape = shape, elevation = elevation)
+    @Suppress("UNUSED_PARAMETER")
+    val compatibilityMaterial = Pair(isLiquidGlass, elevation)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(content = content)
     }
 }
 
-/**
- * 卡片内分隔线（设计稿 .row + .row::before —— left 62px）
- */
 @Composable
 fun IosHairlineDivider(
     startIndent: Dp = 69.dp,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = startIndent)
-            .height(1.dp)
-            .background(IosColors.LineSoft)
+    HorizontalDivider(
+        modifier = modifier.padding(start = startIndent),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant
     )
 }
 
 // =============================================================================
-// 行
+// Rows
 // =============================================================================
 
-/**
- * 设计稿 .row__icon —— 40dp / r13 圆角方形图标底
- */
 @Composable
 fun IosRowIcon(
     icon: ImageVector,
@@ -290,10 +257,6 @@ fun IosRowIcon(
     }
 }
 
-/**
- * 标准列表行。
- * 设计稿 .row —— padding 14×16 / icon 40dp r13 / title 14.5-600 / sub 12-次色 / chevron
- */
 @Composable
 fun IosListRow(
     title: String,
@@ -313,14 +276,7 @@ fun IosListRow(
     subtitleMono: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    val clickableModifier = if (onClick != null) {
-        Modifier.bouncyClickable(onClick = onClick)
-    } else Modifier
-
-    // 图标底色 / 前景色的解析：
-    // ① 显式给了不透明底色 -> 白图标（保证对比度）
-    // ② 显式给了半透明底色 -> 用色调前景或显式 tint
-    // ③ 什么都没给 -> 按 tone 取
+    val scheme = MaterialTheme.colorScheme
     val resolvedBg: Color
     val resolvedFg: Color
     when {
@@ -338,82 +294,114 @@ fun IosListRow(
         }
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(clickableModifier)
-            .padding(horizontal = AppSpacing.pageH, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp)
-    ) {
-        if (icon != null) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(AppShapes.icon)
-                    .background(resolvedBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = resolvedFg,
-                    modifier = Modifier.size(20.dp)
-                )
+    val rowModifier = modifier
+        .fillMaxWidth()
+        .minTouchTarget()
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                Modifier
             }
-        }
+        )
 
-        Column(modifier = Modifier.weight(1f)) {
+    ListItem(
+        modifier = rowModifier,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = if (icon != null) {
+            {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(AppShapes.icon)
+                        .background(resolvedBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = resolvedFg,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        headlineContent = {
             Text(
                 text = title,
-                style = IosTypography.RowTitle,
-                color = if (titleColor != Color.Unspecified) titleColor else IosColors.Label,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (titleColor != Color.Unspecified) titleColor else scheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            if (subtitle != null) {
-                Spacer(Modifier.height(3.dp))
+        },
+        supportingContent = if (subtitle != null) {
+            {
                 Text(
                     text = subtitle,
-                    style = if (subtitleMono) IosTypography.Mono else IosTypography.RowSub,
-                    color = if (subtitleColor != Color.Unspecified) subtitleColor else IosColors.SecondaryLabel,
+                    style = if (subtitleMono) {
+                        MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                    } else {
+                        MaterialTheme.typography.bodySmall
+                    },
+                    color = if (subtitleColor != Color.Unspecified) {
+                        subtitleColor
+                    } else {
+                        scheme.onSurfaceVariant
+                    },
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        } else {
+            null
+        },
+        trailingContent = if (
+            trailingText != null || trailingContent != null || showChevron
+        ) {
+            {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (trailingText != null) {
+                        Text(
+                            text = trailingText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (trailingTextColor != Color.Unspecified) {
+                                trailingTextColor
+                            } else {
+                                scheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                    trailingContent?.invoke()
+                    if (showChevron) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = if (chevronColor != Color.Unspecified) {
+                                chevronColor
+                            } else {
+                                scheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            null
         }
-
-        if (trailingText != null) {
-            Text(
-                text = trailingText,
-                style = IosTypography.Footnote,
-                fontWeight = FontWeight.Medium,
-                color = if (trailingTextColor != Color.Unspecified) trailingTextColor else IosColors.SecondaryLabel
-            )
-        }
-
-        if (trailingContent != null) {
-            trailingContent()
-        }
-
-        if (showChevron) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = if (chevronColor != Color.Unspecified) chevronColor else IosColors.TertiaryLabel,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
+    )
 }
 
 // =============================================================================
-// 开关 / 分段控件
+// Selection controls
 // =============================================================================
 
-/**
- * Apple UISwitch（51×31dp，弹簧物理）
- */
 @Composable
 fun IosSwitch(
     checked: Boolean,
@@ -422,47 +410,27 @@ fun IosSwitch(
     enabled: Boolean = true,
     useBrandColor: Boolean = false
 ) {
-    val offTrackColor = Color(0x24FFFFFF)
-    val onColor = if (useBrandColor) IosColors.SystemBlue else IosColors.SystemGreen
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) onColor else offTrackColor,
-        animationSpec = spring(),
-        label = "iosSwitchTrack"
-    )
-
-    val thumbOffset by animateFloatAsState(
-        targetValue = if (checked) 20f else 0f,
-        animationSpec = MotionTokens.BouncySpringSpec,
-        label = "iosSwitchThumb"
-    )
-
-    Box(
-        modifier = modifier
-            .size(width = 51.dp, height = 31.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(trackColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = enabled
-            ) { onCheckedChange(!checked) }
-            .padding(2.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset.dp)
-                .size(27.dp)
-                .shadow(elevation = 2.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(Color.White)
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    val checkedTrack = if (useBrandColor) scheme.primary else semantic.success
+    val checkedThumb = if (useBrandColor) scheme.onPrimary else semantic.onSuccess
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier.minTouchTarget(),
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = checkedThumb,
+            checkedTrackColor = checkedTrack,
+            checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = scheme.outline,
+            uncheckedTrackColor = scheme.surfaceContainerHighest,
+            uncheckedBorderColor = scheme.outline
         )
-    }
+    )
 }
 
-/**
- * Apple HIG 分段控件
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> IosSegmentedControl(
     items: List<T>,
@@ -472,123 +440,87 @@ fun <T> IosSegmentedControl(
     labelProvider: (T) -> String = { it.toString() }
 ) {
     val selectedIndex = items.indexOf(selectedItem).coerceAtLeast(0)
-    val activePillColor = IosColors.Surface3
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(34.dp),
-        shape = RoundedCornerShape(9.dp),
-        color = IosColors.TertiarySystemFill
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEachIndexed { index, item ->
-                val isSelected = index == selectedIndex
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isSelected) activePillColor else Color.Transparent)
-                        .bouncyClickable { onItemSelected(item) },
-                    contentAlignment = Alignment.Center
-                ) {
+        items.forEachIndexed { index, item ->
+            SegmentedButton(
+                selected = index == selectedIndex,
+                onClick = { onItemSelected(item) },
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = items.size
+                ),
+                label = {
                     Text(
                         text = labelProvider(item),
-                        style = IosTypography.Caption1,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isSelected) IosColors.Label else IosColors.SecondaryLabel
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            }
+            )
         }
     }
 }
 
 // =============================================================================
-// 按钮体系
+// Buttons
 // =============================================================================
 
-/**
- * 主按钮　设计稿 .btn--primary —— 52dp / r16 / 16-600 / 品牌蓝 + 蓝色光晕
- *
- * v1.7.1 扩展：新增 [enabled] 与 [loading]。两者默认值保持旧行为
- * （enabled = true、loading = false），默认路径的渲染结果与旧实现逐项一致，
- * 现有 7 个调用点无需改动。
- *
- * ```
- * IosPrimaryButton(text = "开始模拟", onClick = { start() })                 // 旧写法，行为不变
- * IosPrimaryButton(text = "开始模拟", onClick = { start() }, loading = isBusy)
- * IosPrimaryButton(text = "开始模拟", onClick = { start() }, enabled = canStart)
- * ```
- *
- * @param enabled false 时降低底板与文字不透明度、去掉投影，并屏蔽点击
- * @param loading true 时左侧显示环形进度并屏蔽点击；不传 [loadingText] 时文字沿用 [text]
- * @param loadingText 可选，loading 期间替换显示的文案（如「正在模拟…」）
- */
 @Composable
 fun IosPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = IosColors.SystemBlue,
-    contentColor: Color = Color.White,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     icon: ImageVector? = null,
     height: Dp = 52.dp,
     enabled: Boolean = true,
     loading: Boolean = false,
     loadingText: String? = null
 ) {
-    // loading 期间一律不可点击；enabled=false 同样屏蔽
     val clickable = enabled && !loading
     val label = if (loading) (loadingText ?: text) else text
 
-    val resolvedContainer = if (clickable) containerColor else containerColor.copy(alpha = 0.40f)
-    val resolvedContent = if (clickable) contentColor else contentColor.copy(alpha = 0.72f)
-
-    Surface(
+    Button(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
-            .clip(AppShapes.button)
-            .bouncyClickable(enabled = clickable, onClick = onClick),
+            .height(height),
+        enabled = clickable,
         shape = AppShapes.button,
-        color = resolvedContainer,
-        shadowElevation = if (clickable) 8.dp else 0.dp
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(17.dp),
-                    strokeWidth = 2.dp,
-                    color = resolvedContent
-                )
-                Spacer(Modifier.width(8.dp))
-            } else if (icon != null) {
-                Icon(icon, contentDescription = null, tint = resolvedContent, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = label,
-                style = IosTypography.ButtonText,
-                color = resolvedContent
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = contentColor
             )
+            Spacer(Modifier.width(10.dp))
+        } else if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(10.dp))
         }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
-/**
- * 次级按钮　设计稿 .btn--ghost —— 46dp / r16 / 白 7% 底 + 白 7% 描边
- */
 @Composable
 fun IosGhostButton(
     text: String,
@@ -600,39 +532,37 @@ fun IosGhostButton(
     height: Dp = 46.dp,
     fillColor: Color = Color.Unspecified
 ) {
-    val fg = if (contentColor != Color.Unspecified) contentColor else IosColors.Label
-    Box(
-        modifier = modifier
-            .clip(AppShapes.button)
-            .background(if (fillColor != Color.Unspecified) fillColor else Color(0x12FFFFFF))
-            .border(1.dp, IosColors.Line, AppShapes.button)
-            .bouncyClickable(onClick = onClick)
-            .height(height),
-        contentAlignment = Alignment.Center
+    val scheme = MaterialTheme.colorScheme
+    val resolvedContent = if (contentColor != Color.Unspecified) contentColor else scheme.primary
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(height),
+        shape = AppShapes.button,
+        border = BorderStroke(1.dp, scheme.outline),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (fillColor != Color.Unspecified) fillColor else Color.Transparent,
+            contentColor = resolvedContent
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = if (iconTint != Color.Unspecified) iconTint else fg,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            Text(
-                text = text,
-                style = IosTypography.ButtonSmall,
-                color = fg,
-                maxLines = 1
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (iconTint != Color.Unspecified) iconTint else resolvedContent,
+                modifier = Modifier.size(18.dp)
             )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
-/**
- * 禁用态按钮　设计稿 .btn--disabled —— 白 5% 底 + 三级文字
- */
 @Composable
 fun IosDisabledButton(
     text: String,
@@ -640,78 +570,57 @@ fun IosDisabledButton(
     icon: ImageVector? = null,
     height: Dp = 46.dp
 ) {
-    Box(
-        modifier = modifier
-            .clip(AppShapes.button)
-            .background(Color(0x0DFFFFFF))
-            .height(height),
-        contentAlignment = Alignment.Center
+    OutlinedButton(
+        onClick = {},
+        modifier = modifier.height(height),
+        enabled = false,
+        shape = AppShapes.button,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = IosColors.TertiaryLabel, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                style = IosTypography.ButtonSmall,
-                color = IosColors.TertiaryLabel
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
+            Spacer(Modifier.width(8.dp))
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
 // =============================================================================
-// 芯片 / 徽标
+// Chips and badges
 // =============================================================================
 
-/** 特性标签　设计稿 .chip —— 11.5-600 / r9 / 白 6% 底 + 描边 */
 @Composable
 fun IosChip(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .clip(AppShapes.chip)
-            .background(Color(0x0FFFFFFF))
-            .border(1.dp, IosColors.Line, AppShapes.chip)
-            .padding(horizontal = 11.dp, vertical = 5.dp)
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.chip,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Text(
             text = text,
-            style = IosTypography.Chip,
-            color = IosColors.SecondaryLabel
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
 }
 
-/**
- * 状态徽标语义档位。
- *
- * [NEUTRAL] 中性（灰）、[RUNNING] 运行中（绿）、[WARNING] 警告（橙）、
- * [ERROR] 错误（红）、[INFO] 提示（蓝）。
- */
 enum class IosBadgeTone { NEUTRAL, RUNNING, WARNING, ERROR, INFO }
 
-/**
- * 状态徽标　设计稿 .badge / .badge.run
- *
- * v1.7.1 扩展：新增 [tone] 表达多状态。旧参数 [running] 与旧调用点完全不变，
- * 两者都省略时的渲染结果与旧实现逐项一致（灰底 + 次色文字 + 三级色圆点）。
- *
- * 优先级：[tone] 非空时以 [tone] 为准；[tone] 为 null 时回落到 [running]
- * （true -> RUNNING，false -> NEUTRAL），因此 `IosStatusBadge(text, running = true)`
- * 与 `IosStatusBadge(text, tone = IosBadgeTone.RUNNING)` 视觉等价。
- *
- * ```
- * IosStatusBadge(text = "已连接")                                   // 旧写法，中性灰
- * IosStatusBadge(text = "模拟中", running = true)                    // 旧写法，绿色
- * IosStatusBadge(text = "需要定位权限", tone = IosBadgeTone.WARNING)  // 橙色
- * IosStatusBadge(text = "同步失败", tone = IosBadgeTone.ERROR)        // 红色
- * IosStatusBadge(text = "v1.7.1", tone = IosBadgeTone.INFO)          // 蓝色
- * ```
- */
 @Composable
 fun IosStatusBadge(
     text: String,
@@ -720,66 +629,82 @@ fun IosStatusBadge(
     tone: IosBadgeTone? = null
 ) {
     val resolved = tone ?: if (running) IosBadgeTone.RUNNING else IosBadgeTone.NEUTRAL
-    val fg = when (resolved) {
-        IosBadgeTone.NEUTRAL -> IosColors.SecondaryLabel
-        IosBadgeTone.RUNNING -> IosColors.SystemGreen
-        IosBadgeTone.WARNING -> IosColors.SystemOrange
-        IosBadgeTone.ERROR -> IosColors.SystemRed
-        IosBadgeTone.INFO -> IosColors.SystemBlue
+    val scheme = MaterialTheme.colorScheme
+    val semantic = AppSemanticColors.current
+    val container: Color
+    val content: Color
+    when (resolved) {
+        IosBadgeTone.NEUTRAL -> {
+            container = scheme.surfaceContainerHighest
+            content = scheme.onSurfaceVariant
+        }
+        IosBadgeTone.RUNNING -> {
+            container = semantic.successContainer
+            content = semantic.onSuccessContainer
+        }
+        IosBadgeTone.WARNING -> {
+            container = semantic.warningContainer
+            content = semantic.onWarningContainer
+        }
+        IosBadgeTone.ERROR -> {
+            container = scheme.errorContainer
+            content = scheme.onErrorContainer
+        }
+        IosBadgeTone.INFO -> {
+            container = scheme.primaryContainer
+            content = scheme.onPrimaryContainer
+        }
     }
-    val bg = if (resolved == IosBadgeTone.NEUTRAL) Color(0x14FFFFFF) else fg.copy(alpha = 0.15f)
-    val dot = if (resolved == IosBadgeTone.NEUTRAL) IosColors.TertiaryLabel else fg
 
-    Row(
-        modifier = modifier
-            .clip(AppShapes.pill)
-            .background(bg)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.pill,
+        color = container,
+        contentColor = content
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(dot)
-        )
-        Spacer(Modifier.width(7.dp))
-        Text(
-            text = text,
-            style = IosTypography.ButtonSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = fg
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(content)
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1
+            )
+        }
     }
 }
 
-/** 版本号芯片　设计稿 .ver-chip —— mono 13 / brand-soft / 蓝 12% 底 */
 @Composable
 fun IosVerChip(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .clip(AppShapes.pill)
-            .background(IosColors.SystemBlue.copy(alpha = 0.12f))
-            .padding(horizontal = 13.dp, vertical = 6.dp)
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.pill,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     ) {
         Text(
             text = text,
-            style = IosTypography.Mono13,
-            color = IosColors.BrandSoft
+            style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
 }
 
 // =============================================================================
-// 警告条 / 键值对 / 页面头 / 搜索框
+// Banner, key-value rows, page header, search
 // =============================================================================
 
-/**
- * 警告条　设计稿 .alert —— 橙渐变 + 橙描边 + 36dp 图标 + 标题 14-700 + 行动链接
- */
 @Composable
 fun IosAlertBanner(
     title: String,
@@ -789,79 +714,75 @@ fun IosAlertBanner(
     onAction: (() -> Unit)? = null,
     icon: ImageVector? = null
 ) {
-    Row(
+    val semantic = AppSemanticColors.current
+    OutlinedCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = AppSpacing.pageH)
-            .clip(AppShapes.card)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        IosColors.SystemOrange.copy(alpha = 0.18f),
-                        IosColors.SystemOrange.copy(alpha = 0.07f)
-                    )
-                )
-            )
-            .border(1.dp, IosColors.SystemOrange.copy(alpha = 0.28f), AppShapes.card)
-            .padding(horizontal = 16.dp, vertical = 15.dp),
-        horizontalArrangement = Arrangement.spacedBy(13.dp)
+            .padding(horizontal = AppSpacing.pageH),
+        shape = AppShapes.card,
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = semantic.warningContainer,
+            contentColor = semantic.onWarningContainer
+        ),
+        border = BorderStroke(1.dp, semantic.warning.copy(alpha = 0.45f))
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(IosColors.SystemOrange.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = IosColors.SystemOrange,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = IosTypography.RowTitle,
-                color = Color(0xFFFFD08A)
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                style = IosTypography.RowSub,
-                color = Color(0xC7FFDCAA)
-            )
-            if (actionText != null && onAction != null) {
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier
-                        .clip(AppShapes.chip)
-                        .bouncyClickable(onClick = onAction),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = actionText,
-                        style = IosTypography.ButtonSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFD08A)
-                    )
-                    Spacer(Modifier.width(5.dp))
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(AppShapes.icon)
+                    .background(semantic.warning.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
                     Icon(
-                        Icons.Default.ChevronRight,
+                        imageVector = icon,
                         contentDescription = null,
-                        tint = Color(0xFFFFD08A),
-                        modifier = Modifier.size(13.dp)
+                        tint = semantic.onWarningContainer,
+                        modifier = Modifier.size(20.dp)
                     )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = semantic.onWarningContainer
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantic.onWarningContainer.copy(alpha = 0.82f)
+                )
+                if (actionText != null && onAction != null) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = onAction,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = actionText,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = semantic.onWarningContainer
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = semantic.onWarningContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-/** 键值对行　设计稿 .kv —— 标签 13.5 次色 / 取值 14-600 */
 @Composable
 fun IosKvRow(
     label: String,
@@ -872,27 +793,28 @@ fun IosKvRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = AppSpacing.pageH + 4.dp, vertical = 13.dp),
+            .padding(horizontal = AppSpacing.pageH + 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            style = IosTypography.KvLabel,
-            color = IosColors.SecondaryLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(16.dp))
         Text(
             text = value,
-            style = if (mono) IosTypography.Mono13 else IosTypography.KvValue,
-            color = IosColors.Label
+            style = if (mono) {
+                MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+            } else {
+                MaterialTheme.typography.labelLarge
+            },
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
-/**
- * 页面头　设计稿 .page-head —— kicker 13 次色 + 30-800 大标题 + 徽标 + 版本芯片
- */
 @Composable
 fun IosPageHead(
     kicker: String,
@@ -905,63 +827,64 @@ fun IosPageHead(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = AppSpacing.pageH + 4.dp, end = AppSpacing.pageH, top = 10.dp, bottom = 22.dp)
+            .padding(
+                start = AppSpacing.pageH + 4.dp,
+                end = AppSpacing.pageH,
+                top = 12.dp,
+                bottom = 20.dp
+            )
     ) {
         Text(
             text = kicker,
-            style = IosTypography.Footnote,
-            color = IosColors.SecondaryLabel
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
         )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = title,
-                style = IosTypography.Display,
-                color = IosColors.Label,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Spacer(Modifier.weight(1f))
-            if (badgeText != null) {
-                IosStatusBadge(text = badgeText, running = badgeRunning)
-                Spacer(Modifier.width(10.dp))
-            }
-            if (chipText != null) {
-                IosVerChip(text = chipText)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (badgeText != null || chipText != null) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (badgeText != null) {
+                    IosStatusBadge(text = badgeText, running = badgeRunning)
+                }
+                if (chipText != null) {
+                    IosVerChip(text = chipText)
+                }
             }
         }
     }
 }
 
-/**
- * 搜索框规格档位。
- *
- * [STANDARD] 列表页标准规格 —— 52dp 高 / 18dp 圆角 / 16sp（即旧 IosSearchField 的默认外观）
- * [COMPACT]  地图内嵌紧凑规格 —— 36dp 高 / 13dp 圆角 / 13sp
- */
-enum class IosSearchFieldStyle(val height: Dp, val cornerRadius: Dp, val iconSize: Dp, val horizontalPadding: Dp, val fontSize: TextUnit) {
-    STANDARD(height = 52.dp, cornerRadius = 18.dp, iconSize = 19.dp, horizontalPadding = 16.dp, fontSize = 16.sp),
-    COMPACT(height = 36.dp, cornerRadius = 13.dp, iconSize = 15.dp, horizontalPadding = 10.dp, fontSize = 13.sp)
+enum class IosSearchFieldStyle(
+    val height: Dp,
+    val cornerRadius: Dp,
+    val iconSize: Dp,
+    val horizontalPadding: Dp,
+    val fontSize: TextUnit
+) {
+    STANDARD(
+        height = 56.dp,
+        cornerRadius = 12.dp,
+        iconSize = 20.dp,
+        horizontalPadding = 16.dp,
+        fontSize = 16.sp
+    ),
+    COMPACT(
+        height = 48.dp,
+        cornerRadius = 8.dp,
+        iconSize = 18.dp,
+        horizontalPadding = 12.dp,
+        fontSize = 14.sp
+    )
 }
 
-/**
- * 搜索框　设计稿 .search —— 默认 52dp / r18 / 白 6% 底 + 6% 描边，聚焦时描边转品牌蓝
- *
- * v1.7.1 扩展：参数化高度与圆角，并提供 [IosSearchFieldStyle.COMPACT] 覆盖地图内嵌场景。
- * 新增参数全部带默认值，默认走 STANDARD 规格（52dp / r18 / 16sp），
- * 与旧实现的默认外观完全一致，现有调用点无需改动。
- *
- * ```
- * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索")            // 旧写法
- * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索地点",
- *                style = IosSearchFieldStyle.COMPACT)                                    // 地图内嵌
- * IosSearchField(value = q, onValueChange = { q = it }, placeholder = "搜索",
- *                height = 44.dp, cornerRadius = 14.dp)                                   // 自定义
- * ```
- *
- * @param height 传 null 时取 [style] 的高度
- * @param cornerRadius 传 null 时取 [style] 的圆角
- * @param style 规格档位，默认 [IosSearchFieldStyle.STANDARD]
- */
 @Composable
 fun IosSearchField(
     value: String,
@@ -973,62 +896,70 @@ fun IosSearchField(
     style: IosSearchFieldStyle = IosSearchFieldStyle.STANDARD
 ) {
     var focused by remember { mutableStateOf(false) }
-    val bg = if (focused) Color(0x17FFFFFF) else Color(0x0FFFFFFF)
-    val borderColor = if (focused) IosColors.SystemBlue.copy(alpha = 0.4f) else Color(0x0FFFFFFF)
-
+    val scheme = MaterialTheme.colorScheme
     val resolvedHeight = height ?: style.height
     val resolvedCorner = cornerRadius ?: style.cornerRadius
     val shape = RoundedCornerShape(resolvedCorner)
+    val borderColor by animateColorAsState(
+        targetValue = if (focused) scheme.primary else scheme.outline,
+        label = "searchBorder"
+    )
+    val textStyle: TextStyle = MaterialTheme.typography.bodyLarge.copy(
+        fontSize = style.fontSize,
+        color = scheme.onSurface
+    )
 
-    Row(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(resolvedHeight)
-            .clip(shape)
-            .background(bg)
-            .border(1.dp, borderColor, shape)
-            .padding(horizontal = style.horizontalPadding),
-        verticalAlignment = Alignment.CenterVertically
+            .height(resolvedHeight),
+        shape = shape,
+        color = scheme.surfaceContainerHigh,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(if (focused) 2.dp else 1.dp, borderColor)
     ) {
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            tint = IosColors.SecondaryLabel,
-            modifier = Modifier.size(style.iconSize)
-        )
-        Spacer(Modifier.width(10.dp))
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) {
-                Text(
-                    text = placeholder,
-                    style = IosTypography.Subheadline,
-                    color = IosColors.TertiaryLabel
+        Row(
+            modifier = Modifier.padding(horizontal = style.horizontalPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = scheme.onSurfaceVariant,
+                modifier = Modifier.size(style.iconSize)
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = textStyle.copy(color = scheme.onSurfaceVariant),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = textStyle,
+                    cursorBrush = SolidColor(scheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focused = it.isFocused }
                 )
             }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = IosColors.Label,
-                    fontSize = style.fontSize
-                ),
-                cursorBrush = SolidColor(IosColors.SystemBlue),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { focused = it.isFocused }
-            )
         }
     }
 }
 
 // =============================================================================
-// 浮层控件
+// Floating controls
 // =============================================================================
 
-/**
- * 玻璃图标按钮　设计稿 .icon-btn —— 48dp / r18 / 玻璃 / active 态蓝底
- */
 @Composable
 fun IosGlassIconButton(
     icon: ImageVector,
@@ -1036,86 +967,86 @@ fun IosGlassIconButton(
     modifier: Modifier = Modifier,
     isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current,
     active: Boolean = false,
-    activeColor: Color = IosColors.SystemBlue,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
     size: Dp = 48.dp,
-    iconSize: Dp = 21.dp,
+    iconSize: Dp = 22.dp,
     contentDescription: String? = null
 ) {
-    val shape = if (size <= 44.dp) AppShapes.button else AppShapes.iconLg
-    Box(
+    @Suppress("UNUSED_PARAMETER")
+    val compatibilityMaterial = isLiquidGlass
+    val scheme = MaterialTheme.colorScheme
+    IconButton(
+        onClick = onClick,
         modifier = modifier
             .size(size)
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = shape,
-                elevation = 10.dp,
-                containerColor = if (active) activeColor.copy(alpha = 0.22f) else null
+            .clip(AppShapes.icon)
+            .background(
+                if (active) scheme.primaryContainer else scheme.surfaceContainerHigh
             )
-            .bouncyClickable(onClick = onClick),
-        contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) activeColor else IosColors.Label,
+            tint = if (active) activeColor else scheme.onSurface,
             modifier = Modifier.size(iconSize)
         )
     }
 }
 
-/**
- * 多图标玻璃胶囊　设计稿 .iconpill
- */
 @Composable
 fun IosGlassIconPill(
     modifier: Modifier = Modifier,
     isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current,
     content: @Composable RowScope.() -> Unit
 ) {
-    Row(
-        modifier = modifier
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = RoundedCornerShape(22.dp),
-                elevation = 12.dp
-            )
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        content = content
-    )
+    @Suppress("UNUSED_PARAMETER")
+    val compatibilityMaterial = isLiquidGlass
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.pill,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            content = content
+        )
+    }
 }
 
-/** 胶囊内单个图标按钮　设计稿 .iconpill button —— 38dp / r14 */
 @Composable
 fun IosPillIcon(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     active: Boolean = false,
-    activeColor: Color = IosColors.BrandSoft,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
     contentDescription: String? = null
 ) {
-    Box(
+    val scheme = MaterialTheme.colorScheme
+    IconButton(
+        onClick = onClick,
         modifier = modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (active) IosColors.SystemBlue.copy(alpha = 0.16f) else Color.Transparent)
-            .bouncyClickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+            .size(48.dp)
+            .clip(AppShapes.icon)
+            .background(
+                if (active) scheme.primaryContainer else Color.Transparent
+            )
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (active) activeColor else IosColors.Label,
-            modifier = Modifier.size(19.dp)
+            tint = if (active) activeColor else scheme.onSurface,
+            modifier = Modifier.size(22.dp)
         )
     }
 }
 
-/**
- * 模式胶囊　设计稿 .pill / .pill--solid / .pill--ghost —— 48dp / 全圆角 / 15-600
- */
 @Composable
 fun IosModePill(
     text: String,
@@ -1124,51 +1055,64 @@ fun IosModePill(
     icon: ImageVector? = null,
     solid: Boolean = true
 ) {
-    val bg = if (solid) IosColors.SystemBlue else Color(0x12FFFFFF)
-    val fg = if (solid) Color.White else IosColors.Label
-
-    Row(
-        modifier = modifier
-            .height(48.dp)
-            .clip(AppShapes.pill)
-            .then(
-                if (solid) Modifier.shadow(
-                    elevation = 12.dp,
-                    shape = AppShapes.pill,
-                    spotColor = IosColors.SystemBlue.copy(alpha = 0.9f),
-                    ambientColor = Color.Transparent
-                ) else Modifier.border(1.dp, IosColors.Line, AppShapes.pill)
+    if (solid) {
+        Button(
+            onClick = onClick,
+            modifier = modifier.height(48.dp),
+            shape = AppShapes.pill,
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1
             )
-            .background(bg)
-            .bouncyClickable(onClick = onClick)
-            .padding(horizontal = 22.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
-            Spacer(Modifier.width(8.dp))
         }
-        Text(
-            text = text,
-            style = IosTypography.Subheadline,
-            fontWeight = FontWeight.SemiBold,
-            color = fg,
-            maxLines = 1
-        )
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier.height(48.dp),
+            shape = AppShapes.pill,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1
+            )
+        }
     }
 }
 
 /**
- * 中心定位 Pin　设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 32×40 蓝色水滴
+ * Map affordance. The 32x40 pin geometry is intentionally retained because map
+ * aiming calculations depend on this exact silhouette and size.
  */
 @Composable
 fun IosCenterPin(
     label: String,
     modifier: Modifier = Modifier,
-    pinColor: Color = IosColors.SystemBlue,
+    pinColor: Color = MaterialTheme.colorScheme.primary,
     icon: ImageVector? = null
 ) {
+    val scheme = MaterialTheme.colorScheme
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1176,14 +1120,13 @@ fun IosCenterPin(
         Row(
             modifier = Modifier
                 .shadow(
-                    elevation = 7.dp,
+                    elevation = 6.dp,
                     shape = AppShapes.pill,
-                    spotColor = Color.Black.copy(alpha = 0.24f),
+                    spotColor = scheme.scrim.copy(alpha = 0.30f),
                     ambientColor = Color.Transparent
                 )
                 .clip(AppShapes.pill)
-                .background(IosColors.PinTipBg)
-                .border(1.dp, IosColors.Line, AppShapes.pill)
+                .background(scheme.surfaceContainerLowest)
                 .padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1191,22 +1134,22 @@ fun IosCenterPin(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = IosColors.BrandOnGlass,
+                    tint = scheme.primary,
                     modifier = Modifier.size(12.dp)
                 )
                 Spacer(Modifier.width(5.dp))
             }
             Text(
                 text = label,
-                style = IosTypography.Caption1,
-                fontWeight = FontWeight.SemiBold,
-                color = IosColors.Label,
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.onSurface,
                 maxLines = 1
             )
         }
         Spacer(Modifier.height(7.dp))
-        // 水滴形 Pin（32 × 40）
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(width = 32.dp, height = 40.dp)) {
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.size(width = 32.dp, height = 40.dp)
+        ) {
             val w = size.width
             val h = size.height
             val path = androidx.compose.ui.graphics.Path().apply {
@@ -1218,10 +1161,13 @@ fun IosCenterPin(
                 close()
             }
             drawPath(path, color = pinColor)
-            drawCircle(color = Color.White, radius = w * 0.17f, center = Offset(w / 2f, h * 0.38f))
+            drawCircle(
+                color = Color.White,
+                radius = w * 0.17f,
+                center = Offset(w / 2f, h * 0.38f)
+            )
         }
         Spacer(Modifier.height(3.dp))
-        // 落地阴影
         Box(
             modifier = Modifier
                 .size(width = 15.dp, height = 5.dp)
