@@ -1,9 +1,9 @@
 ﻿package com.mockrun.app.core.designsystem
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -38,35 +38,21 @@ object MotionTokens {
     )
 }
 
-/**
- * Emil Kowalski Core Principle: "Buttons must feel responsive: transform scale(0.97) on :active"
- * Responds instantaneously on pointer-down with subtle spring decompression upon release.
- */
+/** Compatibility click modifier backed by the Material 3 ripple and state layer. */
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
-    pressedScale: Float = 0.96f,
+    @Suppress("UNUSED_PARAMETER") pressedScale: Float = 0.96f,
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
+    val indication = LocalIndication.current
 
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) pressedScale else 1.0f,
-        animationSpec = MotionTokens.BouncySpringSpec,
-        label = "bouncyClickScale"
+    clickable(
+        interactionSource = interactionSource,
+        indication = indication,
+        enabled = enabled,
+        onClick = onClick
     )
-
-    this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .clickable(
-            interactionSource = interactionSource,
-            indication = null, // Disable default ripple for authentic, crisp iOS tactile response
-            enabled = enabled,
-            onClick = onClick
-        )
 }
 
 /**
