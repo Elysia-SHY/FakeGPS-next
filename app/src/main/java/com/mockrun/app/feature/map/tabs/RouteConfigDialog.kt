@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.DirectionsRun
-import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RouteSimulator
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.domain.model.RouteMode
 import kotlin.math.roundToInt
 
@@ -55,6 +58,7 @@ fun RouteConfigDialog(
     customSpm: Int = 165,
     onCadenceConfigChange: (CadenceMode, Int) -> Unit = { _, _ -> }
 ) {
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     // remember 必须带键。
     //
     // isRootAvailable 由 SimulationViewModel 异步探测（首次组合时为 false），
@@ -74,10 +78,10 @@ fun RouteConfigDialog(
     }
 
     val presets = listOf(
-        SpeedPreset("步行", 4.5f, Icons.Default.DirectionsWalk),
-        SpeedPreset("慢跑", 8.0f, Icons.Default.DirectionsRun),
-        SpeedPreset("快跑", 12.0f, Icons.Default.DirectionsRun),
-        SpeedPreset("骑行", 18.0f, Icons.Default.DirectionsBike),
+        SpeedPreset("步行", 4.5f, Icons.AutoMirrored.Filled.DirectionsWalk),
+        SpeedPreset("慢跑", 8.0f, Icons.AutoMirrored.Filled.DirectionsRun),
+        SpeedPreset("快跑", 12.0f, Icons.AutoMirrored.Filled.DirectionsRun),
+        SpeedPreset("骑行", 18.0f, Icons.AutoMirrored.Filled.DirectionsBike),
         SpeedPreset("驾车", 40.0f, Icons.Default.DirectionsCar)
     )
 
@@ -88,12 +92,15 @@ fun RouteConfigDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = "巡航参数配置",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column {
+                GlassDialogWindowEffect(isLiquidGlass)
+                Text(
+                    text = "巡航参数配置",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         },
         text = {
             Column(
@@ -410,7 +417,12 @@ fun RouteConfigDialog(
                 Text("确定", style = MaterialTheme.typography.labelLarge)
             }
         },
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.extraLarge
+        containerColor = if (isLiquidGlass) {
+            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+        tonalElevation = 0.dp,
+        shape = AppShapes.sheet
     )
 }

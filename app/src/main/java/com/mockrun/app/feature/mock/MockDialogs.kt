@@ -122,7 +122,7 @@ fun WeChatTroubleshootDialog(
         onDismissRequest = onDismissRequest,
         title = {
             Text(
-                text = "💬 微信显示真实位置排查指南",
+                text = "微信显示真实位置排查指南",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -141,7 +141,7 @@ fun WeChatTroubleshootDialog(
                     contentColor = AppSemanticColors.current.onWarningContainer
                 ) {
                     Text(
-                        text = "💡 原理说明：微信内嵌腾讯定位 SDK。即便模拟了 GPS，微信默认仍会在后台扫描您周边的 Wi-Fi 路由器 MAC 地址（BSSID）上报给腾讯服务器反查真实经纬度；若检测到 Mock 标记则会直接舍弃 GPS 回退到 Wi-Fi 定位。",
+                        text = "原理说明：微信内嵌腾讯定位 SDK。即便模拟了 GPS，微信默认仍会在后台扫描您周边的 Wi-Fi 路由器 MAC 地址（BSSID）上报给腾讯服务器反查真实经纬度；若检测到 Mock 标记则会直接舍弃 GPS 回退到 Wi-Fi 定位。",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppSemanticColors.current.onWarningContainer,
                         modifier = Modifier.padding(10.dp)
@@ -218,7 +218,7 @@ fun KeepAliveGuideDialog(
         onDismissRequest = onDismissRequest,
         title = {
             Text(
-                text = "🛡️ 后台保活与防掉进程指南",
+                text = "后台保活与防掉进程指南",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

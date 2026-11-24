@@ -20,10 +20,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
@@ -39,13 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.AppSpacing
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -156,11 +158,7 @@ fun DisclaimerGateScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.surfaceContainerLow)
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -239,24 +237,27 @@ fun DisclaimerGateScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-                                        MaterialTheme.colorScheme.background
-                                    )
-                                )
-                            )
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
                             .padding(vertical = 14.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "↓ 请向下滚动阅读至底部",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AppSemanticColors.current.warning,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = AppSemanticColors.current.warning,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "请向下滚动阅读至底部",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = AppSemanticColors.current.warning,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -270,6 +271,10 @@ fun DisclaimerGateScreen(
                     .padding(horizontal = AppSpacing.pageH)
                     .padding(top = 16.dp, bottom = 20.dp)
             ) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                )
+                Spacer(Modifier.height(if (reachedBottom) 16.dp else 12.dp))
                 if (!reachedBottom) {
                     Text(
                         text = "阅读到最底部后即可输入确认短语。",
@@ -288,7 +293,7 @@ fun DisclaimerGateScreen(
                     // 把待输入的短语显著展示出来，避免用户猜测或复制困难
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small,
+                        shape = AppShapes.chip,
                         color = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
@@ -318,7 +323,8 @@ fun DisclaimerGateScreen(
                                 )
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = AppShapes.panel
                     )
                 }
 
@@ -332,6 +338,7 @@ fun DisclaimerGateScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp),
+                    shape = AppShapes.button,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AppSemanticColors.current.success,
                         contentColor = AppSemanticColors.current.onSuccess,
@@ -361,7 +368,8 @@ fun DisclaimerGateScreen(
                     onClick = onDecline,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = 48.dp),
+                    shape = AppShapes.button
                 ) {
                     Text(
                         text = "不同意，退出应用",

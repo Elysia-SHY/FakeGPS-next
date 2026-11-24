@@ -16,18 +16,25 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AtlasSurface
+import com.mockrun.app.core.designsystem.LocalGlassBackdrop
+import com.mockrun.app.core.designsystem.LocalIsDarkTheme
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
+import com.mockrun.app.core.designsystem.liquidGlass
 
 /**
  * Material 3 vertical zoom control.
@@ -54,6 +61,7 @@ fun MapVerticalZoomControl(
         stiffness = Spring.StiffnessMediumLow
     )
 ) {
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     var isDragging by remember { mutableStateOf(false) }
     var trackHeightPx by remember { mutableFloatStateOf(1f) }
 
@@ -84,16 +92,15 @@ fun MapVerticalZoomControl(
     )
 
     val shape = AppShapes.iconLg
-    Surface(
+    AtlasSurface(
         modifier = modifier
             .width(56.dp)
             .height(renderedCapsuleHeight),
+        isLiquidGlass = isLiquidGlass,
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        elevation = if (isLiquidGlass) 16.dp else 6.dp
     ) {
         Column(
             modifier = Modifier
@@ -216,44 +223,87 @@ fun MapSearchField(
     onClear: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val backdrop = LocalGlassBackdrop.current
+    val useGlass = isLiquidGlass && backdrop != null
+    val isDark = LocalIsDarkTheme.current
+    val fieldColors = if (useGlass) {
+        TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            cursorColor = MaterialTheme.colorScheme.primary
+        )
+    } else {
+        TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            cursorColor = MaterialTheme.colorScheme.primary
+        )
+    }
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp),
-        singleLine = true,
-        shape = MaterialTheme.shapes.large,
-        textStyle = MaterialTheme.typography.bodyMedium,
-        placeholder = {
-            Text(
-                text = placeholder,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        trailingIcon = if (value.isNotEmpty()) {
-            {
-                IconButton(onClick = onClear) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "清除搜索内容",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            .heightIn(min = 56.dp)
+            .liquidGlass(
+                isLiquidGlass = useGlass,
+                shape = AppShapes.panel,
+                elevation = if (useGlass) 12.dp else 2.dp,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                backdrop = backdrop,
+                borderWidth = if (useGlass) 0.75.dp else 1.dp,
+                tintAlpha = if (isDark) 0.28f else 0.34f
+            ),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp),
+            singleLine = true,
+            shape = AppShapes.panel,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = fieldColors,
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            trailingIcon = if (value.isNotEmpty()) {
+                {
+                    IconButton(onClick = onClear) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "清除搜索内容",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            } else {
+                null
             }
-        } else {
-            null
-        }
-    )
+        )
+    }
 }
 
 /**

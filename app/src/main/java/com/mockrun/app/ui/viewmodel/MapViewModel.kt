@@ -15,6 +15,8 @@ import com.mockrun.app.util.logFailure
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -76,29 +78,57 @@ class MapViewModel @Inject constructor(
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
+    private val searchRequestGate = SearchRequestGate()
+    private var searchJob: Job? = null
+
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
     }
 
     fun performSearch(query: String) {
         _searchQuery.value = query
+        val requestToken = searchRequestGate.next()
+        searchJob?.cancel()
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
             _searchResults.value = emptyList()
+            _isSearching.value = false
             return
         }
-        viewModelScope.launch {
-            _isSearching.value = true
-            val items = LocationSearchService.search(trimmed)
-            _searchResults.value = items
-            _isSearching.value = false
+        _isSearching.value = true
+        searchJob = viewModelScope.launch {
+            try {
+                delay(250)
+                val items = LocationSearchService.search(trimmed)
+                if (searchRequestGate.isLatest(requestToken)) {
+                    _searchResults.value = items
+                }
+            } finally {
+                if (searchRequestGate.isLatest(requestToken)) {
+                    _isSearching.value = false
+                }
+            }
         }
     }
 
     fun clearSearch() {
+        searchRequestGate.invalidate()
+        searchJob?.cancel()
         _searchQuery.value = ""
         _searchResults.value = emptyList()
         _isSearching.value = false
+    }
+
+    internal class SearchRequestGate {
+        private var generation = 0L
+
+        fun next(): Long = ++generation
+
+        fun invalidate() {
+            generation++
+        }
+
+        fun isLatest(token: Long): Boolean = token == generation
     }
 
     // ---- Two-Point Road Routing State ----

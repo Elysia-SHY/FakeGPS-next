@@ -14,6 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -500,11 +505,11 @@ fun RouteSimulationScreen(
                 Spacer(Modifier.height(12.dp))
 
                 val presetSpeeds = listOf(
-                    Triple(5f, "🚶", "5"),
-                    Triple(8f, "🏃", "8"),
-                    Triple(20f, "🚴", "20"),
-                    Triple(60f, "🚗", "60"),
-                    Triple(100f, "🏎️", "100")
+                    Triple(5f, Icons.AutoMirrored.Filled.DirectionsWalk, "5"),
+                    Triple(8f, Icons.AutoMirrored.Filled.DirectionsRun, "8"),
+                    Triple(20f, Icons.AutoMirrored.Filled.DirectionsBike, "20"),
+                    Triple(60f, Icons.Default.DirectionsCar, "60"),
+                    Triple(100f, Icons.Default.DirectionsCar, "100")
                 )
 
                 FlowRow(
@@ -512,7 +517,7 @@ fun RouteSimulationScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    presetSpeeds.forEach { (speedVal, emoji, numStr) ->
+                    presetSpeeds.forEach { (speedVal, icon, numStr) ->
                         val isSelected = kotlin.math.abs(selectedSpeed - speedVal) < 0.5f
                         FilterChip(
                             selected = isSelected,
@@ -522,9 +527,10 @@ fun RouteSimulationScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text(
-                                        text = emoji,
-                                        style = MaterialTheme.typography.labelLarge
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                     Text(
                                         text = numStr,
@@ -926,7 +932,7 @@ fun RouteSimulationScreen(
                                 title = "航向角切线",
                                 value = "${"%.0f".format(simState.bearing)}°",
                                 subtitle = "路线转弯平滑平角过渡",
-                                icon = Icons.Default.Send,
+                                icon = Icons.AutoMirrored.Filled.Send,
                                 tint = MaterialTheme.colorScheme.tertiary
                             )
                         }

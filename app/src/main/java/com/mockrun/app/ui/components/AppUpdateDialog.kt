@@ -59,10 +59,13 @@ import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.RemoteReleaseInfo
 import com.mockrun.app.core.data.repository.VersionSyncManager
 import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.util.Diag
 
 /**
- * Material Design 3 update dialog.
+ * Atlas update dialog.
  *
  * Downloading intentionally disables both back-press and outside-tap dismissal.
  * The user must explicitly choose 「取消下载」 before the dialog can be dismissed.
@@ -74,6 +77,7 @@ fun AppUpdateDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     val downloadStatus by VersionSyncManager.downloadStatus
     val dismissAllowed = downloadStatus !is DownloadStatus.Downloading
 
@@ -87,9 +91,13 @@ fun AppUpdateDialog(
             dismissOnBackPress = dismissAllowed,
             dismissOnClickOutside = dismissAllowed
         ),
-        shape = MaterialTheme.shapes.extraLarge,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 6.dp,
+        shape = AppShapes.sheet,
+        containerColor = if (isLiquidGlass) {
+            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+        tonalElevation = 0.dp,
         icon = {
             Surface(
                 shape = CircleShape,
@@ -109,12 +117,15 @@ fun AppUpdateDialog(
             }
         },
         title = {
-            Text(
-                text = "发现新版本",
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column {
+                GlassDialogWindowEffect(isLiquidGlass)
+                Text(
+                    text = "发现新版本",
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
         text = {
             UpdateDialogBody(

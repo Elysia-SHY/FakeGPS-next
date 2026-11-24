@@ -5,41 +5,63 @@ import android.os.Build
 import androidx.compose.runtime.mutableStateOf
 
 /**
- * App-level Material 3 appearance preferences.
+ * Global visual material preference.
  *
- * The legacy "liquid glass" key is migrated into the dynamic-color preference so
- * existing users keep a meaningful visual choice after the blur effect is removed.
+ * Liquid Glass is only enabled when the platform can provide a real backdrop
+ * blur. Older devices stay on the high-contrast solid surface automatically.
  */
 object AppAppearancePreferences {
     const val PREFS_NAME = "fake_gps_ui_prefs"
-    const val KEY_DYNAMIC_COLOR_ENABLED = "is_dynamic_color_enabled"
-    private const val LEGACY_KEY_LIQUID_GLASS_ENABLED = "is_liquid_glass_enabled"
+    const val KEY_LIQUID_GLASS_ENABLED = "is_liquid_glass_enabled"
+    const val KEY_ACCENT_COLOR = "accent_color_argb"
 
+    val liquidGlassEnabled = mutableStateOf(false)
     val dynamicColorEnabled = mutableStateOf(false)
+    val accentColorArgb = mutableStateOf<Int?>(null)
 
-    val supportsDynamicColor: Boolean
+    val supportsLiquidGlass: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     fun initialize(context: Context) {
         val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val enabled = if (preferences.contains(KEY_DYNAMIC_COLOR_ENABLED)) {
-            preferences.getBoolean(KEY_DYNAMIC_COLOR_ENABLED, false)
+        val requested = preferences.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+        liquidGlassEnabled.value = requested && supportsLiquidGlass
+        dynamicColorEnabled.value = false
+        accentColorArgb.value = if (preferences.contains(KEY_ACCENT_COLOR)) {
+            preferences.getInt(KEY_ACCENT_COLOR, 0)
         } else {
-            val migrated = preferences.getBoolean(LEGACY_KEY_LIQUID_GLASS_ENABLED, false)
-            preferences.edit()
-                .putBoolean(KEY_DYNAMIC_COLOR_ENABLED, migrated)
-                .apply()
-            migrated
+            null
         }
-        dynamicColorEnabled.value = enabled && supportsDynamicColor
     }
 
-    fun setDynamicColorEnabled(context: Context, enabled: Boolean) {
-        val effectiveValue = enabled && supportsDynamicColor
+    fun setLiquidGlassEnabled(context: Context, enabled: Boolean) {
+        val effectiveValue = enabled && supportsLiquidGlass
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(KEY_DYNAMIC_COLOR_ENABLED, effectiveValue)
+            .putBoolean(KEY_LIQUID_GLASS_ENABLED, effectiveValue)
             .apply()
-        dynamicColorEnabled.value = effectiveValue
+        liquidGlassEnabled.value = effectiveValue
+    }
+
+    fun setAccentColor(context: Context, argb: Int?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .apply {
+                if (argb == null) remove(KEY_ACCENT_COLOR)
+                else putInt(KEY_ACCENT_COLOR, argb)
+            }
+            .apply()
+        accentColorArgb.value = argb
+    }
+
+    fun parseAccentColor(input: String): Int? {
+        val hex = input.trim().removePrefix("#")
+        if (!hex.matches(Regex("[0-9a-fA-F]{6}"))) return null
+        return (0xFF000000L or hex.toLong(16)).toInt()
+    }
+
+    @Deprecated("Dynamic color is not part of the Atlas material system.")
+    fun setDynamicColorEnabled(context: Context, enabled: Boolean) {
+        dynamicColorEnabled.value = false
     }
 }

@@ -111,6 +111,9 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 /** 反向地理编码尚未返回时的占位文案；收藏命名据此判断地址是否可用。 */
 private const val ADDRESS_PLACEHOLDER = "正在获取当前地址..."
@@ -446,6 +449,8 @@ fun MapScreen(
     // 右列悬浮控件的顶边限制线与底部抽屉的高度上限都由它推导。
     var topChromeHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val pageBackdrop = if (isLiquidGlass) rememberLayerBackdrop() else null
 
     // 首帧兜底用的折叠态面板高度：onGloballyPositioned 要等第一次布局结束才回填真实值，
     // 在此之前 offset 若读到 0 会让控件先贴到容器底部、下一帧再弹上去。
@@ -653,7 +658,7 @@ fun MapScreen(
         }
     }
 
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             when (event) {
@@ -671,13 +676,25 @@ fun MapScreen(
         }
     }
 
+    CompositionLocalProvider(LocalGlassBackdrop provides pageBackdrop) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onGloballyPositioned { mapBoxHeightPx = it.size.height }
     ) {
-        // ① 地图层（原生 View，不参与 Haze 捕获）
-        Box(modifier = Modifier.fillMaxSize()) {
+        // The page content is captured once by AppNavigation's shared Backdrop.
+        // Map chrome must stay a sibling of that source, never sample itself.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (pageBackdrop != null) {
+                        Modifier.layerBackdrop(pageBackdrop)
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -787,7 +804,7 @@ fun MapScreen(
                             position = GeoPoint(displayLat, displayLon)
                             icon = MapPinHelper.getRunnerPin(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "🏃 路线模拟位置"
+                            title = "路线模拟位置"
                             rotation = simState.bearing
                         }
                         mapView.overlays.add(runner)
@@ -804,7 +821,7 @@ fun MapScreen(
                             position = GeoPoint(joyLat, joyLon)
                             icon = MapPinHelper.getJoystickPin(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "🕹️ 万向摇杆位置"
+                            title = "万向摇杆位置"
                         }
                         mapView.overlays.add(joyMarker)
                     }
@@ -820,7 +837,7 @@ fun MapScreen(
                             position = GeoPoint(pLat, pLon)
                             icon = MapPinHelper.getActiveMockPin(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "📍 虚拟定位驻留点"
+                            title = "虚拟定位驻留点"
                         }
                         mapView.overlays.add(pMarker)
                     }
@@ -839,7 +856,7 @@ fun MapScreen(
                             position = GeoPoint(appLat, appLon)
                             icon = MapPinHelper.getAppPin(context, colorInt)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "📍 ${rule.appName} · 分流定位"
+                            title = "${rule.appName} · 分流定位"
                             snippet = "坐标: ${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}"
                             setOnMarkerClickListener { _, _ ->
                                 simulationViewModel.setActiveTargetKey(rule.key)
@@ -866,7 +883,7 @@ fun MapScreen(
                             position = GeoPoint(dispLat, dispLon)
                             icon = MapPinHelper.getRealLocationPuck(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "🔵 当前真实物理位置"
+                            title = "当前真实物理位置"
                             snippet = "硬件 GPS 坐标: ${"%.5f".format(rLat)}, ${"%.5f".format(rLon)}"
                             setOnMarkerClickListener { _, _ ->
                                 centerAimingCoord = rLat to rLon
@@ -888,7 +905,7 @@ fun MapScreen(
                             position = GeoPoint(dispLat, dispLon)
                             icon = MapPinHelper.getOriginPin(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "🟢 路线起点"
+                            title = "路线起点"
                         }
                         mapView.overlays.add(origMarker)
                     }
@@ -904,7 +921,7 @@ fun MapScreen(
                             position = GeoPoint(dispLat, dispLon)
                             icon = MapPinHelper.getDestinationPin(context)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "🔴 路线终点"
+                            title = "路线终点"
                         }
                         mapView.overlays.add(destMarker)
                     }
@@ -920,7 +937,36 @@ fun MapScreen(
                     }
                 }
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(
+                                    alpha = if (isSystemDark) 0.035f else 0.025f
+                                ),
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.scrim.copy(
+                                    alpha = if (isSystemDark) 0.08f else 0.025f
+                                )
+                            )
+                        )
+                    )
+            )
         }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(
+                    MaterialTheme.colorScheme.background.copy(
+                        alpha = if (isSystemDark) 0.58f else 0.68f
+                    )
+                )
+        )
 
         // 1. Top Floating Controls Bar & Multi-Target App Capsules
             Column(
@@ -948,7 +994,7 @@ fun MapScreen(
                             .getOrNull()
                     } ?: MaterialTheme.colorScheme.primary
 
-                    Surface(
+                    AtlasSurface(
                         modifier = Modifier
                             .weight(1f, fill = false)
                             .clickable {
@@ -959,12 +1005,11 @@ fun MapScreen(
                                     animateTo(GeoPoint(tLat, tLon))
                                 }
                             },
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        isLiquidGlass = isLiquidGlass,
                         shape = AppShapes.card,
-                        tonalElevation = 3.dp,
-                        shadowElevation = 4.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        elevation = if (isLiquidGlass) 12.dp else 4.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1038,13 +1083,12 @@ fun MapScreen(
                     // 4×48dp 会把顶部地址条挤没，因此把两个「路线专属」入口
                     // 合并进「更多」菜单 —— 功能一个不少，仍全部可达。
                     var showMoreToolsMenu by remember { mutableStateOf(false) }
-                    Surface(
+                    AtlasSurface(
+                        isLiquidGlass = isLiquidGlass,
                         shape = AppShapes.card,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        tonalElevation = 3.dp,
-                        shadowElevation = 4.dp,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        elevation = if (isLiquidGlass) 12.dp else 4.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
@@ -1137,7 +1181,7 @@ fun MapScreen(
                                         onDismissRequest = { showMoreToolsMenu = false }
                                     ) {
                                         DropdownMenuItem(
-                                            text = { Text("沿路规划 🛣️", color = MaterialTheme.colorScheme.onSurface) },
+                                            text = { Text("沿路规划", color = MaterialTheme.colorScheme.onSurface) },
                                             onClick = {
                                                 showMoreToolsMenu = false
                                                 showRoadRouteDialog = true
@@ -1169,9 +1213,10 @@ fun MapScreen(
                         // Item 0: Global Default
                         item {
                             val isSelected = activeTargetKey == null
-                            Surface(
+                            AtlasSurface(
+                                isLiquidGlass = isLiquidGlass,
                                 shape = AppShapes.pill,
-                                color = if (isSelected) {
+                                containerColor = if (isSelected) {
                                     MaterialTheme.colorScheme.primaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.surfaceContainerHigh
@@ -1181,9 +1226,7 @@ fun MapScreen(
                                 } else {
                                     MaterialTheme.colorScheme.onSurface
                                 },
-                                tonalElevation = if (isSelected) 3.dp else 1.dp,
-                                shadowElevation = if (isSelected) 3.dp else 1.dp,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                elevation = if (isSelected) 8.dp else 3.dp,
                                 modifier = Modifier
                                     .height(48.dp)
                                     .clickable {
@@ -1230,9 +1273,10 @@ fun MapScreen(
                                     .logFailure("MapScreen", "parse rule color chip", Diag.Level.DEBUG)
                                     .getOrDefault(defaultRuleColor)
                             }
-                            Surface(
+                            AtlasSurface(
+                                isLiquidGlass = isLiquidGlass,
                                 shape = AppShapes.pill,
-                                color = if (isSelected) {
+                                containerColor = if (isSelected) {
                                     MaterialTheme.colorScheme.secondaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.surfaceContainerHigh
@@ -1242,9 +1286,7 @@ fun MapScreen(
                                 } else {
                                     MaterialTheme.colorScheme.onSurface
                                 },
-                                tonalElevation = if (isSelected) 3.dp else 1.dp,
-                                shadowElevation = if (isSelected) 3.dp else 1.dp,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                elevation = if (isSelected) 8.dp else 3.dp,
                                 modifier = Modifier
                                     .height(48.dp)
                                     .clickable {
@@ -1288,13 +1330,12 @@ fun MapScreen(
 
                         // Item N+1: Add App Capsule
                         item {
-                            Surface(
+                            AtlasSurface(
+                                isLiquidGlass = isLiquidGlass,
                                 shape = AppShapes.pill,
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 contentColor = MaterialTheme.colorScheme.primary,
-                                tonalElevation = 1.dp,
-                                shadowElevation = 1.dp,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                elevation = 3.dp,
                                 modifier = Modifier
                                     .height(48.dp)
                                     .clickable { showMapAppPickerSheet = true }
@@ -1402,7 +1443,7 @@ fun MapScreen(
 
             // 3. Dynamic Status Capsule (iOS Dynamic Island style)
             if (isPointMockActive && pointMockLocation != null) {
-                Surface(
+                AtlasSurface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
@@ -1410,11 +1451,11 @@ fun MapScreen(
                         // 一旦开启虚拟定位，这条胶囊就把「全局通用 / 添加分流」盖住、点不到。
                         // 改为跟随实测的顶部控件簇底边，永远落在分流行下方。
                         .padding(top = topChromeHeight + 8.dp, start = 12.dp),
+                    isLiquidGlass = isLiquidGlass,
                     shape = AppShapes.pill,
-                    color = MaterialTheme.colorScheme.inverseSurface,
+                    containerColor = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.90f),
                     contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    tonalElevation = 3.dp,
-                    shadowElevation = 6.dp
+                    elevation = if (isLiquidGlass) 16.dp else 6.dp
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -1572,7 +1613,7 @@ fun MapScreen(
                             simulationViewModel.toggleMultiTargetRule(rule.key, true)
                         }
                         simulationViewModel.updateMultiTargetLocation(rule.key, activeCoord.first, activeCoord.second)
-                        Toast.makeText(context, "✅ 已设为【${rule.appName}】分流定位点：$currentAddressText", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "已设为【${rule.appName}】分流定位点：$currentAddressText", Toast.LENGTH_SHORT).show()
                     },
                     onToggleTargetRule = { rule, isChecked ->
                         simulationViewModel.toggleMultiTargetRule(rule.key, isChecked)
@@ -1743,6 +1784,7 @@ fun MapScreen(
                 )
             }
         }
+    }
 
     if (showRouteConfigDialog) {
         RouteConfigDialog(
@@ -1792,8 +1834,18 @@ fun MapScreen(
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text("保存路线", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            title = {
+                Column {
+                    GlassDialogWindowEffect(isLiquidGlass)
+                    Text("保存路线", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                }
+            },
+            containerColor = if (isLiquidGlass) {
+                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+            tonalElevation = 0.dp,
             text = {
                 OutlinedTextField(
                     value = routeNameInput,
@@ -1817,7 +1869,7 @@ fun MapScreen(
                     Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            shape = MaterialTheme.shapes.extraLarge
+            shape = AppShapes.sheet
         )
     }
 

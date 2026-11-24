@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.chrisbanes.haze.HazeState
 
 // =============================================================================
 // Row tones
@@ -175,11 +174,8 @@ fun IosInsetGroupCard(
     isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current,
     shape: Shape = AppShapes.card,
     elevation: Dp = 10.dp,
-    hazeState: HazeState? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    @Suppress("UNUSED_PARAMETER")
-    val compatibilityMaterial = Triple(isLiquidGlass, hazeState, elevation)
     OutlinedCard(
         modifier = modifier
             .fillMaxWidth()

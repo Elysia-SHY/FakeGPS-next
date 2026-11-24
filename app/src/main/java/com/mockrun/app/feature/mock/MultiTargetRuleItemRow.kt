@@ -151,14 +151,14 @@ fun MultiTargetRuleItemRow(
                     onDismissRequest = { showModeMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("📍 独立定点 (自定义分流坐标)") },
+                        text = { Text("独立定点 (自定义分流坐标)") },
                         onClick = {
                             onModeChange(TargetMockMode.STATIONARY)
                             showModeMenu = false
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("🛰️ 物理透传 (放行真实物理定位)") },
+                        text = { Text("物理透传（放行真实物理定位）") },
                         onClick = {
                             onModeChange(TargetMockMode.REAL_PASSTHROUGH)
                             showModeMenu = false

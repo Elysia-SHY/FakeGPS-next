@@ -41,7 +41,9 @@ import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.ScreenInsets
+import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
@@ -80,6 +82,7 @@ fun LocationControlPanel(
     onSelectSavedRoute: (Route) -> Unit
 ) {
     val context = LocalContext.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     // 初始状态恒为「完全收起」—— 不读任何持久化存储、也不沿用上一次的选择。
     // 于是「首次安装 / 冷启动 / 从其它页面切回定位页」三条路径都从收起开始，先给用户一张完整地图。
     // 旧实现把用户选择写进 SharedPreferences 并在每次进入页面时读回来当初始值：
@@ -127,7 +130,7 @@ fun LocationControlPanel(
     val fullAddress = address.ifBlank { "已选定目标坐标" }
     var addressExpanded by remember(fullAddress) { mutableStateOf(false) }
 
-    Surface(
+    Box(
         modifier = modifier
             .widthIn(max = 560.dp)
             .fillMaxWidth()
@@ -138,13 +141,13 @@ fun LocationControlPanel(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessMediumLow
                 )
-            ),
-        shape = AppShapes.sheet,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 4.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            )
+            .liquidGlass(
+                isLiquidGlass = isLiquidGlass,
+                shape = AppShapes.sheet,
+                elevation = if (isLiquidGlass) 20.dp else 8.dp,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            )
     ) {
         Column {
         // 1. Drag Handle Pill (支持点击快速在 COLLAPSED / DEFAULT / EXPANDED 间循环切换)
@@ -368,34 +371,33 @@ fun LocationControlPanel(
                 }
             } else {
                 // Global Mode: Search Bar + Master Action Capsule Pill
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(dragGestureModifier),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 搜索框统一走 M3 OutlinedTextField 封装
-                    Box(modifier = Modifier.weight(1f)) {
-                        MapSearchField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
-                            placeholder = "搜索地点",
-                            onClear = onClearSearch,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    MapSearchField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = "搜索地点",
+                        onClear = onClearSearch,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
                     if (isMockActive) {
                         // Dual Capsule when active: [ 移动到此 ] & [ 停止定位 ]
                         Row(
-                            modifier = Modifier.height(52.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Button(
                                 onClick = onStartMock,
                                 modifier = Modifier
+                                    .weight(1f)
                                     .height(52.dp)
                                     .widthIn(min = 88.dp),
                                 shape = MaterialTheme.shapes.large,
@@ -427,6 +429,7 @@ fun LocationControlPanel(
                             FilledTonalButton(
                                 onClick = onStopMock,
                                 modifier = Modifier
+                                    .weight(1f)
                                     .height(52.dp),
                                 shape = MaterialTheme.shapes.large,
                                 colors = ButtonDefaults.filledTonalButtonColors(
@@ -458,6 +461,7 @@ fun LocationControlPanel(
                         Button(
                             onClick = onStartMock,
                             modifier = Modifier
+                                .fillMaxWidth()
                                 .height(52.dp),
                             shape = MaterialTheme.shapes.large,
                             colors = ButtonDefaults.buttonColors(
@@ -749,7 +753,7 @@ fun LocationControlPanel(
                             }
                         } else {
                             Text(
-                                text = "⭐ 收藏地点 (${savedLocations.size})",
+                                text = "收藏地点 (${savedLocations.size})",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -784,7 +788,7 @@ fun LocationControlPanel(
 
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = "🧭 收藏路线 (${savedTracks.size})",
+                                text = "收藏路线 (${savedTracks.size})",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface

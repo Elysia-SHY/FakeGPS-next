@@ -11,13 +11,13 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mockrun.app.ui.components.AndroidFloatingBottomBar
@@ -29,14 +29,17 @@ import com.mockrun.app.feature.map.MapScreen
 import com.mockrun.app.feature.map.MapTab
 import com.mockrun.app.feature.route.RouteLibraryScreen
 import com.mockrun.app.core.designsystem.AppAppearancePreferences
+import com.mockrun.app.core.designsystem.AppBackground
 import com.mockrun.app.core.designsystem.BackgroundThemeManager
+import com.mockrun.app.core.designsystem.GlassCapabilities
+import com.mockrun.app.core.designsystem.LocalGlassBackdrop
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.ui.viewmodel.MapViewModel
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
 import com.mockrun.app.core.data.repository.VersionSyncManager
 import com.mockrun.app.core.data.repository.VersionSyncStatus
-import kotlinx.coroutines.launch
-import kotlin.math.abs
-import kotlin.math.roundToInt
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Location : Screen("location", "定位", Icons.Default.Place)
@@ -59,9 +62,15 @@ fun AppNavigation(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
-    val coroutineScope = rememberCoroutineScope()
 
-    val dynamicColorEnabled by AppAppearancePreferences.dynamicColorEnabled
+    val liquidGlassRequested by AppAppearancePreferences.liquidGlassEnabled
+    val liquidGlassEnabled = liquidGlassRequested && GlassCapabilities.supportsBackdropBlur
+    val chromeBackdrop = if (liquidGlassEnabled) {
+        rememberLayerBackdrop(captureHeightFraction = 0.20f)
+    } else {
+        null
+    }
+    val atlasBackdrop = if (liquidGlassEnabled) rememberLayerBackdrop() else null
 
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomBarPadding = navBarBottom + 94.dp
@@ -75,8 +84,8 @@ fun AppNavigation(
         )
     }
 
-    // Unified interactive tab position: 0.0f .. 3.0f
-    val tabPosition = remember { Animatable(0f) }
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    val saveableStateHolder = rememberSaveableStateHolder()
     var showLibrarySubScreen by remember { mutableStateOf(false) }
 
     val updateStatus by VersionSyncManager.status
@@ -88,91 +97,116 @@ fun AppNavigation(
     }
 
     // Android back handler
-    BackHandler(enabled = showLibrarySubScreen || tabPosition.value.roundToInt() != 0) {
+    BackHandler(enabled = showLibrarySubScreen || selectedTabIndex != 0) {
         if (showLibrarySubScreen) {
             showLibrarySubScreen = false
         } else {
-            coroutineScope.launch {
-                tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
-            }
+            selectedTabIndex = 0
         }
     }
 
+    CompositionLocalProvider(
+        LocalLiquidGlassEnabled provides liquidGlassEnabled,
+        LocalGlassBackdrop provides chromeBackdrop
+    ) {
     Box(modifier = Modifier.fillMaxSize()) {
-            // Main Sliding Multi-Screen View (Driven by tabPosition in real-time)
-            //
-            // Keep placement-stage offsets so the map AndroidView and hit testing stay
-            // synchronized with the continuously dragged tab position.
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val density = LocalDensity.current
-                val widthPx = with(density) { maxWidth.toPx() }
-
-                // Page 0: MapScreen (Handles Tab 0: 定位 and Tab 1: 路线)
-                val mapTab = if (tabPosition.value < 0.5f) MapTab.LOCATION else MapTab.ROUTE
-                val mapOffsetFraction = if (tabPosition.value <= 1.0f) 0f else (1.0f - tabPosition.value)
-                if (tabPosition.value < 2.05f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .offset {
-                                IntOffset((mapOffsetFraction * widthPx).roundToInt(), 0)
-                            }
-                    ) {
-                        MapScreen(
-                            mapViewModel = mapViewModel,
-                            simulationViewModel = simulationViewModel,
-                            initialTab = mapTab,
-                            isTablet = isTablet,
-                            bottomBarPadding = bottomBarPadding,
-                            onNavigateToLibrary = { showLibrarySubScreen = true }
-                        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (chromeBackdrop != null) {
+                        Modifier.layerBackdrop(chromeBackdrop)
+                    } else {
+                        Modifier
                     }
-                }
-
-                // Page 1: LocationMockScreen (Tab 2: 功能)
-                val featuresOffsetFraction = 2.0f - tabPosition.value
-                if (tabPosition.value in 0.95f..3.05f) {
+                )
+        ) {
+            val sharedAtlasBackdrop = atlasBackdrop
+            if (sharedAtlasBackdrop != null) {
+                AnimatedVisibility(
+                    visible = selectedTabIndex >= 2,
+                    enter = fadeIn(tween(240, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(tween(180, easing = FastOutSlowInEasing)),
+                    label = "sharedAtlasBackground"
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .offset {
-                                IntOffset((featuresOffsetFraction * widthPx).roundToInt(), 0)
-                            }
+                            .layerBackdrop(sharedAtlasBackdrop)
                     ) {
-                        LocationMockScreen(
-                            simulationViewModel = simulationViewModel,
-                            onNavigateToMap = {
-                                coroutineScope.launch {
-                                    tabPosition.animateTo(0f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Page 2: AboutScreen (Tab 3: 关于)
-                val aboutOffsetFraction = 3.0f - tabPosition.value
-                if (tabPosition.value > 1.95f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .offset {
-                                IntOffset((aboutOffsetFraction * widthPx).roundToInt(), 0)
-                            }
-                    ) {
-                        AboutScreen(
-                            dynamicColor = dynamicColorEnabled,
-                            isTablet = isTablet,
-                            onToggleDynamicColor = {
-                                AppAppearancePreferences.setDynamicColorEnabled(context, it)
-                            },
-                            onNavigateToLibrary = { showLibrarySubScreen = true }
-                        )
+                        AppBackground()
                     }
                 }
             }
+
+            // The four tabs crossfade in place. The MapScreen is shared by
+            // Location and Route so a tab switch never creates a second map
+            // instance or a full-screen backdrop capture.
+            AnimatedContent(
+                targetState = selectedTabIndex,
+                contentKey = { tab ->
+                    if (tab <= 1) "map" else "tab$tab"
+                },
+                transitionSpec = {
+                    (
+                        fadeIn(tween(240, easing = FastOutSlowInEasing)) +
+                            scaleIn(
+                                initialScale = 0.985f,
+                                animationSpec = tween(240, easing = FastOutSlowInEasing)
+                            )
+                        ).togetherWith(
+                        fadeOut(tween(180, easing = FastOutSlowInEasing)) +
+                            scaleOut(
+                                targetScale = 1.01f,
+                                animationSpec = tween(180, easing = FastOutSlowInEasing)
+                            )
+                    )
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "mainTabTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { tabIndex ->
+                val stateKey = if (tabIndex <= 1) "map" else "tab$tabIndex"
+                saveableStateHolder.SaveableStateProvider(stateKey) {
+                    when (tabIndex) {
+                        0, 1 -> {
+                            val mapTab = if (tabIndex == 0) MapTab.LOCATION else MapTab.ROUTE
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                MapScreen(
+                                    mapViewModel = mapViewModel,
+                                    simulationViewModel = simulationViewModel,
+                                    initialTab = mapTab,
+                                    isTablet = isTablet,
+                                    bottomBarPadding = bottomBarPadding,
+                                    onNavigateToLibrary = { showLibrarySubScreen = true }
+                                )
+                            }
+                        }
+
+                        2 -> {
+                            LocationMockScreen(
+                                simulationViewModel = simulationViewModel,
+                                onNavigateToMap = { selectedTabIndex = 0 },
+                                sharedGlassBackdrop = atlasBackdrop
+                            )
+                        }
+
+                        else -> {
+                            AboutScreen(
+                                isLiquidGlass = liquidGlassEnabled,
+                                supportsLiquidGlass = GlassCapabilities.supportsBackdropBlur,
+                                isTablet = isTablet,
+                                onToggleLiquidGlass = {
+                                    AppAppearancePreferences.setLiquidGlassEnabled(context, it)
+                                },
+                                onNavigateToLibrary = { showLibrarySubScreen = true },
+                                sharedGlassBackdrop = atlasBackdrop
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
             // Sub-screen overlay: Route Library
             AnimatedVisibility(
@@ -184,9 +218,7 @@ fun AppNavigation(
                     mapViewModel = mapViewModel,
                     onRouteSelected = {
                         showLibrarySubScreen = false
-                        coroutineScope.launch {
-                            tabPosition.animateTo(1f, spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
-                        }
+                        selectedTabIndex = 1
                     }
                 )
             }
@@ -197,29 +229,9 @@ fun AppNavigation(
                 AndroidFloatingBottomBar(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     tabs = navigationTabs,
-                    currentPosition = tabPosition.value,
-                    onDragDelta = { delta ->
-                        coroutineScope.launch {
-                            val next = (tabPosition.value + delta).coerceIn(0f, (navigationTabs.size - 1).toFloat())
-                            tabPosition.snapTo(next)
-                        }
-                    },
-                    onDragEnd = {
-                        val target = tabPosition.value.roundToInt().coerceIn(0, navigationTabs.size - 1)
-                        coroutineScope.launch {
-                            tabPosition.animateTo(
-                                targetValue = target.toFloat(),
-                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
-                            )
-                        }
-                    },
+                    currentPosition = selectedTabIndex.toFloat(),
                     onTabSelected = { targetIndex ->
-                        coroutineScope.launch {
-                            tabPosition.animateTo(
-                                targetValue = targetIndex.toFloat(),
-                                animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)
-                            )
-                        }
+                        selectedTabIndex = targetIndex
                     }
                 )
             }
@@ -243,5 +255,6 @@ fun AppNavigation(
                     onDismiss = { VersionSyncManager.dismissUpdatePrompt() }
                 )
             }
+    }
     }
 }

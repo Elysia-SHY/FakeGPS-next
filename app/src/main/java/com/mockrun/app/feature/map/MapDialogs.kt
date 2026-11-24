@@ -46,7 +46,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -68,6 +69,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AtlasSurface
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.location.RoadMode
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.WayPoint
@@ -157,6 +162,7 @@ fun SearchLocationDialog(
     onSetAsDestination: (Double, Double) -> Unit,
     onDirectMock: (Double, Double) -> Unit
 ) {
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     val searchQuery by mapViewModel.searchQuery.collectAsState()
     val searchResults by mapViewModel.searchResults.collectAsState()
     val isSearching by mapViewModel.isSearching.collectAsState()
@@ -168,17 +174,26 @@ fun SearchLocationDialog(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.extraLarge
+        containerColor = Color.Transparent,
+        shape = AppShapes.sheet,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.38f)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        AtlasSurface(
+            modifier = Modifier.fillMaxWidth(),
+            isLiquidGlass = isLiquidGlass,
+            shape = AppShapes.sheet,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            elevation = if (isLiquidGlass) 22.dp else 8.dp
         ) {
+            GlassDialogWindowEffect(isLiquidGlass)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
             SheetHeader(
                 title = "搜索地点与经纬度",
                 subtitle = "支持地名 / POI 关键词，也可直接粘贴经纬度",
@@ -186,7 +201,7 @@ fun SearchLocationDialog(
             )
 
             // Search Input Field
-            OutlinedTextField(
+            TextField(
                 value = textInput,
                 onValueChange = {
                     textInput = it
@@ -201,7 +216,16 @@ fun SearchLocationDialog(
                 },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                shape = MaterialTheme.shapes.extraSmall,
+                shape = AppShapes.panel,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                ),
                 trailingIcon = {
                     if (textInput.isNotEmpty()) {
                         IconButton(
@@ -373,6 +397,7 @@ fun SearchLocationDialog(
             }
 
             Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
@@ -389,6 +414,7 @@ fun RoadRouteDialog(
     onNavigateToOrigin: (Double, Double) -> Unit
 ) {
     val context = LocalContext.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     val roadOrigin by mapViewModel.roadOrigin.collectAsState()
     val roadDestination by mapViewModel.roadDestination.collectAsState()
     val roadMode by mapViewModel.roadMode.collectAsState()
@@ -411,18 +437,27 @@ fun RoadRouteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.extraLarge
+        containerColor = Color.Transparent,
+        shape = AppShapes.sheet,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.38f)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        AtlasSurface(
+            modifier = Modifier.fillMaxWidth(),
+            isLiquidGlass = isLiquidGlass,
+            shape = AppShapes.sheet,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            elevation = if (isLiquidGlass) 22.dp else 8.dp
         ) {
+            GlassDialogWindowEffect(isLiquidGlass)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
             SheetHeader(
                 title = "真实道路路线规划",
                 subtitle = "基于真实道路网拓扑，沿车道与街道折线生成模拟轨迹",
@@ -768,6 +803,7 @@ fun RoadRouteDialog(
             }
 
             Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }

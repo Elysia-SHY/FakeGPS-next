@@ -213,7 +213,7 @@ object IosColors {
     val SystemGreen: Color
         @Composable
         @ReadOnlyComposable
-        get() = AppSemanticColors.current.success
+        get() = MaterialTheme.colorScheme.primary
 
     val SystemRed: Color
         @Composable
@@ -223,22 +223,22 @@ object IosColors {
     val SystemOrange: Color
         @Composable
         @ReadOnlyComposable
-        get() = AppSemanticColors.current.warning
+        get() = MaterialTheme.colorScheme.onSurfaceVariant
 
     val SystemYellow: Color
         @Composable
         @ReadOnlyComposable
-        get() = AppSemanticColors.current.warning
+        get() = MaterialTheme.colorScheme.onSurfaceVariant
 
     val SystemPurple: Color
         @Composable
         @ReadOnlyComposable
-        get() = MaterialTheme.colorScheme.tertiary
+        get() = MaterialTheme.colorScheme.onSurfaceVariant
 
     val SystemTeal: Color
         @Composable
         @ReadOnlyComposable
-        get() = MaterialTheme.colorScheme.secondary
+        get() = MaterialTheme.colorScheme.primary
 
     val SystemIndigo: Color
         @Composable
@@ -248,17 +248,17 @@ object IosColors {
     val SystemPink: Color
         @Composable
         @ReadOnlyComposable
-        get() = MaterialTheme.colorScheme.tertiary
+        get() = MaterialTheme.colorScheme.onSurfaceVariant
 
     val SystemMint: Color
         @Composable
         @ReadOnlyComposable
-        get() = AppSemanticColors.current.success
+        get() = MaterialTheme.colorScheme.primary
 
     val SystemCyan: Color
         @Composable
         @ReadOnlyComposable
-        get() = MaterialTheme.colorScheme.secondary
+        get() = MaterialTheme.colorScheme.primary
 
     val BrandPress: Color
         @Composable
@@ -273,7 +273,7 @@ object IosColors {
     val Violet: Color
         @Composable
         @ReadOnlyComposable
-        get() = MaterialTheme.colorScheme.tertiary
+        get() = MaterialTheme.colorScheme.onSurfaceVariant
 
     val SystemGray: Color
         @Composable
@@ -437,13 +437,13 @@ object IosColors {
 }
 
 val IosBlue = BrandSeed
-val IosGreen = Color(0xFF30D158)
+val IosGreen = Color(0xFF0B7376)
 val IosRed = Color(0xFFFF453A)
-val IosOrange = Color(0xFFFF9F0A)
-val IosYellow = Color(0xFFFFD60A)
-val IosPurple = Color(0xFF7C4DFF)
-val IosTeal = Color(0xFF64D2FF)
-val IosIndigo = Color(0xFF5E5CE6)
+val IosOrange = Color(0xFF6B6E71)
+val IosYellow = Color(0xFF6B6E71)
+val IosPurple = Color(0xFF6B6E71)
+val IosTeal = Color(0xFF0B7376)
+val IosIndigo = Color(0xFF0B7376)
 val IosGray = Color(0xFF8E8E93)
 val IosGray2 = Color(0xFFAEAEB2)
 val IosGray3 = Color(0xFFC7C7CC)
@@ -510,20 +510,20 @@ val IosText3Dark = DesignTokens.T3
 object IosSemanticColors {
     val Danger = Color(0xFFFFB4AB)
     val DangerLight = Color(0xFFBA1A1A)
-    val DangerContainer = Color(0xFF93000A)
-    val DangerContainerLight = Color(0xFFFFDAD6)
-    val Warning = Color(0xFFFFB95C)
-    val WarningLight = Color(0xFF8A5100)
-    val WarningContainer = Color(0xFF6B3A00)
-    val WarningContainerLight = Color(0xFFFFDDB8)
-    val Success = Color(0xFF7DDA95)
-    val SuccessLight = Color(0xFF146C2E)
-    val SuccessContainer = Color(0xFF005322)
-    val SuccessContainerLight = Color(0xFFA6F4B8)
-    val Info = Color(0xFFADC6FF)
-    val InfoLight = Color(0xFF005AC1)
-    val InfoContainer = Color(0xFF004494)
-    val InfoContainerLight = Color(0xFFD8E2FF)
+    val DangerContainer = Color(0xFF5A1718)
+    val DangerContainerLight = Color(0xFFFBEAEA)
+    val Warning = Color(0xFFB8BABC)
+    val WarningLight = Color(0xFF6B6E71)
+    val WarningContainer = Color(0xFF303234)
+    val WarningContainerLight = Color(0xFFF2F3F4)
+    val Success = Color(0xFF69D3D5)
+    val SuccessLight = Color(0xFF0B7376)
+    val SuccessContainer = Color(0xFF303234)
+    val SuccessContainerLight = Color(0xFFF2F3F4)
+    val Info = Color(0xFF69D3D5)
+    val InfoLight = Color(0xFF0B7376)
+    val InfoContainer = Color(0xFF303234)
+    val InfoContainerLight = Color(0xFFF2F3F4)
 }
 
 data class IosSemanticPalette(

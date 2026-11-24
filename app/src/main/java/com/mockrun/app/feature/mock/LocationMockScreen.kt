@@ -29,13 +29,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mockrun.app.BuildConfig
 import com.mockrun.app.hook.HookStateBridge
 import com.mockrun.app.hook.XposedStatusHelper
@@ -59,12 +60,14 @@ import com.mockrun.app.core.location.fingerprint.FingerprintStore
 import com.mockrun.app.ui.components.AppPickerBottomSheet
 import com.mockrun.app.core.designsystem.*
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import kotlinx.coroutines.launch
 
 @Composable
 fun LocationMockScreen(
     simulationViewModel: SimulationViewModel,
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: () -> Unit,
+    sharedGlassBackdrop: LayerBackdrop? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -274,15 +277,15 @@ fun LocationMockScreen(
 
     var showHelpSheet by remember { mutableStateOf(false) }
     var showWeChatGuideSheet by remember { mutableStateOf(false) }
+    var showTroubleshootHint by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.TopCenter
+    AtlasGlassPage(
+        modifier = Modifier.fillMaxSize(),
+        sharedBackdrop = sharedGlassBackdrop
     ) {
         Column(
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .widthIn(max = 680.dp)
                 .fillMaxSize()
                 .statusBarsPadding()
@@ -300,50 +303,6 @@ fun LocationMockScreen(
             statusTone = if (isMockOn) Md3Tone.SUCCESS else Md3Tone.NEUTRAL,
             versionText = BuildConfig.VERSION_NAME
         )
-
-        // =====================================================================
-        // 反检测排查入口（原为常显橙渐变警告条，压过主控操作）。
-        //
-        // 现在默认折叠为一行次级入口：日常操作（选点、开关虚拟定位）不再被
-        // 橙色警示抢占视觉重心，遇到「仍显示真实位置」时点开即可看到完整说明。
-        // 功能与文案一字未删，只是默认收起。
-        // =====================================================================
-        var showTroubleshootHint by remember { mutableStateOf(false) }
-
-        Md3InsetCard {
-            Md3SettingRow(
-                title = "微信/打卡软件仍显示真实位置？",
-                subtitle = "Root 一键关闭蓝牙 / Wi‑Fi 与背景扫描，阻止定位反查",
-                icon = Icons.Default.Info,
-                tone = Md3Tone.WARNING,
-                trailingText = if (showTroubleshootHint) "收起" else "排查",
-                showChevron = !showTroubleshootHint,
-                onClick = { showTroubleshootHint = !showTroubleshootHint }
-            )
-
-            AnimatedVisibility(visible = showTroubleshootHint) {
-                Column {
-                    Md3InsetDivider(startIndent = 72.dp)
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            text = "若目标应用仍读取到真实位置，通常是系统级 Wi‑Fi / 蓝牙背景扫描" +
-                                "仍在回传真实周边环境。可在下方「系统防护与保活状态」中开启 " +
-                                "Root 注入模式，由系统底层关闭扫描并分发虚拟坐标。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Md3PrimaryActionButton(
-                            text = "查看完整排查指南",
-                            containerColor = AppSemanticColors.current.warningContainer,
-                            contentColor = AppSemanticColors.current.onWarningContainer,
-                            icon = Icons.Default.Build,
-                            onClick = { showWeChatGuideSheet = true }
-                        )
-                    }
-                }
-            }
-        }
 
         // =====================================================================
         // 2. Target Location & Primary Master Controller
@@ -377,7 +336,9 @@ fun LocationMockScreen(
                     Text(
                         text = currentAddress,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
@@ -452,50 +413,88 @@ fun LocationMockScreen(
                 )
             }
 
-            Md3InsetDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AtlasQuickAction(
+                    title = "地图选点",
+                    subtitle = "拖动地图精准定位",
+                    icon = Icons.Default.LocationOn,
+                    onClick = onNavigateToMap,
+                    modifier = Modifier.weight(1f)
+                )
+                AtlasQuickAction(
+                    title = "回到真机",
+                    subtitle = "复位物理位置",
+                    icon = Icons.Default.MyLocation,
+                    onClick = {
+                        if (isPointMockActive) {
+                            simulationViewModel.stopPointMock(context)
+                        }
+                        simulationViewModel.stopSimulation(context)
+                        CoordinateConverter.clearSavedRealLocation(context)
+                        com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
+                        CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
+                            realLocationCoord = freshLat to freshLon
+                            simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
+                        }
+                        val real = CoordinateConverter.getRealDeviceLocation(context) ?: realLocationCoord
+                        if (real != null) {
+                            realLocationCoord = real
+                            simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
+                            simulationViewModel.updateSelectedTarget(real.first, real.second)
+                            Toast.makeText(context, "已重置为真实位置，正在地图中呈现", Toast.LENGTH_SHORT).show()
+                            onNavigateToMap()
+                        } else {
+                            Toast.makeText(context, "未能获取到真机定位，请检查系统定位权限", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
 
-            // Map Picker Row
+        AtlasGlassGroup(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
             Md3SettingRow(
-                title = "地图精准选点",
-                subtitle = "在交互式底图上任意点选或手绘连线",
-                icon = Icons.Default.LocationOn,
-                tone = Md3Tone.PRIMARY,
-                showChevron = true,
-                onClick = onNavigateToMap
+                title = "仍显示真实位置？",
+                subtitle = "检查 Root 注入与 Wi-Fi / 蓝牙背景扫描",
+                icon = Icons.Default.Info,
+                tone = Md3Tone.WARNING,
+                trailingText = if (showTroubleshootHint) "收起" else "排查",
+                showChevron = !showTroubleshootHint,
+                onClick = { showTroubleshootHint = !showTroubleshootHint }
             )
 
-            Md3InsetDivider(startIndent = 72.dp)
-
-            // Reset to Real Physical Location Row
-            Md3SettingRow(
-                title = "重置为真机物理位置",
-                subtitle = "复位并跳转至地图显示当前真实 GPS 定位",
-                icon = Icons.Default.Refresh,
-                tone = Md3Tone.PRIMARY,
-                showChevron = true,
-                onClick = {
-                    if (isPointMockActive) {
-                        simulationViewModel.stopPointMock(context)
-                    }
-                    simulationViewModel.stopSimulation(context)
-                    CoordinateConverter.clearSavedRealLocation(context)
-                    com.mockrun.app.core.location.MockLocationEngine.forceCleanAllTestProviders(context)
-                    CoordinateConverter.requestFreshLocation(context) { freshLat, freshLon ->
-                        realLocationCoord = freshLat to freshLon
-                        simulationViewModel.updateRealPhysicalLocation(freshLat, freshLon)
-                    }
-                    val real = CoordinateConverter.getRealDeviceLocation(context) ?: realLocationCoord
-                    if (real != null) {
-                        realLocationCoord = real
-                        simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
-                        simulationViewModel.updateSelectedTarget(real.first, real.second)
-                        Toast.makeText(context, "已重置为真实位置，正在地图中呈现", Toast.LENGTH_SHORT).show()
-                        onNavigateToMap()
-                    } else {
-                        Toast.makeText(context, "未能获取到真机定位，请检查系统定位权限", Toast.LENGTH_SHORT).show()
+            AnimatedVisibility(visible = showTroubleshootHint) {
+                Column {
+                    Md3InsetDivider(startIndent = 72.dp)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            text = "若目标应用仍读取到真实位置，通常是系统级 Wi-Fi / 蓝牙背景扫描" +
+                                "仍在回传真实周边环境。可在下方「系统防护与保活状态」中开启 " +
+                                "Root 注入模式，由系统底层关闭扫描并分发虚拟坐标。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Md3PrimaryActionButton(
+                            text = "查看完整排查指南",
+                            containerColor = AppSemanticColors.current.warningContainer,
+                            contentColor = AppSemanticColors.current.onWarningContainer,
+                            icon = Icons.Default.Build,
+                            onClick = { showWeChatGuideSheet = true }
+                        )
                     }
                 }
-            )
+            }
         }
 
         // =====================================================================
@@ -596,7 +595,7 @@ fun LocationMockScreen(
                                 .padding(vertical = 2.dp),
                             shape = MaterialTheme.shapes.medium,
                             color = if (isActiveFp) {
-                                MaterialTheme.colorScheme.primaryContainer
+                                MaterialTheme.colorScheme.surfaceContainerHigh
                             } else {
                                 Color.Transparent
                             }
@@ -1361,6 +1360,61 @@ private fun md3ToneAccent(tone: Md3Tone): Color {
 }
 
 @Composable
+private fun AtlasQuickAction(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AtlasGlassGroup(
+        modifier = modifier
+            .minTouchTarget(minHeight = 80.dp)
+            .clickable(onClick = onClick),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        elevation = 3.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(34.dp),
+                shape = AppShapes.icon,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun Md3PageHeader(
     kicker: String,
     title: String,
@@ -1368,32 +1422,23 @@ private fun Md3PageHeader(
     statusTone: Md3Tone,
     versionText: String
 ) {
-    Column(
+    AtlasPageHeader(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 16.dp, top = 20.dp, bottom = 4.dp)
-    ) {
-        Text(
-            text = kicker,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Md3StatusBadge(text = statusText, tone = statusTone)
+            .padding(start = 20.dp, end = 16.dp, top = 24.dp, bottom = 4.dp),
+        title = title,
+        description = kicker,
+        status = statusText,
+        statusTone = when (statusTone) {
+            Md3Tone.SUCCESS -> AtlasStatusTone.ACTIVE
+            Md3Tone.WARNING -> AtlasStatusTone.WARNING
+            Md3Tone.ERROR -> AtlasStatusTone.DANGER
+            else -> AtlasStatusTone.NEUTRAL
+        },
+        trailing = {
             Md3VersionChip(text = versionText)
         }
-    }
+    )
 }
 
 @Composable
@@ -1403,9 +1448,9 @@ private fun Md3SectionHeader(
 ) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 2.dp)
     )
 }
 
@@ -1427,7 +1472,7 @@ private fun Md3GroupHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f)
         )
         if (count != null) {
@@ -1469,16 +1514,11 @@ private fun Md3InsetCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    OutlinedCard(
+    AtlasGlassGroup(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(content = content)
     }
@@ -1502,30 +1542,16 @@ private fun Md3StatusBadge(
     tone: Md3Tone,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = md3ToneContainer(tone)
-    val contentColor = md3ToneContent(tone)
-    Surface(
+    AtlasStatusPill(
         modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = containerColor,
-        contentColor = contentColor
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(8.dp),
-                shape = CircleShape,
-                color = md3ToneAccent(tone)
-            ) {}
-            Spacer(Modifier.width(7.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium
-            )
+        text = text,
+        tone = when (tone) {
+            Md3Tone.SUCCESS -> AtlasStatusTone.ACTIVE
+            Md3Tone.WARNING -> AtlasStatusTone.WARNING
+            Md3Tone.ERROR -> AtlasStatusTone.DANGER
+            else -> AtlasStatusTone.NEUTRAL
         }
-    }
+    )
 }
 
 @Composable
@@ -1536,8 +1562,8 @@ private fun Md3VersionChip(
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ) {
         Text(
             text = text,
@@ -1573,8 +1599,8 @@ private fun Md3SettingRow(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
             Surface(
-                modifier = Modifier.size(40.dp),
-                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.size(42.dp),
+                shape = AppShapes.panel,
                 color = md3ToneContainer(tone)
             ) {
                 Box(
@@ -1585,7 +1611,7 @@ private fun Md3SettingRow(
                         imageVector = icon,
                         contentDescription = null,
                         tint = md3ToneContent(tone),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(21.dp)
                     )
                 }
             }
@@ -1593,7 +1619,7 @@ private fun Md3SettingRow(
         headlineContent = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
         },
@@ -1661,7 +1687,11 @@ private fun Md3PrimaryActionButton(
             .fillMaxWidth()
             .heightIn(min = 48.dp),
         enabled = clickable,
-        shape = MaterialTheme.shapes.small,
+        shape = AppShapes.button,
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = if (enabled && !loading) 2.dp else 0.dp,
+            pressedElevation = 0.dp
+        ),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor
@@ -1702,7 +1732,7 @@ private fun Md3OutlinedActionButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp),
-        shape = MaterialTheme.shapes.small,
+        shape = AppShapes.button,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

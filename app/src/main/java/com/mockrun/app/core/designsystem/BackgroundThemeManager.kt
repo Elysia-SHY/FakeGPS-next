@@ -7,10 +7,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -126,11 +129,7 @@ object BackgroundThemeManager {
  * A custom photo receives a strong surface scrim so foreground text keeps AA contrast.
  */
 @Composable
-@Suppress("UNUSED_PARAMETER")
-fun AppBackground(
-    modifier: Modifier = Modifier,
-    hazeState: dev.chrisbanes.haze.HazeState? = null
-) {
+fun AppBackground(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val isCustom by BackgroundThemeManager.hasCustomWallpaper
@@ -177,19 +176,54 @@ fun AppBackground(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+        }
+        if (customBitmap != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                scheme.surface.copy(alpha = 0.90f),
-                                scheme.surface.copy(alpha = 0.78f),
-                                scheme.surface.copy(alpha = 0.84f)
+                                scheme.surface.copy(alpha = 0.82f),
+                                scheme.surface.copy(alpha = 0.68f),
+                                scheme.surface.copy(alpha = 0.80f)
                             )
                         )
                     )
             )
         }
+        AtlasAmbientLight(Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun AtlasAmbientLight(modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val isDark = LocalIsDarkTheme.current
+    Canvas(modifier = modifier) {
+        val accentAlpha = if (isDark) 0.12f else 0.075f
+        val neutralAlpha = if (isDark) 0.055f else 0.05f
+
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    scheme.primary.copy(alpha = accentAlpha),
+                    Color.Transparent,
+                    scheme.onSurface.copy(alpha = neutralAlpha)
+                ),
+                start = Offset(size.width * 0.92f, 0f),
+                end = Offset(size.width * 0.08f, size.height)
+            )
+        )
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    scheme.surfaceContainerHighest.copy(alpha = neutralAlpha),
+                    Color.Transparent
+                ),
+                center = Offset(size.width * 0.08f, size.height * 0.72f),
+                radius = size.maxDimension * 0.72f
+            )
+        )
     }
 }

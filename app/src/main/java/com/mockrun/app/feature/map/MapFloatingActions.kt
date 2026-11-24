@@ -2,18 +2,22 @@ package com.mockrun.app.feature.map
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.rounded.CenterFocusStrong
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.mockrun.app.core.designsystem.AtlasSurface
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.CoordinateConverter
 import com.mockrun.app.ui.viewmodel.SimulationViewModel
@@ -34,6 +38,7 @@ fun MapFloatingActions(
     modifier: Modifier = Modifier,
     onResetToRealLocation: (Pair<Double, Double>) -> Unit
 ) {
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     // 定位由父级 Column 统一控制（设计稿：与缩放控件同列，去除 bottom 225dp 魔法数字）。
     // 原 bottomBarPadding 参数在此处从未被使用（只是被 @Suppress 吞掉的死参数），
     // 已删除 —— 底部安全区改由 ScreenInsets 在各面板内部统一推导。
@@ -44,8 +49,16 @@ fun MapFloatingActions(
     ) {
         // Route Fit Bounds FAB (only in ROUTE mode when waypoints >= 2)
         if (activeMapTab == MapTab.ROUTE && drawnWaypoints.size >= 2) {
-            FilledTonalIconButton(
-                onClick = {
+            AtlasSurface(
+                isLiquidGlass = isLiquidGlass,
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                elevation = if (isLiquidGlass) 14.dp else 5.dp,
+                modifier = Modifier
+                    .size(54.dp)
+                    .semantics { contentDescription = "全览路线" }
+                    .clickable {
                     val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                     val points = drawnWaypoints.map { wp ->
                         if (isGcj) CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude) else (wp.latitude to wp.longitude)
@@ -56,22 +69,33 @@ fun MapFloatingActions(
                     val maxLon = points.maxOf { it.second }
                     val box = org.osmdroid.util.BoundingBox(maxLat + 0.002, maxLon + 0.002, minLat - 0.002, minLon - 0.002)
                     mapViewRef?.zoomToBoundingBox(box, true, 80)
-                },
-                modifier = Modifier.size(54.dp),
-                shape = CircleShape
+                    }
             ) {
-                Icon(
-                    Icons.Rounded.CenterFocusStrong,
-                    contentDescription = "全览路线",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.CenterFocusStrong,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
 
         // Locate to Real Physical Location FAB —— 设计稿 .locate-btn 54dp 圆
-        FilledTonalIconButton(
-            onClick = {
+        AtlasSurface(
+            isLiquidGlass = isLiquidGlass,
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            elevation = if (isLiquidGlass) 14.dp else 5.dp,
+            modifier = Modifier
+                .size(54.dp)
+                .semantics { contentDescription = "真机物理定位" }
+                .clickable {
                 if (isPointMockActive) simulationViewModel.stopPointMock(context)
                 if (simState.status is com.mockrun.app.domain.model.SimulationStatus.Running) simulationViewModel.stopSimulation(context)
                 CoordinateConverter.clearSavedRealLocation(context)
@@ -105,16 +129,19 @@ fun MapFloatingActions(
                     }
                 }
                 Toast.makeText(context, "已复位至真机物理位置", Toast.LENGTH_SHORT).show()
-            },
-            modifier = Modifier.size(54.dp),
-            shape = CircleShape
+                }
         ) {
-            Icon(
-                Icons.Default.MyLocation,
-                contentDescription = "真机物理定位",
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.MyLocation,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,7 +35,9 @@ import com.mockrun.app.domain.model.SimulationStatus
 import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.ScreenInsets
+import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
@@ -54,35 +60,77 @@ private fun RouteStageIndicator(
     modifier: Modifier = Modifier
 ) {
     val steps = listOf(
-        RouteStage.SELECTING to "① 选点",
-        RouteStage.READY to "② 就绪",
-        RouteStage.RUNNING to "③ 巡航"
+        RouteStage.SELECTING to "选点",
+        RouteStage.READY to "就绪",
+        RouteStage.RUNNING to "巡航"
     )
+    val currentIndex = steps.indexOfFirst { it.first == stage }
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = modifier
+            .semantics {
+                contentDescription = "路线阶段：${steps[currentIndex.coerceAtLeast(0)].second}"
+            },
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        steps.forEach { (step, label) ->
-            val active = step == stage
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = if (active) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                }
+        steps.forEachIndexed { index, (_, label) ->
+            val isCurrent = index == currentIndex
+            val isReached = index <= currentIndex
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                isCurrent -> MaterialTheme.colorScheme.primary
+                                isReached -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceContainerHighest
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            isCurrent -> MaterialTheme.colorScheme.onPrimary
+                            isReached -> MaterialTheme.colorScheme.onPrimaryContainer
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isReached) {
+                        MaterialTheme.colorScheme.onSurface
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (index != steps.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 11.dp)
+                        .width(26.dp)
+                        .height(2.dp)
+                        .background(
+                            if (index < currentIndex) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.68f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        )
                 )
             }
         }
@@ -123,6 +171,173 @@ private fun RouteMetric(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WaypointWorkspace(
+    waypoints: List<WayPoint>,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = AppShapes.panel,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        if (waypoints.isEmpty()) {
+            Row(
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    Icons.Default.AddLocationAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp)
+                )
+                Text(
+                    text = "点击地图放置起点，或从上方搜索地点",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 13.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                WaypointEndpoint(
+                    label = "起点",
+                    waypoint = waypoints.first(),
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .width(28.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+                WaypointEndpoint(
+                    label = if (waypoints.size == 1) "等待终点" else "当前终点",
+                    waypoint = waypoints.last(),
+                    modifier = Modifier.weight(1f)
+                )
+                if (waypoints.size > 2) {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = AppShapes.pill,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Text(
+                            text = "+${waypoints.size - 2}",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WaypointEndpoint(
+    label: String,
+    waypoint: WayPoint,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = "${"%.4f".format(waypoint.latitude)}, ${"%.4f".format(waypoint.longitude)}",
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun RouteSelectionActions(
+    waypointCount: Int,
+    stacked: Boolean,
+    onAddWaypoint: () -> Unit,
+    onFinishSelecting: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val addButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+        Button(
+            onClick = onAddWaypoint,
+            modifier = buttonModifier.height(48.dp),
+            shape = AppShapes.button,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (waypointCount == 0) "添加起点" else "添加第 ${waypointCount + 1} 点",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
+            )
+        }
+    }
+    val finishButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+        Button(
+            onClick = onFinishSelecting,
+            enabled = waypointCount >= 2,
+            modifier = buttonModifier.height(48.dp),
+            shape = AppShapes.button,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = AppSemanticColors.current.success,
+                contentColor = AppSemanticColors.current.onSuccess,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        ) {
+            Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "完成规划",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
+            )
+        }
+    }
+
+    if (stacked) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            addButton(Modifier.fillMaxWidth())
+            finishButton(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            addButton(Modifier.weight(1.2f))
+            finishButton(Modifier.weight(1f))
         }
     }
 }
@@ -272,26 +487,12 @@ fun RouteBottomPanel(
     onStopSimulation: () -> Unit
 ) {
     val isPaused = simState.status is SimulationStatus.Paused
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val configuration = LocalConfiguration.current
+    val stackActions = configuration.fontScale >= 1.3f || configuration.screenWidthDp < 380
     // 底部安全区统一由 ScreenInsets 推导（系统导航栏 + 底栏 72 + 上下外距 12 + 呼吸 8）。
     // 不再依赖调用方传入的 navBar + 94 硬编码值。
     val bottomInset = ScreenInsets.bottomInset(extra = 8.dp)
-
-    // 仅在巡航运行中且未暂停时启动脉冲动画，避免在选点/就绪阶段每帧空转触发重组
-    val pulseAlpha = if (stage == RouteStage.RUNNING && !isPaused) {
-        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-        val anim by infiniteTransition.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulseAlpha"
-        )
-        anim
-    } else {
-        1.0f
-    }
 
     Column(
         modifier = modifier
@@ -410,15 +611,15 @@ fun RouteBottomPanel(
         // =====================================================================
         // 2. Main Route Control Surface
         // =====================================================================
-        Surface(
+        Box(
             modifier = Modifier
-                .fillMaxWidth(),
-            shape = AppShapes.card,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 4.dp,
-            shadowElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                .fillMaxWidth()
+                .liquidGlass(
+                    isLiquidGlass = isLiquidGlass,
+                    shape = AppShapes.card,
+                    elevation = if (isLiquidGlass) 16.dp else 6.dp,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
         ) {
             Box(modifier = Modifier.padding(14.dp)) {
                 when (stage) {
@@ -436,13 +637,15 @@ fun RouteBottomPanel(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RouteStageIndicator(stage = stage)
+                                RouteStageIndicator(stage = stage, modifier = Modifier.weight(1f))
                                 Text(
                                     text = "${waypoints.size} 个航点",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+
+                            WaypointWorkspace(waypoints = waypoints)
 
                             // 撤销 / 清空：独立一行 + 48dp 触区，与下方主按钮之间隔一条分隔线
                             if (waypoints.isNotEmpty()) {
@@ -459,7 +662,7 @@ fun RouteBottomPanel(
                                         shape = MaterialTheme.shapes.large,
                                         contentPadding = PaddingValues(horizontal = 8.dp)
                                     ) {
-                                        Icon(Icons.Default.Undo, null, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.AutoMirrored.Filled.Undo, null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(5.dp))
                                         Text("撤销上一点", style = MaterialTheme.typography.labelMedium, maxLines = 1)
                                     }
@@ -490,57 +693,12 @@ fun RouteBottomPanel(
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                             }
 
-                            // Main action buttons: +添加路点 与 完成规划
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = onAddWaypoint,
-                                    modifier = Modifier
-                                        .weight(1.2f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                ) {
-                                    Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = if (waypoints.isEmpty()) "添加起点" else "添加第 ${waypoints.size + 1} 点",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                }
-
-                                Button(
-                                    onClick = onFinishSelecting,
-                                    enabled = waypoints.size >= 2,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = AppSemanticColors.current.success,
-                                        contentColor = AppSemanticColors.current.onSuccess,
-                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    )
-                                ) {
-                                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "完成规划",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
+                            RouteSelectionActions(
+                                waypointCount = waypoints.size,
+                                stacked = stackActions,
+                                onAddWaypoint = onAddWaypoint,
+                                onFinishSelecting = onFinishSelecting
+                            )
 
                             // 选点不足 2 点：说明为什么「完成规划」不可用。
                             // 原先只靠按钮禁用表达，用户看不出差在哪一步
@@ -572,7 +730,7 @@ fun RouteBottomPanel(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RouteStageIndicator(stage = stage)
+                                RouteStageIndicator(stage = stage, modifier = Modifier.weight(1f))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     FilledTonalButton(
@@ -593,69 +751,107 @@ fun RouteBottomPanel(
                                 }
                             }
 
+                            WaypointWorkspace(waypoints = waypoints)
+
                             Text(
-                                text = "✅ 路线已就绪 · ${waypoints.size} 折点 · ${"%.1f".format(selectedSpeed)} km/h",
+                                text = "路线已就绪 · ${waypoints.size} 折点 · ${"%.1f".format(selectedSpeed)} km/h",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = onReselect,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    contentPadding = PaddingValues(horizontal = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("重选", style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                                }
-
-                                OutlinedButton(
-                                    onClick = onSaveRoute,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    contentPadding = PaddingValues(horizontal = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.BookmarkAdd, null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("收藏路线", style = MaterialTheme.typography.labelMedium, maxLines = 1)
-                                }
-
+                            if (stackActions) {
                                 Button(
                                     onClick = onStartSimulation,
-                                    // 第三层防护：waypoints 不足 2 个时禁用。
-                                    // 正常情况下 MapScreen 的 routeStage 会先退回 SELECTING，
-                                    // 但这个面板也可能在状态短暂不一致时被渲染 ——
-                                    // 一旦以空航点启动，RouteSimulator 会走 require() 崩溃路径
-                                    // （该异常在无 CoroutineExceptionHandler 的作用域内抛出）。
                                     enabled = waypoints.size >= 2,
                                     modifier = Modifier
-                                        .weight(1.4f)
+                                        .fillMaxWidth()
                                         .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                    shape = AppShapes.button
                                 ) {
                                     Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp))
+                                    Spacer(Modifier.width(6.dp))
                                     Text(
                                         "开启模拟",
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
-                                        maxLines = 1
+                                        maxLines = 2
                                     )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onReselect,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = AppShapes.button
+                                    ) {
+                                        Text("重选", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                    }
+                                    OutlinedButton(
+                                        onClick = onSaveRoute,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = AppShapes.button
+                                    ) {
+                                        Text("收藏路线", style = MaterialTheme.typography.labelMedium, maxLines = 2)
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onReselect,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = AppShapes.button,
+                                        contentPadding = PaddingValues(horizontal = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("重选", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                    }
+                                    OutlinedButton(
+                                        onClick = onSaveRoute,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = AppShapes.button,
+                                        contentPadding = PaddingValues(horizontal = 6.dp)
+                                    ) {
+                                        Icon(Icons.Default.BookmarkAdd, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("收藏路线", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                    }
+                                    Button(
+                                        onClick = onStartSimulation,
+                                        enabled = waypoints.size >= 2,
+                                        modifier = Modifier
+                                            .weight(1.4f)
+                                            .height(48.dp),
+                                        shape = AppShapes.button,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 8.dp)
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            "开启模拟",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
 
@@ -682,7 +878,7 @@ fun RouteBottomPanel(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RouteStageIndicator(stage = stage)
+                                RouteStageIndicator(stage = stage, modifier = Modifier.weight(1f))
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
@@ -690,7 +886,11 @@ fun RouteBottomPanel(
                                             .size(10.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (isPaused) AppSemanticColors.current.warning else AppSemanticColors.current.success.copy(alpha = pulseAlpha)
+                                                if (isPaused) {
+                                                    AppSemanticColors.current.warning
+                                                } else {
+                                                    AppSemanticColors.current.success
+                                                }
                                             )
                                     )
                                     Spacer(Modifier.width(8.dp))

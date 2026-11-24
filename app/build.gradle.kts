@@ -42,8 +42,8 @@ android {
         applicationId = "com.mockrun.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 65
-        versionName = "v2.4.9"
+        versionCode = 66
+        versionName = "v2.5.0"
         buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -143,8 +143,8 @@ dependencies {
     // Gson
     implementation(libs.gson)
 
-    // Chris Banes Haze (Glassmorphism / Frosted Glass)
-    implementation(libs.haze)
+    // AndroidLiquidGlass backdrop material, adapted locally for Compose 1.7.
+    implementation(project(":backdrop"))
 
     // LSPosed / Xposed API (compileOnly, never pack into dex)
     compileOnly("de.robv.android.xposed:api:82")

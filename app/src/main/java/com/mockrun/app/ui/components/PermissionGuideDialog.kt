@@ -13,6 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.util.PermissionHelper
 import com.mockrun.app.util.PermissionIssueType
@@ -33,37 +36,47 @@ fun PermissionGuideDialog(
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = if (isLiquidGlass) {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        tonalElevation = 0.dp,
+        shape = AppShapes.sheet,
         title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = when (issueType) {
-                        PermissionIssueType.MOCK_LOCATION_APP_NOT_SET -> "需设置模拟位置应用"
-                        PermissionIssueType.LOCATION_PERMISSION_MISSING -> "需授予系统定位权限"
-                        else -> "提示"
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onDismissRequest) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "关闭",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+            Column {
+                GlassDialogWindowEffect(isLiquidGlass)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (issueType) {
+                            PermissionIssueType.MOCK_LOCATION_APP_NOT_SET -> "需设置模拟位置应用"
+                            PermissionIssueType.LOCATION_PERMISSION_MISSING -> "需授予系统定位权限"
+                            else -> "提示"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "关闭",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         },
@@ -153,7 +166,8 @@ fun PermissionGuideDialog(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = 48.dp),
+                shape = AppShapes.button
             ) {
                 Icon(
                     Icons.Default.Settings,

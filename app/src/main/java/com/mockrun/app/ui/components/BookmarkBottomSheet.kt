@@ -14,10 +14,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AtlasSurface
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.domain.model.Route
 
@@ -50,18 +55,29 @@ fun BookmarkBottomSheet(
     onDelete: (Route) -> Unit
 ) {
     val isLocation = kind == BookmarkKind.LOCATION
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     var pendingDelete by remember { mutableStateOf<Route?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        containerColor = Color.Transparent,
+        shape = AppShapes.sheet,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.38f)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
+        AtlasSurface(
+            modifier = Modifier.fillMaxWidth(),
+            isLiquidGlass = isLiquidGlass,
+            shape = AppShapes.sheet,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            elevation = if (isLiquidGlass) 22.dp else 8.dp
         ) {
+            GlassDialogWindowEffect(isLiquidGlass)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -246,6 +262,7 @@ fun BookmarkBottomSheet(
             }
 
             Spacer(Modifier.height(16.dp))
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 package com.mockrun.app.feature.settings
 
+import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -12,10 +13,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -29,8 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,46 +46,70 @@ import com.mockrun.app.core.data.repository.VersionSyncManager
 import com.mockrun.app.core.data.repository.DownloadStatus
 import com.mockrun.app.core.data.repository.VersionSyncStatus
 import com.mockrun.app.core.designsystem.*
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.2.0 更新日志】
+private const val BUILTIN_CHANGELOG = """【FakeGPS-next v2.5.0 更新日志】
 
-1. 🛠️ LSPosed 通道迁移至 Vector 框架（修复 HyperOS / Android 17 模块零派发）：
+1. Liquid Glass 界面与 Dock 手势重构：
+   - 四个主页面、地图浮层、路线库与弹窗统一 Material 3 和双模式配色；
+   - Dock 使用手指绝对坐标吸附、跨 Tab 触觉反馈与弹簧落槽；
+   - 主页面改为原地微景深交叉叠化，消除右侧弹跳留白。
+
+2. 渲染与交互性能优化：
+   - 页面共享 Backdrop，背景采样降采样至 0.5，Dock 仅捕获底部区域；
+   - 胶囊位置和缩放仅在绘制阶段读取，减少拖动重组；
+   - 纯净模式彻底停用实时采样。
+
+3. 自定义强调色：
+   - 提供六种预设与 #RRGGBB 自定义颜色；
+   - 支持输入校验、即时应用、恢复原生和冷启动持久化。
+
+4. 稳定性修复：
+   - 修复纯净模式切换崩溃、功能与关于页底栏模糊丢失；
+   - 修复地图搜索旧请求覆盖新结果，加入输入防抖与请求失效保护；
+   - 保留分流应用、模拟点位、路线、壁纸和外观记忆，启动不会自动开启模拟。
+
+—— 以下为 v2.2.0 及更早历史更新 ——
+
+【FakeGPS-next v2.2.0 更新日志】
+
+1. LSPosed 通道迁移至 Vector 框架（修复 HyperOS / Android 17 模块零派发）：
    - 官方 LSPosed 2.2.1 在 HyperOS 上仅注入 hyos_spawner/artd（Rust 运行时，无 ART/Java 回调），
      handleLoadPackage 全设备零触发；迁移到 JingMatrix Vector v2.2 后系统框架与目标应用双侧正常注入。
 
-2. 🗺️ 系统框架定位注入在 HyperOS 真机恢复生效：
+2. 系统框架定位注入在 HyperOS 真机恢复生效：
    - system_server 侧 onReportLocation / acceptLocationChange / reportLocation 钩子正常触发，
      系统定位返回值与合成卫星状态可按模拟点输出（高德地图实测已跳到模拟点）。
    - 地图 SDK 兼容层挂钩逻辑整理为 hookAmapLocationGetters，按已加载 Class 直接挂钩。
 
-3. 🎯 坐标偏差修复：瞄准点改为 Pin 尖端投影；热门城市常量修正为 GCJ-02→WGS-84。
+3. 坐标偏差修复：瞄准点改为 Pin 尖端投影；热门城市常量修正为 GCJ-02→WGS-84。
 
-4. 🧭 坐标系收敛为唯一实现 GeoTransform（WGS-84/GCJ-02/BD-09），全量单测覆盖。
+4. 坐标系收敛为唯一实现 GeoTransform（WGS-84/GCJ-02/BD-09），全量单测覆盖。
 
-5. 🔀 应用独立分流：移除全局 kill-switch、空规则清缓存、按方法记账可重试、IPackageManager 兜底。
+5. 应用独立分流：移除全局 kill-switch、空规则清缓存、按方法记账可重试、IPackageManager 兜底。
 
-6. 🧩 注入通道默认 Provider；LSPosed 改为手动高级选项，不再自动优先。Provider 通道不发布 hook 配置，消除坐标残留。
+6. 注入通道默认 Provider；LSPosed 改为手动高级选项，不再自动优先。Provider 通道不发布 hook 配置，消除坐标残留。
 
 —— 以下为 v2.1.2 历史更新 ——
 
-1. 💧 修复定位页 / 路线页毛玻璃全面失效（严重）：
+1. 修复定位页 / 路线页毛玻璃全面失效（严重）：
    - 这两页此前没有可被 Haze 捕获的 Compose 源层（底层是 OSMDroid 原生 View），
      全部玻璃卡片静默退化为不透明色块，底部悬浮栏同样无模糊；
    - 现叠加一层 Compose 绘制的 Aurora 雾面作为模糊源（上下厚、中间薄，
      中央地图区保持干净），底部悬浮 Tab 栏接入页面内容源，全部恢复真实高斯模糊。
 
-2. 🎯 环境指纹采集真机物理定位优先：
+2. 环境指纹采集真机物理定位优先：
    - 采集弹窗默认直取真机真实物理定位，不再误填地图选定模拟点；
    - 弹窗内置「获取本机真实位置」实时校准与「一键停止模拟」，无需退回首页重置。
 
-3. ☁️ 在线更新服务无官网化多源升级：
+3. 在线更新服务无官网化多源升级：
    - 「蓝奏云（南咒云）直链自动解析 + 多 CDN 静态清单 + 镜像兜底」多级容灾；
    - 下载完成后执行 SHA-256 哈希与 APK 签名证书双重完整性校验。
 
-4. 📡 环境指纹采集与 5G NR 回放：打通 5G NR 36-bit NCI 采集与回放。"""
+4. 环境指纹采集与 5G NR 回放：打通 5G NR 36-bit NCI 采集与回放。"""
 
 @Composable
 private fun AboutSectionHeader(
@@ -100,33 +131,212 @@ private fun AboutCard(
     containerColor: Color? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val resolvedContainerColor = containerColor ?: MaterialTheme.colorScheme.surfaceContainer
-    val colors = CardDefaults.outlinedCardColors(containerColor = resolvedContainerColor)
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    AtlasGlassGroup(
+        modifier = modifier.fillMaxWidth(),
+        shape = AppShapes.card,
+        containerColor = containerColor ?: MaterialTheme.colorScheme.surfaceContainerLow,
+        elevation = 4.dp,
+        borderWidth = 0.75.dp,
+        tintAlpha = if (LocalIsDarkTheme.current) 0.20f else 0.30f
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (onClick != null) {
+                        Modifier
+                            .clip(AppShapes.card)
+                            .clickable(role = Role.Button, onClick = onClick)
+                    } else {
+                        Modifier
+                    }
+                ),
+            content = content
+        )
+    }
+}
 
-    if (onClick != null) {
-        OutlinedCard(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = colors,
-            border = border
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                content = content
-            )
+private data class AccentOption(
+    val argb: Int?,
+    val label: String,
+    val color: Color
+)
+
+@Composable
+private fun AccentColorCard() {
+    val context = LocalContext.current
+    val accentArgb by AppAppearancePreferences.accentColorArgb
+    val options = remember {
+        listOf(
+            AccentOption(null, "原生", Color(0xFF69D3D5)),
+            AccentOption(0xFF2F7BFF.toInt(), "海蓝", Color(0xFF2F7BFF)),
+            AccentOption(0xFF2E9E6B.toInt(), "松绿", Color(0xFF2E9E6B)),
+            AccentOption(0xFFD96854.toInt(), "珊瑚", Color(0xFFD96854)),
+            AccentOption(0xFF8067B7.toInt(), "鸢尾", Color(0xFF8067B7)),
+            AccentOption(0xFF6B7280.toInt(), "石墨", Color(0xFF6B7280))
+        )
+    }
+    var hexInput by remember { mutableStateOf("") }
+    val parsedColor = AppAppearancePreferences.parseAccentColor(hexInput)
+
+    LaunchedEffect(accentArgb) {
+        hexInput = accentArgb?.let { "#%06X".format(it and 0xFFFFFF) }.orEmpty()
+    }
+
+    fun applyCustomColor() {
+        parsedColor?.let {
+            AppAppearancePreferences.setAccentColor(context, it)
         }
-    } else {
-        OutlinedCard(
-            modifier = modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = colors,
-            border = border
+    }
+
+    AboutCard {
+        Column(
+            modifier = Modifier.padding(AppSpacing.s4),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                content = content
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                options.forEach { option ->
+                    val selected = option.argb == accentArgb
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(AppShapes.chip)
+                            .clickable(onClickLabel = "使用${option.label}强调色") {
+                                AppAppearancePreferences.setAccentColor(context, option.argb)
+                            }
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(option.color)
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = hexInput,
+                onValueChange = { hexInput = it.take(9) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("自定义 HEX") },
+                placeholder = { Text("#2F7BFF") },
+                supportingText = {
+                    Text(
+                        if (hexInput.isNotBlank() && parsedColor == null) {
+                            "请输入 6 位十六进制颜色"
+                        } else {
+                            "例如 #2F7BFF，应用后立即生效"
+                        }
+                    )
+                },
+                isError = hexInput.isNotBlank() && parsedColor == null,
+                singleLine = true,
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(parsedColor ?: accentArgb ?: 0xFF69D3D5.toInt()))
+                    )
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = ::applyCustomColor,
+                        enabled = parsedColor != null
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "应用自定义强调色"
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { applyCustomColor() })
+            )
+
+            if (accentArgb != null) {
+                TextButton(
+                    onClick = { AppAppearancePreferences.setAccentColor(context, null) },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("恢复原生强调色")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaterialFeatureChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    isLiquidGlass: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = AppShapes.chip,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -134,14 +344,15 @@ private fun AboutCard(
 
 @Composable
 fun AboutScreen(
-    dynamicColor: Boolean,
+    isLiquidGlass: Boolean,
+    supportsLiquidGlass: Boolean,
     isTablet: Boolean = false,
-    onToggleDynamicColor: (Boolean) -> Unit,
-    onNavigateToLibrary: () -> Unit = {}
+    onToggleLiquidGlass: (Boolean) -> Unit,
+    onNavigateToLibrary: () -> Unit = {},
+    sharedGlassBackdrop: LayerBackdrop? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     val syncState by VersionSyncManager.status
     val downloadState by VersionSyncManager.downloadStatus
@@ -178,17 +389,11 @@ fun AboutScreen(
                 val success = BackgroundThemeManager.setCustomWallpaper(context, uri)
                 Toast.makeText(
                     context,
-                    if (success) "🖼️ 自定义壁纸已设置并在全应用生效" else "⚠️ 壁纸读取失败，请重试",
+                    if (success) "自定义壁纸已设置并在全应用生效" else "壁纸读取失败，请重试",
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }
-    }
-
-    // Auto-sync version & background preferences on screen launch
-    LaunchedEffect(Unit) {
-        BackgroundThemeManager.initialize(context)
-        VersionSyncManager.checkForUpdates(force = false)
     }
 
     // Changelog Dialog
@@ -206,13 +411,13 @@ fun AboutScreen(
         AboutDetailsSheet(onDismiss = { showDetailsSheet = false })
     }
 
-    Box(
+    AtlasGlassPage(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
+        sharedBackdrop = sharedGlassBackdrop
     ) {
-        AppBackground()
         Column(
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .widthIn(max = 680.dp)
                 .fillMaxSize()
                 .statusBarsPadding()
@@ -224,78 +429,60 @@ fun AboutScreen(
             // =====================================================================
             // 0. 品牌标识（精简 Hero）—— 完整品牌介绍已移入「关于与致谢」详情 sheet
             // =====================================================================
-            AboutCard(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(AppSpacing.s4),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(58.dp),
+                    shape = AppShapes.card,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(MaterialTheme.shapes.large),
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Place,
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "FakeGPS-next",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            modifier = Modifier.size(29.dp)
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.secondaryContainer
-                            ) {
-                                Text(
-                                    text = BuildConfig.VERSION_NAME,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 4.dp)
-                                )
-                            }
-                            Text(
-                                text = "构建时间: ${BuildConfig.BUILD_TIME}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
                     }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "FakeGPS-next",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "${BuildConfig.VERSION_NAME} · 构建于 ${BuildConfig.BUILD_TIME}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
             // =====================================================================
-            // 2. 视觉渲染风格
+            // 2. 界面材质
             // =====================================================================
-            AboutSectionHeader("外观与色彩")
+            AboutSectionHeader("界面材质")
 
-            AboutCard {
-                Column(modifier = Modifier.padding(AppSpacing.s4)) {
+            AboutCard(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Column(
+                    modifier = Modifier.padding(AppSpacing.s4),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -308,22 +495,18 @@ fun AboutScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(MaterialTheme.shapes.small)
+                                    .size(46.dp)
+                                    .clip(AppShapes.panel)
                                     .background(
-                                        if (dynamicColor) {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceContainerHighest
-                                        }
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Palette,
+                                    imageVector = Icons.Default.BlurOn,
                                     contentDescription = null,
-                                    tint = if (dynamicColor) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    tint = if (isLiquidGlass) {
+                                        MaterialTheme.colorScheme.primary
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant
                                     },
@@ -333,16 +516,16 @@ fun AboutScreen(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "动态取色",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    text = "液态玻璃质感",
+                                    style = MaterialTheme.typography.titleLarge,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = when {
-                                        !supportsDynamicColor -> "当前系统不支持动态取色（需 Android 12 及以上）"
-                                        dynamicColor -> "跟随壁纸生成协调的 Material 3 色彩"
-                                        else -> "使用 FakeGPS-next 品牌蓝配色"
+                                        !supportsLiquidGlass -> "当前设备自动使用高对比纯净实色模式"
+                                        isLiquidGlass -> "实时背景采样 · 柔焦 · 折射边缘 · 高光"
+                                        else -> "纯净实色表面，零模糊开销"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -351,38 +534,88 @@ fun AboutScreen(
                         }
 
                         Switch(
-                            checked = dynamicColor,
-                            enabled = supportsDynamicColor,
+                            checked = isLiquidGlass,
+                            enabled = supportsLiquidGlass,
                             onCheckedChange = { next ->
-                                onToggleDynamicColor(next)
+                                onToggleLiquidGlass(next)
                                 Toast.makeText(
                                     context,
-                                    if (next) "已开启动态取色" else "已切换为品牌配色",
+                                    if (next) "液态玻璃已开启" else "已切换为纯净实色模式",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             },
-                            colors = SwitchDefaults.colors()
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                            )
                         )
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 1.dp
-                    )
-                    Spacer(Modifier.height(10.dp))
+                    val materialFeatures = if (isLiquidGlass) {
+                        listOf(
+                            Icons.Default.BlurOn to "实时采样",
+                            Icons.Default.CenterFocusStrong to "柔焦",
+                            Icons.Default.LightMode to "折射高光"
+                        )
+                    } else {
+                        listOf(
+                            Icons.Default.CropSquare to "实色表面",
+                            Icons.Default.Contrast to "高对比",
+                            Icons.Default.BatteryFull to "低功耗"
+                        )
+                    }
+                    val configuration = LocalConfiguration.current
+                    val stackFeatures = configuration.fontScale >= 1.3f ||
+                        configuration.screenWidthDp < 380
+                    if (stackFeatures) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            materialFeatures.forEach { (icon, label) ->
+                                MaterialFeatureChip(
+                                    icon = icon,
+                                    label = label,
+                                    isLiquidGlass = isLiquidGlass,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            materialFeatures.forEach { (icon, label) ->
+                                MaterialFeatureChip(
+                                    icon = icon,
+                                    label = label,
+                                    isLiquidGlass = isLiquidGlass,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
 
                     Text(
-                        text = if (supportsDynamicColor) {
-                            "Material 3 会从系统壁纸提取主色，并同步应用到按钮、选中状态与强调信息。"
-                        } else {
-                            "Android 12 以下继续使用品牌蓝配色，开关不可用。"
+                        text = when {
+                            !supportsLiquidGlass -> "实时背景采样从 Android 12 开始支持，当前设备会平滑降级。"
+                            isLiquidGlass -> "玻璃只用于导航、浮层与弹窗，主体内容始终保持清晰可读。"
+                            else -> "关闭后移除采样与模糊计算，更适合长时间导航和低端设备。"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+
+            // =====================================================================
+            // 3. 强调色
+            // =====================================================================
+            AboutSectionHeader("强调色")
+            AccentColorCard()
 
             // =====================================================================
             // 3. 个性化背景壁纸
@@ -436,7 +669,16 @@ fun AboutScreen(
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    text = if (hasCustomWallpaper) "选择照片作为全应用底衬，卡片将通透毛玻璃折射" else "纯黑 / 纯白纯色底衬，卡片呈通透毛玻璃折射",
+                                    text = when {
+                                        hasCustomWallpaper && isLiquidGlass ->
+                                            "选择照片作为全应用底衬，玻璃浮层会实时采样背景"
+                                        hasCustomWallpaper ->
+                                            "选择照片作为全应用底衬，保持不变"
+                                        isLiquidGlass ->
+                                            "纯黑 / 纯白底衬，玻璃浮层会实时采样背景"
+                                        else ->
+                                            "纯黑 / 纯白底衬，主体内容保持清晰"
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -493,6 +735,7 @@ fun AboutScreen(
 
             AboutCard(onClick = onNavigateToLibrary) {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         Text(
                             text = "已收藏路线与航点库",
@@ -543,7 +786,7 @@ fun AboutScreen(
                     val isChecking = sync is VersionSyncStatus.Checking
 
                     // 仅在检查更新期间运行旋转动画，避免静止状态下每帧触发重组重绘
-                    val angle = if (isChecking) {
+                    val angle = if (isChecking && ValueAnimator.areAnimatorsEnabled()) {
                         val infiniteTransition = rememberInfiniteTransition(label = "spin")
                         val animatedAngle by infiniteTransition.animateFloat(
                             initialValue = 0f,
@@ -1197,6 +1440,7 @@ fun AboutScreen(
 
             AboutCard(onClick = { showDetailsSheet = true }) {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     headlineContent = {
                         Text(
                             text = "关于与致谢",
@@ -1559,10 +1803,10 @@ private fun AboutDetailsSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     CreditItem(
-                        name = "Haze",
-                        author = "chrisbanes",
-                        desc = "现代化 Jetpack Compose 玻璃拟态 (Glassmorphism) 与实时毛玻璃背景模糊渲染库",
-                        url = "https://github.com/chrisbanes/haze"
+                        name = "AndroidLiquidGlass",
+                        author = "Kyant0",
+                        desc = "背景采样、实时高斯模糊、AGSL 折射、Vibrancy 与边缘高光材质实现 (Apache-2.0)",
+                        url = "https://github.com/Kyant0/AndroidLiquidGlass"
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     CreditItem(

@@ -26,6 +26,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.mockrun.app.core.designsystem.AppSemanticColors
+import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AtlasSurface
+import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
+import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.core.data.repository.InstalledAppItem
 import com.mockrun.app.domain.model.MultiTargetRule
@@ -62,6 +66,7 @@ fun AppPickerBottomSheet(
     onAppSelected: (MultiTargetRule) -> Unit,
     loadInstalledApps: suspend () -> List<InstalledAppItem>
 ) {
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedUserId by remember { mutableIntStateOf(0) } // 0 = Main, 999 = Dual
     var isCustomUserId by remember { mutableStateOf(false) }
@@ -113,14 +118,24 @@ fun AppPickerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        containerColor = Color.Transparent,
+        shape = AppShapes.sheet,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.38f)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
+        AtlasSurface(
+            modifier = Modifier.fillMaxWidth(),
+            isLiquidGlass = isLiquidGlass,
+            shape = AppShapes.sheet,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            elevation = if (isLiquidGlass) 22.dp else 8.dp
         ) {
+            GlassDialogWindowEffect(isLiquidGlass)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+            ) {
             // Header Row
             Row(
                 modifier = Modifier
@@ -390,6 +405,7 @@ fun AppPickerBottomSheet(
                 }
             }
             Spacer(Modifier.height(16.dp))
+            }
         }
     }
 

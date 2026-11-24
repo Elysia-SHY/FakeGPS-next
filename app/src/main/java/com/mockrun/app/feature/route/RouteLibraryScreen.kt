@@ -6,12 +6,11 @@ import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,14 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.mockrun.app.BuildConfig
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.RouteMode
 import com.mockrun.app.core.location.RouteSimulator
@@ -57,6 +57,7 @@ fun RouteLibraryScreen(
     onRouteSelected: () -> Unit
 ) {
     val context = LocalContext.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     val savedRoutes by mapViewModel.savedRoutes.collectAsState()
     val selectedRoute by mapViewModel.selectedRoute.collectAsState()
 
@@ -193,56 +194,22 @@ fun RouteLibraryScreen(
         // =====================================================================
         // 1. Page Head —— 与其他页面共用同一排版基准
         // =====================================================================
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)
-        ) {
-            Text(
-                text = "FAKE GPS",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "路线库",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Text(
-                        text = "${savedRoutes.size} 条路线",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ) {
-                    Text(
-                        text = BuildConfig.VERSION_NAME,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-            }
-        }
+        AtlasPageHeader(
+            title = "路线库",
+            description = "管理已保存路线、轨迹与 GPX 数据",
+            status = "${savedRoutes.size} 条路线",
+            statusTone = if (savedRoutes.isEmpty()) {
+                AtlasStatusTone.NEUTRAL
+            } else {
+                AtlasStatusTone.ACTIVE
+            },
+            modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 18.dp)
+        )
 
         // =====================================================================
         // 2. 搜索框 —— 复用地图页的 M3 OutlinedTextField 封装
         // =====================================================================
-        OutlinedTextField(
+        TextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier
@@ -250,8 +217,17 @@ fun RouteLibraryScreen(
                 .fillMaxWidth()
                 .heightIn(min = 52.dp),
             singleLine = true,
-            shape = MaterialTheme.shapes.large,
+            shape = AppShapes.panel,
             textStyle = MaterialTheme.typography.bodyMedium,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colorScheme.primary
+            ),
             placeholder = {
                 Text(
                     text = "搜索路线名称...",
@@ -322,27 +298,31 @@ fun RouteLibraryScreen(
                     val isCurrent = selectedRoute?.id == route.id
                     var menuExpanded by remember { mutableStateOf(false) }
 
-                    OutlinedCard(
+                    AtlasGroup(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.outlinedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        ),
-                        border = BorderStroke(
-                            width = if (isCurrent) 2.dp else 1.dp,
-                            color = if (isCurrent) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant
-                            }
-                        )
+                        containerColor = if (isCurrent) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        }
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(
+                                    if (isCurrent) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                    }
+                                )
+                        )
                         Column(modifier = Modifier.padding(16.dp)) {
-                            // Top Row: Title + Date + Selection Capsule
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.Top
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
@@ -353,115 +333,59 @@ fun RouteLibraryScreen(
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(Modifier.height(2.dp))
+                                    Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = "存档时间: ${dateFormatter.format(Date(route.createdAt))}",
+                                        text = dateFormatter.format(Date(route.createdAt)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-
                                 if (isCurrent) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = AppSemanticColors.current.successContainer,
-                                        contentColor = AppSemanticColors.current.onSuccessContainer
-                                    ) {
-                                        Text(
-                                            text = "当前载入",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                        )
-                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    AtlasStatusPill(
+                                        text = "正在使用",
+                                        tone = AtlasStatusTone.ACTIVE
+                                    )
                                 }
-                                if (route.mode != RouteMode.ONE_WAY) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Surface(
-                                        shape = MaterialTheme.shapes.small,
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ) {
-                                        Text(
-                                            text = route.mode.label,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                        )
+                            }
+
+                            if (route.mode != RouteMode.ONE_WAY || route.sourceTrackId != null) {
+                                Spacer(Modifier.height(9.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    if (route.mode != RouteMode.ONE_WAY) {
+                                        Surface(
+                                            shape = AppShapes.chip,
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        ) {
+                                            Text(
+                                                text = route.mode.label,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
-                                }
-                                if (route.sourceTrackId != null) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Surface(
-                                        shape = MaterialTheme.shapes.small,
-                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ) {
-                                        Text(
-                                            text = "轨迹",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                        )
+                                    if (route.sourceTrackId != null) {
+                                        Surface(
+                                            shape = AppShapes.chip,
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ) {
+                                            Text(
+                                                text = "轨迹生成",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(13.dp))
 
-                            // Middle Row: Metrics Badges —— 距离 + 航点数
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = MaterialTheme.shapes.small,
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Place,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(14.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = "${"%.2f".format(route.totalDistanceKm)} km",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = MaterialTheme.shapes.small,
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(14.dp),
-                                            tint = AppSemanticColors.current.success
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = "${route.waypoints.size} 航点",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
+                            RouteStats(route = route)
 
                             Spacer(Modifier.height(12.dp))
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -558,7 +482,7 @@ fun RouteLibraryScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
+                                    shape = AppShapes.button,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isCurrent) {
                                             AppSemanticColors.current.success
@@ -601,12 +525,15 @@ fun RouteLibraryScreen(
         AlertDialog(
             onDismissRequest = { routeToRename = null },
             title = {
-                Text(
-                    text = "重命名路线",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    GlassDialogWindowEffect(isLiquidGlass)
+                    Text(
+                        text = "重命名路线",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             },
             text = {
                 OutlinedTextField(
@@ -643,8 +570,13 @@ fun RouteLibraryScreen(
                     Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
             },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.extraLarge
+            containerColor = if (isLiquidGlass) {
+                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+            tonalElevation = 0.dp,
+            shape = AppShapes.sheet
         )
     }
 
@@ -652,12 +584,15 @@ fun RouteLibraryScreen(
         AlertDialog(
             onDismissRequest = { routeToDelete = null },
             title = {
-                Text(
-                    text = "确认删除路线？",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    GlassDialogWindowEffect(isLiquidGlass)
+                    Text(
+                        text = "确认删除路线？",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             },
             text = {
                 Text(
@@ -685,8 +620,13 @@ fun RouteLibraryScreen(
                     Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 }
             },
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.extraLarge
+            containerColor = if (isLiquidGlass) {
+                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+            tonalElevation = 0.dp,
+            shape = AppShapes.sheet
         )
     }
 
@@ -702,6 +642,93 @@ fun RouteLibraryScreen(
             }
         )
     }
+}
+
+@Composable
+private fun RouteStats(route: Route) {
+    val configuration = LocalConfiguration.current
+    val stacked = configuration.fontScale >= 1.3f || configuration.screenWidthDp < 380
+
+    if (stacked) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AtlasMetric(
+                    label = "总距离",
+                    value = "%.2f".format(route.totalDistanceKm),
+                    unit = "km",
+                    modifier = Modifier.weight(1f)
+                )
+                AtlasMetric(
+                    label = "航点",
+                    value = route.waypoints.size.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            RouteModeStat(route = route)
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AtlasMetric(
+                label = "总距离",
+                value = "%.2f".format(route.totalDistanceKm),
+                unit = "km",
+                modifier = Modifier.weight(1f)
+            )
+            RouteStatDivider()
+            AtlasMetric(
+                label = "航点",
+                value = route.waypoints.size.toString(),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp)
+            )
+            RouteStatDivider()
+            RouteModeStat(
+                route = route,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RouteModeStat(
+    route: Route,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = "运行方式",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = route.mode.label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun RouteStatDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(34.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 /**
@@ -738,10 +765,9 @@ private fun LibraryEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
-                shape = MaterialTheme.shapes.extraLarge,
+                shape = AppShapes.card,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(72.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                modifier = Modifier.size(72.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -782,7 +808,7 @@ private fun LibraryEmptyState(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                    shape = MaterialTheme.shapes.large,
+                    shape = AppShapes.button,
                     contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
                     Icon(
@@ -803,7 +829,7 @@ private fun LibraryEmptyState(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = MaterialTheme.shapes.large,
+                        shape = AppShapes.button,
                         contentPadding = PaddingValues(horizontal = 16.dp)
                     ) {
                         if (secondaryIcon != null) {

@@ -93,28 +93,60 @@ fun TrackRecordScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    OutlinedCard(
+                    AtlasGroup(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.outlinedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
+                        containerColor = if (isRecording) {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.20f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        }
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AtlasStatusPill(
+                                    text = if (isRecording) "录制中" else "待机",
+                                    tone = if (isRecording) {
+                                        AtlasStatusTone.DANGER
+                                    } else {
+                                        AtlasStatusTone.NEUTRAL
+                                    }
+                                )
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text = if (isRecording) "正在记录真实 GPS" else "准备记录新轨迹",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
                             Text(
-                                if (isRecording) "● 录制中" else "未在录制",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "${"%.2f".format(distance / 1000.0)} km · $pointCount 点 · ${formatDuration(elapsedSec)}",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
+                                text = formatDuration(elapsedSec),
+                                style = MaterialTheme.typography.displaySmall.copy(
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                ),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                AtlasMetric(
+                                    label = "距离",
+                                    value = "%.2f".format(distance / 1000.0),
+                                    unit = "km",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                AtlasMetric(
+                                    label = "采样点",
+                                    value = pointCount.toString(),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
                             Text(
                                 "不需要 Root。屏幕可以关，手机放口袋即可；从最近任务划掉不会丢数据。",
                                 style = MaterialTheme.typography.bodySmall,
@@ -134,7 +166,7 @@ fun TrackRecordScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                                shape = MaterialTheme.shapes.large,
+                                shape = AppShapes.button,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isRecording) {
                                         MaterialTheme.colorScheme.error
@@ -180,13 +212,22 @@ fun TrackRecordScreen(
                 }
 
                 items(tracks, key = { it.id }) { track ->
-                    OutlinedCard(
+                    AtlasGroup(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.outlinedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(
+                                    if (track.isFavorite) {
+                                        AppSemanticColors.current.warning
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    }
+                                )
+                        )
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -223,58 +264,67 @@ fun TrackRecordScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    trackViewModel.convertToRoute(track) { route ->
+                                        if (route != null) {
+                                            Toast.makeText(context, "已生成路线「${route.name}」", Toast.LENGTH_SHORT).show()
+                                            onRouteCreated(route)
+                                        } else {
+                                            Toast.makeText(context, "轨迹点数不足，无法生成路线", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = AppShapes.button
+                            ) {
+                                Icon(Icons.Default.Route, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("转成路线", style = MaterialTheme.typography.labelLarge)
+                            }
+                            Spacer(Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                OutlinedButton(
+                                TextButton(
                                     onClick = { trackViewModel.toggleFavorite(track) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
+                                        .heightIn(min = 48.dp),
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
+                                    Icon(
+                                        if (track.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(Modifier.width(5.dp))
                                     Text(
                                         if (track.isFavorite) "取消收藏" else "收藏",
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = MaterialTheme.typography.labelMedium,
                                         maxLines = 1
                                     )
                                 }
-                                OutlinedButton(
-                                    onClick = {
-                                        trackViewModel.convertToRoute(track) { route ->
-                                            if (route != null) {
-                                                Toast.makeText(context, "已生成路线「${route.name}」", Toast.LENGTH_SHORT).show()
-                                                onRouteCreated(route)
-                                            } else {
-                                                Toast.makeText(context, "轨迹点数不足，无法生成路线", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
-                                    contentPadding = PaddingValues(horizontal = 6.dp)
-                                ) {
-                                    Text(
-                                        "转成路线",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        maxLines = 1
-                                    )
-                                }
-                                OutlinedButton(
+                                TextButton(
                                     onClick = { trackViewModel.delete(track.id) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(48.dp),
-                                    shape = MaterialTheme.shapes.large,
+                                        .heightIn(min = 48.dp),
                                     contentPadding = PaddingValues(horizontal = 6.dp)
                                 ) {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                    Spacer(Modifier.width(5.dp))
                                     Text(
                                         "删除",
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.error,
                                         maxLines = 1
                                     )

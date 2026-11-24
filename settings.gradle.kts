@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FakeGPS-next"
 include(":app")
+include(":backdrop")
