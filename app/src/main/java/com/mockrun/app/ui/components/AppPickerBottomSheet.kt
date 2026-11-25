@@ -30,6 +30,7 @@ import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.AtlasSurface
 import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
+import com.mockrun.app.core.designsystem.appSegmentedButtonColors
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.core.data.repository.InstalledAppItem
 import com.mockrun.app.domain.model.MultiTargetRule
@@ -67,6 +68,7 @@ fun AppPickerBottomSheet(
     loadInstalledApps: suspend () -> List<InstalledAppItem>
 ) {
     val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val segmentedButtonColors = appSegmentedButtonColors()
     var searchQuery by remember { mutableStateOf("") }
     var selectedUserId by remember { mutableIntStateOf(0) } // 0 = Main, 999 = Dual
     var isCustomUserId by remember { mutableStateOf(false) }
@@ -178,6 +180,7 @@ fun AppPickerBottomSheet(
                         isCustomUserId = false
                         selectedUserId = 0
                     },
+                    colors = segmentedButtonColors,
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     label = {
                         Text(
@@ -194,6 +197,7 @@ fun AppPickerBottomSheet(
                         isCustomUserId = false
                         selectedUserId = 999
                     },
+                    colors = segmentedButtonColors,
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                     label = {
                         Text(
@@ -220,6 +224,7 @@ fun AppPickerBottomSheet(
                     SegmentedButton(
                         selected = selectedCategory == cat,
                         onClick = { selectedCategory = cat },
+                        colors = segmentedButtonColors,
                         shape = SegmentedButtonDefaults.itemShape(
                             index = index,
                             count = AppCategoryFilter.values().size

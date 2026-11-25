@@ -443,6 +443,7 @@ fun <T> IosSegmentedControl(
             SegmentedButton(
                 selected = index == selectedIndex,
                 onClick = { onItemSelected(item) },
+                colors = appSegmentedButtonColors(),
                 shape = SegmentedButtonDefaults.itemShape(
                     index = index,
                     count = items.size

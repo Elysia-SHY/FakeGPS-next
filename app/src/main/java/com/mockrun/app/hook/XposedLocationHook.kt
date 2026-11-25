@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.mockrun.app.hook
 
 import android.content.Context

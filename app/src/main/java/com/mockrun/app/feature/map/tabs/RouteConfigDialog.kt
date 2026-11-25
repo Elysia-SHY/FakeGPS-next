@@ -2,6 +2,7 @@ package com.mockrun.app.feature.map.tabs
 import androidx.compose.material3.MaterialTheme
 import com.mockrun.app.core.designsystem.AppSemanticColors
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.RouteSimulator
 import com.mockrun.app.core.designsystem.AppShapes
+import com.mockrun.app.core.designsystem.AppSelectionColors
 import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.domain.model.RouteMode
@@ -59,6 +61,7 @@ fun RouteConfigDialog(
     onCadenceConfigChange: (CadenceMode, Int) -> Unit = { _, _ -> }
 ) {
     val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val selection = AppSelectionColors.current
     // remember 必须带键。
     //
     // isRootAvailable 由 SimulationViewModel 异步探测（首次组合时为 false），
@@ -124,6 +127,13 @@ fun RouteConfigDialog(
                 ) {
                     presets.forEach { p ->
                         val isSelected = kotlin.math.abs(speedVal - p.speed) < 0.2f
+                        val selectedBorder = if (isSelected) {
+                            selection.selectedBorderWidth.takeIf { it > 0.dp }?.let {
+                                BorderStroke(it, selection.selectedOutline)
+                            }
+                        } else {
+                            BorderStroke(1.dp, selection.unselectedOutline)
+                        }
                         Surface(
                             onClick = {
                                 speedVal = p.speed
@@ -135,16 +145,17 @@ fun RouteConfigDialog(
                                 .fillMaxWidth(),
                             shape = MaterialTheme.shapes.medium,
                             color = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer
+                                selection.primaryContainer
                             } else {
-                                MaterialTheme.colorScheme.surfaceContainerHigh
+                                selection.unselectedContainer
                             },
                             contentColor = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                                selection.onPrimaryContainer
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                selection.unselectedContent
                             },
-                            tonalElevation = if (isSelected) 2.dp else 1.dp
+                            tonalElevation = if (isSelected) 2.dp else 1.dp,
+                            border = selectedBorder
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize(),
@@ -155,9 +166,9 @@ fun RouteConfigDialog(
                                     imageVector = p.icon,
                                     contentDescription = null,
                                     tint = if (isSelected) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                        selection.onPrimaryContainer
                                     } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                        selection.unselectedContent
                                     },
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -167,9 +178,9 @@ fun RouteConfigDialog(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isSelected) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                        selection.onPrimaryContainer
                                     } else {
-                                        MaterialTheme.colorScheme.onSurface
+                                        selection.unselectedContent
                                     },
                                     maxLines = 1
                                 )
@@ -221,6 +232,15 @@ fun RouteConfigDialog(
                             val loopBlocked = m == RouteMode.LOOP &&
                                 closingGapMeters > RouteSimulator.LOOP_MAX_GAP_M
                             val selected = m == modeVal
+                            val modeBorder = when {
+                                selected && selection.selectedBorderWidth > 0.dp -> {
+                                    BorderStroke(selection.selectedBorderWidth, selection.selectedOutline)
+                                }
+                                !selected && !loopBlocked -> {
+                                    BorderStroke(1.dp, selection.unselectedOutline)
+                                }
+                                else -> null
+                            }
                             Surface(
                                 onClick = {
                                     modeVal = m
@@ -232,15 +252,16 @@ fun RouteConfigDialog(
                                     .heightIn(min = 58.dp),
                                 shape = MaterialTheme.shapes.medium,
                                 color = when {
-                                    selected -> MaterialTheme.colorScheme.primaryContainer
+                                    selected -> selection.primaryContainer
                                     loopBlocked -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                    else -> selection.unselectedContainer
                                 },
                                 contentColor = when {
-                                    selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    selected -> selection.onPrimaryContainer
                                     loopBlocked -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                }
+                                    else -> selection.unselectedContent
+                                },
+                                border = modeBorder
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -254,9 +275,9 @@ fun RouteConfigDialog(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (selected) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                            selection.onPrimaryContainer
                                         } else {
-                                            MaterialTheme.colorScheme.onSurface
+                                            selection.unselectedContent
                                         },
                                         maxLines = 1
                                     )
@@ -269,9 +290,9 @@ fun RouteConfigDialog(
                                         },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (selected) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                                            selection.onPrimaryContainer.copy(alpha = 0.82f)
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                            selection.unselectedContent
                                         },
                                         maxLines = 1
                                     )
@@ -293,6 +314,13 @@ fun RouteConfigDialog(
                     ) {
                         CadenceMode.entries.forEach { cm ->
                             val selected = cm == cadenceModeVal
+                            val cadenceBorder = if (selected) {
+                                selection.selectedBorderWidth.takeIf { it > 0.dp }?.let {
+                                    BorderStroke(it, selection.selectedOutline)
+                                }
+                            } else {
+                                BorderStroke(1.dp, selection.unselectedOutline)
+                            }
                             Surface(
                                 onClick = {
                                     cadenceModeVal = cm
@@ -303,15 +331,16 @@ fun RouteConfigDialog(
                                     .heightIn(min = 48.dp),
                                 shape = MaterialTheme.shapes.medium,
                                 color = if (selected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
+                                    selection.secondaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                    selection.unselectedContainer
                                 },
                                 contentColor = if (selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                    selection.onSecondaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
+                                    selection.unselectedContent
+                                },
+                                border = cadenceBorder
                             ) {
                                 Box(
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
@@ -328,9 +357,9 @@ fun RouteConfigDialog(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                         color = if (selected) {
-                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                            selection.onSecondaryContainer
                                         } else {
-                                            MaterialTheme.colorScheme.onSurface
+                                            selection.unselectedContent
                                         },
                                         maxLines = 2
                                     )

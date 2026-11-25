@@ -1,6 +1,7 @@
 package com.mockrun.app.core.location
 
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.MockSimulationMode
 import com.mockrun.app.domain.model.SimulatedPoint
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.domain.model.SimulationStatus
@@ -23,6 +24,9 @@ class SimulationStateRepository @Inject constructor() {
 
     val currentState: SimulationState get() = _state.value
 
+    private val _activeMode = MutableStateFlow(MockSimulationMode.NONE)
+    val activeMode: StateFlow<MockSimulationMode> = _activeMode.asStateFlow()
+
     // Independent Joystick Simulation State (decoupled from route simulation)
     private val _isJoystickActive = MutableStateFlow(false)
     val isJoystickActive: StateFlow<Boolean> = _isJoystickActive.asStateFlow()
@@ -32,8 +36,18 @@ class SimulationStateRepository @Inject constructor() {
 
     fun setJoystickActive(active: Boolean) {
         _isJoystickActive.value = active
-        if (!active) {
+        if (active) {
+            clearRouteState()
+            _activeMode.value = MockSimulationMode.JOYSTICK
+        } else {
             _joystickLocation.value = null
+            if (_activeMode.value == MockSimulationMode.JOYSTICK) {
+                _activeMode.value = if (_isPointMockActive.value) {
+                    MockSimulationMode.SINGLE_POINT
+                } else {
+                    MockSimulationMode.NONE
+                }
+            }
         }
     }
 
@@ -65,10 +79,19 @@ class SimulationStateRepository @Inject constructor() {
     }
 
     fun setPointMock(active: Boolean, location: WayPoint? = null) {
+        if (active) {
+            clearRouteState()
+        }
         _isPointMockActive.value = active
         _pointMockLocation.value = if (active) location else null
         if (active && location != null) {
             _selectedTargetLocation.value = location
+        }
+        _activeMode.value = when {
+            _isJoystickActive.value -> MockSimulationMode.JOYSTICK
+            active -> MockSimulationMode.SINGLE_POINT
+            _activeMode.value == MockSimulationMode.SINGLE_POINT -> MockSimulationMode.NONE
+            else -> _activeMode.value
         }
     }
 
@@ -81,7 +104,12 @@ class SimulationStateRepository @Inject constructor() {
     }
 
     fun onSimulationStarted(route: Route, speedKmh: Float) {
+        _isPointMockActive.value = false
+        _pointMockLocation.value = null
+        _isJoystickActive.value = false
+        _joystickLocation.value = null
         _pendingRoute = route
+        _activeMode.value = MockSimulationMode.ROUTE
         _state.value = SimulationState(
             status = SimulationStatus.Running,
             route = route,
@@ -113,6 +141,7 @@ class SimulationStateRepository @Inject constructor() {
             pausedElapsedMs = cur.pausedElapsedMs + runElapsed,
             startTimeMs = null
         )
+        _activeMode.value = MockSimulationMode.ROUTE
     }
 
     fun onSimulationCompleted() {
@@ -120,11 +149,17 @@ class SimulationStateRepository @Inject constructor() {
             status = SimulationStatus.Completed,
             progressPercent = 1f
         )
+        _activeMode.value = MockSimulationMode.NONE
     }
 
     fun onStopped() {
         _pendingRoute = null
         _state.value = SimulationState()   // full reset
+        _activeMode.value = when {
+            _isJoystickActive.value -> MockSimulationMode.JOYSTICK
+            _isPointMockActive.value -> MockSimulationMode.SINGLE_POINT
+            else -> MockSimulationMode.NONE
+        }
     }
 
     fun onError(message: String) {
@@ -133,5 +168,14 @@ class SimulationStateRepository @Inject constructor() {
 
     fun setSpeed(speedKmh: Float) {
         _state.value = _state.value.copy(speedKmh = speedKmh)
+    }
+
+    /**
+     * Route state and single-point state can never coexist. This is intentionally synchronous so a
+     * paused route cannot briefly survive while a point-mock foreground-service intent is starting.
+     */
+    private fun clearRouteState() {
+        _pendingRoute = null
+        _state.value = SimulationState()
     }
 }

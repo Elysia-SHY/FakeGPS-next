@@ -73,6 +73,7 @@ import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.AtlasSurface
 import com.mockrun.app.core.designsystem.GlassDialogWindowEffect
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
+import com.mockrun.app.core.designsystem.appFilterChipColors
 import com.mockrun.app.core.location.RoadMode
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.domain.model.WayPoint
@@ -415,6 +416,7 @@ fun RoadRouteDialog(
 ) {
     val context = LocalContext.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val filterChipColors = appFilterChipColors()
     val roadOrigin by mapViewModel.roadOrigin.collectAsState()
     val roadDestination by mapViewModel.roadDestination.collectAsState()
     val roadMode by mapViewModel.roadMode.collectAsState()
@@ -654,6 +656,7 @@ fun RoadRouteDialog(
                     FilterChip(
                         selected = mode == roadMode,
                         onClick = { mapViewModel.setRoadMode(mode) },
+                        colors = filterChipColors,
                         label = {
                             Text(
                                 text = "${mode.emoji} ${mode.label}",

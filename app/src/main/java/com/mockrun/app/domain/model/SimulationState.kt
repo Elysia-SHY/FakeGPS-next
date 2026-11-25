@@ -8,6 +8,14 @@ sealed class SimulationStatus {
     data class Error(val message: String) : SimulationStatus()
 }
 
+/** The one coordinate-injection pipeline that currently owns the shared system provider. */
+enum class MockSimulationMode {
+    NONE,
+    SINGLE_POINT,
+    ROUTE,
+    JOYSTICK
+}
+
 /**
  * Full simulation state exposed to the UI via StateFlow.
  * Elapsed time survives pause by accumulating in [pausedElapsedMs].

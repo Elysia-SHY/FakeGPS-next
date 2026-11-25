@@ -6,12 +6,6 @@ import com.mockrun.app.feature.map.SearchLocationDialog
 import com.mockrun.app.feature.map.RoadRouteDialog
 import com.mockrun.app.feature.map.MapFloatingActions
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.drawable.BitmapDrawable
 import android.content.Intent
 import android.location.Location
 import android.location.LocationManager
@@ -20,6 +14,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,22 +55,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.compose.ui.viewinterop.AndroidView
@@ -118,45 +106,29 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 /** 反向地理编码尚未返回时的占位文案；收藏命名据此判断地址是否可用。 */
 private const val ADDRESS_PLACEHOLDER = "正在获取当前地址..."
 
-/**
- * 中央准星 Pin 块的固有高度（dp）：
- * 胶囊提示条 ≈ 28（Caption1 12pt + 上下 5dp padding + 描边）
- * + 7 间距 + 水滴 Pin 40 + 3 间距 + 落地阴影 5 ≈ 83dp。
- *
- * 用于按底部面板实测高度反推 Pin 的垂直让位量，替代原先写死的 130dp。
- */
+/** 中央准星 Pin 块的固有高度（dp），只用于让水滴尖端对准屏幕中心。 */
 private val CENTER_PIN_BLOCK_HEIGHT = 83.dp
 
-/**
- * Pin 尖端相对「Pin 块中心」的垂直偏移（dp）。
- *
- * 块内自顶向下：胶囊提示条 ≈28 + 间距 7 + 水滴 Pin 40 + 间距 3 + 落地阴影 5 = 83dp，
- * 水滴的尖端在 28+7+40 = 75dp 处，块中心在 41.5dp 处 → 尖端在块中心下方 33.5dp。
- * 即：`CENTER_PIN_BLOCK_HEIGHT / 2 - (3 + 5)`。
- */
+/** Pin 尖端相对 Pin 块中心的固定偏移，与抽屉高度完全无关。 */
 private val PIN_TIP_BELOW_BLOCK_CENTER = CENTER_PIN_BLOCK_HEIGHT / 2 - 8.dp
 
-/** Pin 尖端与底部抽屉顶边之间必须保留的呼吸距离。 */
-private val PIN_TIP_GAP = 12.dp
+private val CROSSHAIR_FADE_BAND = 48.dp
 
 /**
- * Pin 尖端需要从容器中心再上移多少像素（抽屉让位量）。
- *
- * 约束：`容器中心 − 让位量 ≤ 抽屉顶边 − PIN_TIP_GAP`
- *     ⇒ 让位量 ≥ 抽屉高 − 容器高/2 + PIN_TIP_GAP
- * 抽屉不高时取 0：此时尖端正好压在容器中心，瞄准点 = 地图中心 = 尖端，三者重合。
- *
- * 纯函数，方便单测；`panelHeightPx` 为 0（首帧还没测量）时用折叠态兜底高度。
+ * Crosshair opacity is derived only from whether the drawer has reached the screen centre. The
+ * crosshair position never reads drawer height, so dragging the sheet cannot push it toward the
+ * status bar.
  */
-private fun pinTipClearancePx(
-    boxHeightPx: Int,
+internal fun crosshairAlphaForDrawer(
+    containerHeightPx: Int,
     panelHeightPx: Int,
-    fallbackPanelPx: Int,
-    gapPx: Int
-): Int {
-    if (boxHeightPx <= 0) return 0
-    val panelPx = if (panelHeightPx > 0) panelHeightPx else fallbackPanelPx
-    return maxOf(0, panelPx - boxHeightPx / 2 + gapPx)
+    fadeBandPx: Int
+): Float {
+    if (containerHeightPx <= 0 || panelHeightPx <= 0) return 1f
+    val drawerTop = containerHeightPx - panelHeightPx
+    val center = containerHeightPx / 2f
+    val halfBand = fadeBandPx.coerceAtLeast(1) / 2f
+    return ((drawerTop - center + halfBand) / (halfBand * 2f)).coerceIn(0f, 1f)
 }
 
 /**
@@ -164,8 +136,7 @@ private fun pinTipClearancePx(
  * - 54dp / 12dp 来自 MapFloatingActions（MapFloatingActions.kt:54「全览路线」FAB、
  *   :80「真机物理定位」FAB，以及它自己 Column 的 spacedBy(12.dp)）。
  *   ROUTE 且航点 >= 2 时两个圆同时在列里，所以那一档 FAB 块高 = 54 + 12 + 54 = 120dp。
- * - 112dp 是缩放胶囊的几何下限：两个 48dp 按钮 + 轨道与内边距 16dp
- *   （IosVerticalZoomControl 的 Column = padding(vertical = 4.dp) + 两个 48dp 按钮 + weight 轨道）。
+ * - 缩放控件固定为 176dp，绝不随抽屉高度压缩。
  * - 56dp 是顶部图标簇高度，用于推出右列顶边不得越过的限制线。
  */
 private val RIGHT_FAB_SIZE = 54.dp
@@ -181,8 +152,11 @@ private val RIGHT_PANEL_GAP = 12.dp
 private val TOP_ICON_ROW_HEIGHT = 56.dp
 /** 控件列顶边与顶部图标簇之间的呼吸距离。 */
 private val TOP_MARGIN = 12.dp
-private val RIGHT_MIN_CAPSULE = 112.dp
-private val RIGHT_MAX_CAPSULE = 180.dp
+
+private data class RightControlsVisibility(
+    val zoom: Boolean,
+    val actions: Boolean
+)
 
 /**
  * 应用分流胶囊行（「全局通用」+ 各应用分流 +「添加分流」）的固有高度 [估算]：
@@ -191,126 +165,19 @@ private val RIGHT_MAX_CAPSULE = 180.dp
  */
 private val TOP_CAPSULE_ROW_HEIGHT = 56.dp
 
-/**
- * 地图必须留给用户操作的净空高度 —— 任何悬浮控件都不许侵入这一条带。
- *
- * = 右列紧凑形态的高度（max(胶囊几何下限 112dp, 路线页双 FAB 块 120dp)）
- *   + 与底部抽屉的呼吸 12dp + 与顶部控件的呼吸 12dp = 144dp。
- *
- * 由右列几何常量推导而非写死数字：改右列尺寸时这里自动跟随。底部抽屉的高度上限
- * 就是用这条净空反推的（见 MapScreen 的 panelMaxHeight），因此右列在任何抽屉档位下
- * 都放得下，且顶部控件永远压不到。
- */
-private val MAP_MIN_VISIBLE_BAND =
-    maxOf(RIGHT_MIN_CAPSULE, RIGHT_FAB_BLOCK_ROUTE) + RIGHT_PANEL_GAP + TOP_MARGIN
-
-/**
- * 抽屉的物理下限（卡片内容高）：拖拽手柄 48dp + 卡片上下内边距 28dp。
- * 屏幕再矮也不能把抽屉压到连手柄都点不到 —— 那会让「收起 / 展开」交互直接失效。
- */
-private val PANEL_MIN_CONTENT_HEIGHT = 76.dp
-
-/**
- * 抽屉折叠（COLLAPSED）态下卡片部分的固有高度 [估算]。
- *
- * 推导自 LocationControlPanel 的布局（只读参考，本文件不改它）：
- * 卡片内 Column = padding 14 + 拖拽手柄 48（minTouchTarget）+ 间距 12 + 搜索行 52 + padding 14
- * ≈ 140dp；卡片底部那份 ScreenInsets 预留不含在内，由 collapsedPanelFallback 按设备实时求得。
- * 只用于 onGloballyPositioned 首次回填之前的那一帧。
- */
-private val COLLAPSED_PANEL_CARD_HEIGHT = 140.dp
-
-/**
- * 右列「胶囊收缩 / 形态切换」的过渡曲线 —— 与底部抽屉自身的展开动画同源。
- *
- * 规格逐字抄自 LocationControlPanel.kt:138-143（只读抄录，未改该文件）：
- *     .animateContentSize(
- *         animationSpec = spring(
- *             dampingRatio = Spring.DampingRatioLowBouncy,
- *             stiffness = Spring.StiffnessMediumLow
- *         )
- *     )
- * 即 dampingRatio = 0.75f、stiffness = 400f；visibilityThreshold 未显式给出，
- * 沿用各动画类型的默认阈值（Dp 为 0.5dp，Float 为 0.01f）。
- */
-private val DRAWER_SPRING = spring<Float>(
-    dampingRatio = Spring.DampingRatioLowBouncy,
-    stiffness = Spring.StiffnessMediumLow
-)
-private val DRAWER_SPRING_DP = spring<Dp>(
-    dampingRatio = Spring.DampingRatioLowBouncy,
-    stiffness = Spring.StiffnessMediumLow
-)
-
-/**
- * 右列在「当前抽屉高度」下的形态与胶囊目标高度。
- *
- * @param compact 竖排最小形态也放不下时为 true —— FAB 块移到胶囊左侧，整列高度只剩胶囊。
- * @param capsuleHeight 胶囊目标高度，已扣入顶边限制线（statusBarTop + 图标簇 + 呼吸）。
- * @param compactFloor 形态插值至少要走到这个比例（0..1），列顶才不越限制线。动画的 fraction
- *   取 max(spring 值, 这个下限)：既保证不变量②在过渡的每一帧成立，又因为是 max 而非赋值，
- *   曲线仍连续（不跳变）。
- */
-private data class RightColumnMetrics(
-    val compact: Boolean,
-    val capsuleHeight: Dp,
-    val compactFloor: Float
-)
-
-/**
- * 右列悬浮控件的两种形态，在同一条 spring 上插值（子节点顺序：0 = 缩放胶囊，1 = FAB 块）。
- *
- * - 竖排（compactFraction = 0）：胶囊在上，FAB 块在下方 RIGHT_FAB_GAP 处（原设计稿 .map-fabs）；
- * - 紧凑（= 1）：FAB 块移到胶囊左侧 RIGHT_FAB_GAP 处，整列高度 = max(胶囊高, FAB 块高)。
- *
- * 为什么不用 Column / Row 互换：两种形态要在同一棵节点树上滑动过渡（FAB 从「胶囊下方」滑到
- * 「胶囊左侧」），互换容器会重建子树、只能靠淡入淡出，既不是同一条 spring，也会在切换瞬间
- * 丢掉 48dp 触区。这里两个子节点全程在位，位置按 fraction 线性插值。
- *
- * 不变量：任何 fraction 下两个子节点都落在上报尺寸内（竖排的上报高度恰为内容高，紧凑按上报
- * 高度居中），所以「底边恒胶着在抽屉顶边上方」（不变量①）在过渡的每一帧都成立。
- */
-@Composable
-private fun RightFloatingControlsLayout(
-    compactFraction: Float,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Layout(modifier = modifier, content = content) { measurables, _ ->
-        if (measurables.size < 2) {
-            layout(0, 0) { }
-        } else {
-            val capsule = measurables[0].measure(Constraints())
-            val fab = measurables[1].measure(Constraints())
-            val gapPx = RIGHT_FAB_GAP.roundToPx()
-            val f = compactFraction.coerceIn(0f, 1f)
-            fun mix(a: Int, b: Int) = (a + (b - a) * f).roundToInt()
-
-            // 竖排槽位
-            val portraitWidth = maxOf(capsule.width, fab.width)
-            val portraitHeight = capsule.height + gapPx + fab.height
-            val portraitCapsuleX = (portraitWidth - capsule.width) / 2
-            val portraitFabX = (portraitWidth - fab.width) / 2
-            val portraitFabY = capsule.height + gapPx
-
-            // 紧凑槽位
-            val compactWidth = fab.width + gapPx + capsule.width
-            val compactHeight = maxOf(capsule.height, fab.height)
-            val compactFabY = (compactHeight - fab.height) / 2
-            val compactCapsuleX = fab.width + gapPx
-            val compactCapsuleY = (compactHeight - capsule.height) / 2
-
-            layout(mix(portraitWidth, compactWidth), mix(portraitHeight, compactHeight)) {
-                capsule.place(mix(portraitCapsuleX, compactCapsuleX), mix(0, compactCapsuleY))
-                fab.place(mix(portraitFabX, 0), mix(portraitFabY, compactFabY))
-            }
-        }
-    }
-}
-
 enum class MapTab {
     LOCATION,
     ROUTE
+}
+
+internal enum class MapOverlayMode {
+    SINGLE_LOCATION,
+    ROUTE
+}
+
+internal fun overlayModeFor(tab: MapTab): MapOverlayMode = when (tab) {
+    MapTab.LOCATION -> MapOverlayMode.SINGLE_LOCATION
+    MapTab.ROUTE -> MapOverlayMode.ROUTE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -429,19 +296,23 @@ fun MapScreen(
     var updateCenterJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var userRealLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-    var centerAimingCoord by remember {
+    var locationAimingCoord by remember {
         mutableStateOf(
             pointMockLocation?.let { it.latitude to it.longitude }
                 ?: selectedTargetLocation?.let { it.latitude to it.longitude }
                 ?: (39.9042 to 116.4074)
         )
     }
+    var routeAimingCoord by remember {
+        mutableStateOf(
+            selectedRoute?.waypoints?.firstOrNull()?.let { it.latitude to it.longitude }
+                ?: (39.9042 to 116.4074)
+        )
+    }
     var currentAddressText by remember { mutableStateOf(ADDRESS_PLACEHOLDER) }
     var currentZoom by remember { mutableDoubleStateOf(16.0) }
 
-    // 中央 Pin 的让位量由底部面板实测高度推导（面板有 COLLAPSED/DEFAULT/EXPANDED
-    // 三档，以及路线页 SELECTING/READY/RUNNING 三种布局，写死的 130dp 在面板长高时
-    // 会被面板盖住）。这里测容器高度与面板高度，实时校准。
+    // 中央 Pin 固定在屏幕中心；抽屉实测高度只用于计算覆盖后的淡出透明度。
     var mapBoxHeightPx by remember { mutableIntStateOf(0) }
     var bottomPanelHeightPx by remember { mutableIntStateOf(0) }
     // 顶部控件簇（状态栏 + 地址条 + 定位页的应用分流胶囊行）的实测高度。
@@ -450,12 +321,8 @@ fun MapScreen(
     var topChromeHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val selectionColors = AppSelectionColors.current
     val pageBackdrop = if (isLiquidGlass) rememberLayerBackdrop() else null
-
-    // 首帧兜底用的折叠态面板高度：onGloballyPositioned 要等第一次布局结束才回填真实值，
-    // 在此之前 offset 若读到 0 会让控件先贴到容器底部、下一帧再弹上去。
-    // ScreenInsets 的底部预留是设备相关的（系统导航栏 + 浮空底栏 72 + 外距 12 + 呼吸 12）。
-    val collapsedPanelFallback = ScreenInsets.bottomInset(extra = 12.dp) + COLLAPSED_PANEL_CARD_HEIGHT
 
     // 顶部安全区高度（只用于 onGloballyPositioned 首次回填之前的兜底估算）。
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -470,6 +337,14 @@ fun MapScreen(
     } else {
         topChromeFallback
     }
+    // The location drawer may expand under the secondary app-diversion capsule row, but never
+    // under the primary address/tool card. Route mode has no secondary row.
+    val panelTopChromeHeight = if (activeMapTab == MapTab.LOCATION) {
+        (topChromeHeight - TOP_CAPSULE_ROW_HEIGHT)
+            .coerceAtLeast(statusBarTop + TOP_ICON_ROW_HEIGHT)
+    } else {
+        topChromeHeight
+    }
 
     // 右列顶边不得越过的限制线 = 顶部控件簇实测底边 + 呼吸。
     // 旧实现写死「状态栏 + 56dp 图标行 + 12dp」，漏掉了定位页第二行的应用分流胶囊行
@@ -477,33 +352,18 @@ fun MapScreen(
     // 胶囊行里盖住「添加分流」等入口。改为跟随实测高度后这条重叠在物理上不可能发生。
     val rightColumnTopLimit = topChromeHeight + TOP_MARGIN
 
-    // 统一「地图可用区」约束：底部抽屉允许长到的最大高度（含底部安全区）。
-    //   上限 = 容器高 − 顶部控件簇实测高 − 地图净空（MAP_MIN_VISIBLE_BAND）
-    //          → 抽屉在物理上够不到应用分流胶囊行，顶部控件不可能被抽屉遮挡；
-    //   下限 = 底部安全区 + 拖拽手柄 + 卡片内边距
-    //          → 屏幕再矮也保证手柄可点、抽屉可收放（此时宁可让抽屉压住顶部控件，
-    //            也不能把抽屉压成一条点不到手柄的窄缝）。
-    // 抽屉内容超出上限的部分由面板内部的 verticalScroll 承载，功能一个不少。
-    // collapsedPanelFallback = 底部安全区 + 折叠卡片 140dp，扣掉卡片高度即得底部安全区。
-    val panelMinHeight =
-        collapsedPanelFallback - COLLAPSED_PANEL_CARD_HEIGHT + PANEL_MIN_CONTENT_HEIGHT
-    // 容器高：首帧 onGloballyPositioned 还没回填时用窗口高度兜底 ——
-    // 高度上限因此永远是具体值（面板内部要用 weight 分配剩余空间，不能是无限约束）。
-    val containerHeight = if (mapBoxHeightPx > 0) {
-        with(density) { mapBoxHeightPx.toDp() }
-    } else {
-        LocalConfiguration.current.screenHeightDp.dp
-    }
-    val panelMaxHeight = (containerHeight - topChromeHeight - MAP_MIN_VISIBLE_BAND)
-        .coerceAtLeast(panelMinHeight)
+    val collapsedPanelFallback = ScreenInsets.bottomBarHeight +
+        if (activeMapTab == MapTab.LOCATION) 96.dp else 84.dp
 
-    // 右列形态与胶囊目标高度 —— 由抽屉实测高度推导。
-    // 用 derivedStateOf 而不是直接读 state：只有结果真的变了才通知读取者 ——
-    // compact 是 Boolean，一整轮抽屉动作最多翻转一次；capsuleHeight 只在「顶边被限制线压住」
-    // 的区间里逐帧变化，且是连续变化（不跳变）。
-    // 竖排最小形态 = 胶囊下限 112 + 间距 12 + FAB 块（54；ROUTE 且航点 >= 2 时 120）；
-    // 可用高度连它都放不下就切紧凑形态，整列高度只剩胶囊，下限仍是 112。
-    val rightColumnMetrics by remember(activeMapTab, drawnWaypoints.size, density, rightColumnTopLimit) {
+    // The zoom capsule has a fixed 176dp geometry. If the drawer leaves less than that (plus the
+    // FAB block and breathing room), it fades out instead of being squeezed. derivedStateOf keeps
+    // the map page out of per-frame recomposition while the drawer itself is being dragged.
+    val rightControlsVisibility by remember(
+        activeMapTab,
+        drawnWaypoints.size,
+        density,
+        rightColumnTopLimit
+    ) {
         derivedStateOf {
             val fabBlock = if (activeMapTab == MapTab.ROUTE && drawnWaypoints.size >= 2) {
                 RIGHT_FAB_BLOCK_ROUTE
@@ -511,44 +371,19 @@ fun MapScreen(
                 RIGHT_FAB_SIZE
             }
             if (mapBoxHeightPx == 0 || bottomPanelHeightPx == 0) {
-                RightColumnMetrics(compact = false, capsuleHeight = RIGHT_MAX_CAPSULE, compactFloor = 0f)
+                RightControlsVisibility(zoom = true, actions = true)
             } else {
                 with(density) {
-                    // 列底（胶着在抽屉顶边上方 RIGHT_PANEL_GAP）到限制线之间还剩多少高度
                     val available = mapBoxHeightPx.toDp() - bottomPanelHeightPx.toDp() -
                         RIGHT_PANEL_GAP - rightColumnTopLimit
-                    // 竖排口径的胶囊高度：剩余空间扣掉间距与 FAB 块，再夹到 112..180
-                    val portraitCapsule = (available - RIGHT_FAB_GAP - fabBlock)
-                        .coerceIn(RIGHT_MIN_CAPSULE, RIGHT_MAX_CAPSULE)
-                    val portraitHeight = portraitCapsule + RIGHT_FAB_GAP + fabBlock
-                    // 竖排最小形态都放不下 -> 切紧凑；紧凑下胶囊停在几何下限（不去填满剩余空间：
-                    // 填满会把列顶推到限制线以上，且会在切换点与竖排的 112dp 产生跳变）。
-                    val compact = available < portraitHeight
-                    val capsule = if (compact) RIGHT_MIN_CAPSULE else portraitCapsule
-                    val compactHeight = maxOf(capsule, fabBlock)
-                    val compactFloor = if (compact && compactHeight < portraitHeight) {
-                        ((available - portraitHeight) / (compactHeight - portraitHeight))
-                            .coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    }
-                    RightColumnMetrics(compact, capsule, compactFloor)
+                    RightControlsVisibility(
+                        zoom = available >= MapVerticalZoomControlHeight + RIGHT_FAB_GAP + fabBlock,
+                        actions = available >= fabBlock
+                    )
                 }
             }
         }
     }
-    val zoomCapsuleTarget = rightColumnMetrics.capsuleHeight
-
-    // 形态切换本身也是动画：FAB 块从「胶囊下方」滑到「胶囊左侧」，与胶囊收缩共用
-    // 抽屉自己的那条 spring（DRAWER_SPRING，规格来源见其 KDoc）。
-    val rightColumnCompactFraction by animateFloatAsState(
-        targetValue = if (rightColumnMetrics.compact) 1f else 0f,
-        animationSpec = DRAWER_SPRING,
-        label = "rightColumnCompact"
-    )
-    // 抽屉还在继续变高、而 spring 还没走完的中间帧，用实时下限把形态至少压到
-    // 「列顶落在限制线上」的程度：不变量②在整个过渡期间成立，且 max 而非赋值保证曲线连续。
-    val rightColumnFraction = maxOf(rightColumnCompactFraction, rightColumnMetrics.compactFloor)
 
     val roadOrigin by mapViewModel.roadOrigin.collectAsState()
     val roadDestination by mapViewModel.roadDestination.collectAsState()
@@ -586,16 +421,50 @@ fun MapScreen(
             userRealLocation = lat to lon
             simulationViewModel.updateRealPhysicalLocation(lat, lon)
             if (pointMockLocation == null && selectedTargetLocation == null) {
-                centerAimingCoord = lat to lon
+                locationAimingCoord = lat to lon
             }
         }
     }
 
-    // Active Aiming Coordinate: directly anchored to center crosshair
-    val activeCoord = centerAimingCoord
+    // Page-local aiming coordinates. Route waypoints must never overwrite the single-location
+    // target merely because the two tabs share one MapView instance.
+    val activeCoord = if (activeMapTab == MapTab.LOCATION) {
+        locationAimingCoord
+    } else {
+        routeAimingCoord
+    }
+    val mapOverlayMode = overlayModeFor(activeMapTab)
+
+    fun setActiveAimingCoord(latitude: Double, longitude: Double) {
+        if (activeMapTab == MapTab.LOCATION) {
+            locationAimingCoord = latitude to longitude
+            if (activeTargetKey == null) {
+                simulationViewModel.updateSelectedTarget(latitude, longitude)
+            }
+        } else {
+            routeAimingCoord = latitude to longitude
+        }
+    }
 
     LaunchedEffect(activeCoord) {
         currentAddressText = AddressResolver.resolveAddress(context, activeCoord.first, activeCoord.second)
+    }
+
+    LaunchedEffect(activeMapTab, mapViewRef) {
+        bottomPanelHeightPx = 0
+        val mapView = mapViewRef ?: return@LaunchedEffect
+        val target = if (activeMapTab == MapTab.LOCATION) {
+            locationAimingCoord
+        } else {
+            routeAimingCoord
+        }
+        val (displayLat, displayLon) = if (currentMapType == MapSourceType.OPEN_STREET_MAP) {
+            target
+        } else {
+            CoordinateConverter.wgs84ToGcj02(target.first, target.second)
+        }
+        mapView.controller.setCenter(GeoPoint(displayLat, displayLon))
+        mapView.invalidate()
     }
 
     val gpxPickerLauncher = rememberLauncherForActivityResult(
@@ -610,53 +479,35 @@ fun MapScreen(
         }
     }
 
-    /**
-     * 把「Pin 尖端所指的地图位置」写回瞄准坐标（内部统一 WGS-84）。
-     *
-     * 瞄准点必须跟着**尖端**走，而不是跟着地图中心走：尖端为了让开底部抽屉会上移，
-     * 用中心点会让注入位置落在尖端以南（折叠态几十米，抽屉全展可达数百米）。
-     */
-    fun recomputeAimingFromPinTip() {
+    /** The crosshair is fixed at the map centre, so the aiming coordinate is the centre point. */
+    fun recomputeAimingFromMapCenter() {
         val mapView = mapViewRef ?: return
         if (mapView.width <= 0 || mapView.height <= 0) return
-        val clearancePx = with(density) {
-            pinTipClearancePx(
-                boxHeightPx = mapBoxHeightPx,
-                panelHeightPx = bottomPanelHeightPx,
-                fallbackPanelPx = collapsedPanelFallback.roundToPx(),
-                gapPx = PIN_TIP_GAP.roundToPx()
-            )
+        val centerGeo = runCatching {
+            mapView.projection.fromPixels(mapView.width / 2, mapView.height / 2)
         }
-        val tipY = (mapView.height / 2f - clearancePx).toInt()
-            .coerceIn(0, (mapView.height - 1).coerceAtLeast(0))
-        val tipGeo = runCatching { mapView.projection.fromPixels(mapView.width / 2, tipY) }
-            .logFailure("MapScreen", "project pin tip to GeoPoint", Diag.Level.DEBUG)
+            .logFailure("MapScreen", "project map centre to GeoPoint", Diag.Level.DEBUG)
             .getOrNull() ?: return
         val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
         val (wgsLat, wgsLon) = if (isGcjMap) {
-            CoordinateConverter.gcj02ToWgs84(tipGeo.latitude, tipGeo.longitude)
+            CoordinateConverter.gcj02ToWgs84(centerGeo.latitude, centerGeo.longitude)
         } else {
-            tipGeo.latitude to tipGeo.longitude
+            centerGeo.latitude to centerGeo.longitude
         }
-        centerAimingCoord = wgsLat to wgsLon
-        if (activeTargetKey == null) {
-            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
-        }
+        setActiveAimingCoord(wgsLat, wgsLon)
     }
 
-    /**
-     * 抽屉高度变化后延迟重算瞄准点（防抖 160ms：展开动画期间只算最后一帧）。
-     *
-     * 由面板的 `onGloballyPositioned` 触发 —— 刻意不放在组合期：
-     * 组合期读 `bottomPanelHeightPx` 会让整页在抽屉动画的每一帧重组（连带地图 overlay 重建）。
-     */
-    fun scheduleAimingRecompute() {
-        updateCenterJob?.cancel()
-        updateCenterJob = coroutineScope.launch {
-            delay(160)
-            recomputeAimingFromPinTip()
+    // AndroidView.factory stores its first lambda. These holders keep map gestures bound to the
+    // currently selected page instead of the tab that happened to create the MapView.
+    val latestSetActiveAimingCoord = rememberUpdatedState<(Double, Double) -> Unit>(
+        newValue = { latitude, longitude ->
+            setActiveAimingCoord(latitude, longitude)
         }
-    }
+    )
+    val latestRecomputeAiming = rememberUpdatedState<() -> Unit>(
+        newValue = { recomputeAimingFromMapCenter() }
+    )
+    val latestMapType = rememberUpdatedState(currentMapType)
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -707,7 +558,7 @@ fun MapScreen(
                         controller.setZoom(currentZoom)
 
                         // Center on initial aiming coordinate
-                        val initCoord = centerAimingCoord
+                        val initCoord = activeCoord
                         val (initLat, initLon) = if (currentMapType != MapSourceType.OPEN_STREET_MAP) {
                             CoordinateConverter.wgs84ToGcj02(initCoord.first, initCoord.second)
                         } else {
@@ -724,8 +575,7 @@ fun MapScreen(
                                 updateCenterJob?.cancel()
                                 updateCenterJob = coroutineScope.launch {
                                     delay(120)
-                                    // 瞄准点 = Pin 尖端所指的位置（不是地图中心），见 recomputeAimingFromPinTip
-                                    recomputeAimingFromPinTip()
+                                    latestRecomputeAiming.value()
                                 }
                                 return false
                             }
@@ -734,7 +584,7 @@ fun MapScreen(
                         val receiver = object : MapEventsReceiver {
                             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                                 p?.let {
-                                    val (wgsLat, wgsLon) = if (currentMapType == MapSourceType.OPEN_STREET_MAP) {
+                                    val (wgsLat, wgsLon) = if (latestMapType.value == MapSourceType.OPEN_STREET_MAP) {
                                         it.latitude to it.longitude
                                     } else {
                                         CoordinateConverter.gcj02ToWgs84(it.latitude, it.longitude)
@@ -743,11 +593,7 @@ fun MapScreen(
                                         mapViewModel.addWaypoint(wgsLat, wgsLon)
                                     } else {
                                         mapViewRef?.controller?.animateTo(it)
-                                        centerAimingCoord = wgsLat to wgsLon
-                                        val activeKey = activeTargetKey
-                                        if (activeKey == null) {
-                                            simulationViewModel.updateSelectedTarget(wgsLat, wgsLon)
-                                        }
+                                        latestSetActiveAimingCoord.value(wgsLat, wgsLon)
                                     }
                                 }
                                 return true
@@ -768,162 +614,154 @@ fun MapScreen(
                         mapView.overlayManager.tilesOverlay.setColorFilter(null)
                     }
 
-                    // 1. Draw route polyline
-                    val routeOverlays = mapView.overlays.filterIsInstance<Polyline>()
-                    routeOverlays.forEach { mapView.overlays.remove(it) }
+                    // Overlay ownership is exclusive: every update clears both marker and polyline
+                    // layers, then redraws only the active page's mode.
+                    mapView.overlays.filterIsInstance<Polyline>().forEach(mapView.overlays::remove)
+                    mapView.overlays.filterIsInstance<Marker>().forEach(mapView.overlays::remove)
 
-                    if (drawnWaypoints.size >= 2) {
-                        val polyline = Polyline().apply {
-                            val displayPoints = drawnWaypoints.map { wp ->
-                                if (isGcjMap) {
-                                    val (gcjLat, gcjLon) = CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude)
-                                    GeoPoint(gcjLat, gcjLon)
-                                } else {
-                                    GeoPoint(wp.latitude, wp.longitude)
+                    fun displayPoint(latitude: Double, longitude: Double): GeoPoint {
+                        return if (isGcjMap) {
+                            val (gcjLat, gcjLon) = CoordinateConverter.wgs84ToGcj02(latitude, longitude)
+                            GeoPoint(gcjLat, gcjLon)
+                        } else {
+                            GeoPoint(latitude, longitude)
+                        }
+                    }
+
+                    when (mapOverlayMode) {
+                        MapOverlayMode.ROUTE -> {
+                            if (drawnWaypoints.size >= 2) {
+                                val polyline = Polyline().apply {
+                                    setPoints(drawnWaypoints.map {
+                                        displayPoint(it.latitude, it.longitude)
+                                    })
+                                    outlinePaint.color = android.graphics.Color.parseColor("#34C759")
+                                    outlinePaint.strokeWidth = 12f
+                                }
+                                mapView.overlays.add(polyline)
+                            }
+
+                            drawnWaypoints.forEachIndexed { index, waypoint ->
+                                val isTerminal = index == 0 || index == drawnWaypoints.lastIndex
+                                val waypointMarker = Marker(mapView).apply {
+                                    position = displayPoint(waypoint.latitude, waypoint.longitude)
+                                    icon = MapPinHelper.getWaypointPin(context, index + 1, isTerminal)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                    title = "航点 ${index + 1}"
+                                    snippet = "${"%.5f".format(waypoint.latitude)}, ${"%.5f".format(waypoint.longitude)}"
+                                }
+                                mapView.overlays.add(waypointMarker)
+                            }
+
+                            simState.currentWayPoint?.let { progress ->
+                                val runner = Marker(mapView).apply {
+                                    position = displayPoint(progress.latitude, progress.longitude)
+                                    icon = MapPinHelper.getRunnerPin(context)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                    title = "路线巡航实时位置"
+                                    rotation = simState.bearing
+                                }
+                                mapView.overlays.add(runner)
+                            }
+
+                            roadOrigin?.let { origin ->
+                                val marker = Marker(mapView).apply {
+                                    position = displayPoint(origin.latitude, origin.longitude)
+                                    icon = MapPinHelper.getOriginPin(context)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    title = "沿路规划起点"
+                                }
+                                mapView.overlays.add(marker)
+                            }
+                            roadDestination?.let { destination ->
+                                val marker = Marker(mapView).apply {
+                                    position = displayPoint(destination.latitude, destination.longitude)
+                                    icon = MapPinHelper.getDestinationPin(context)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    title = "沿路规划终点"
+                                }
+                                mapView.overlays.add(marker)
+                            }
+                        }
+
+                        MapOverlayMode.SINGLE_LOCATION -> {
+                            val activePoint = pointMockLocation
+                            if (activePoint != null) {
+                                val marker = Marker(mapView).apply {
+                                    position = displayPoint(activePoint.latitude, activePoint.longitude)
+                                    icon = MapPinHelper.getActiveMockPin(context)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    title = "虚拟定位驻留点"
+                                }
+                                mapView.overlays.add(marker)
+                            } else {
+                                selectedTargetLocation?.let { target ->
+                                    val marker = Marker(mapView).apply {
+                                        position = displayPoint(target.latitude, target.longitude)
+                                        icon = MapPinHelper.getSelectedPin(context)
+                                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                        title = "当前目标虚拟定位点"
+                                    }
+                                    mapView.overlays.add(marker)
                                 }
                             }
-                            setPoints(displayPoints)
-                            outlinePaint.color = android.graphics.Color.parseColor("#34C759")
-                            outlinePaint.strokeWidth = 12f
-                        }
-                        mapView.overlays.add(polyline)
-                    }
 
-                    // 2. Clear markers and redraw
-                    val markers = mapView.overlays.filterIsInstance<Marker>()
-                    markers.forEach { mapView.overlays.remove(it) }
+                            if (isJoystickRunning) {
+                                joystickLocation?.let { joystick ->
+                                    val marker = Marker(mapView).apply {
+                                        position = displayPoint(joystick.latitude, joystick.longitude)
+                                        icon = MapPinHelper.getJoystickPin(context)
+                                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                        title = "万向摇杆位置"
+                                    }
+                                    mapView.overlays.add(marker)
+                                }
+                            }
 
-                    // Route Simulation Runner Marker
-                    simState.currentWayPoint?.let { wp ->
-                        val (displayLat, displayLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(wp.latitude, wp.longitude)
-                        } else {
-                            wp.latitude to wp.longitude
-                        }
-                        val runner = Marker(mapView).apply {
-                            position = GeoPoint(displayLat, displayLon)
-                            icon = MapPinHelper.getRunnerPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "路线模拟位置"
-                            rotation = simState.bearing
-                        }
-                        mapView.overlays.add(runner)
-                    }
+                            multiTargetRules.filter { it.isEnabled }.forEach { rule ->
+                                val colorInt = runCatching { android.graphics.Color.parseColor(rule.colorHex) }
+                                    .logFailure(
+                                        "MapScreen",
+                                        "parse rule color (${rule.appName})",
+                                        Diag.Level.DEBUG
+                                    )
+                                    .getOrDefault(android.graphics.Color.parseColor("#007AFF"))
+                                val marker = Marker(mapView).apply {
+                                    position = displayPoint(rule.latitude, rule.longitude)
+                                    icon = MapPinHelper.getAppPin(context, colorInt)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    title = "${rule.appName} · 分流定位"
+                                    snippet = "坐标: ${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}"
+                                    setOnMarkerClickListener { _, _ ->
+                                        simulationViewModel.setActiveTargetKey(rule.key)
+                                        locationAimingCoord = rule.latitude to rule.longitude
+                                        mapView.controller.animateTo(
+                                            displayPoint(rule.latitude, rule.longitude)
+                                        )
+                                        true
+                                    }
+                                }
+                                mapView.overlays.add(marker)
+                            }
 
-                    // Independent Joystick Marker
-                    joystickLocation?.let { joyWp ->
-                        val (joyLat, joyLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(joyWp.latitude, joyWp.longitude)
-                        } else {
-                            joyWp.latitude to joyWp.longitude
-                        }
-                        val joyMarker = Marker(mapView).apply {
-                            position = GeoPoint(joyLat, joyLon)
-                            icon = MapPinHelper.getJoystickPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "万向摇杆位置"
-                        }
-                        mapView.overlays.add(joyMarker)
-                    }
-
-                    // Single-Point Virtual Location Marker (Apple Emerald Green Teardrop Pin)
-                    pointMockLocation?.let { pLoc ->
-                        val (pLat, pLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(pLoc.latitude, pLoc.longitude)
-                        } else {
-                            pLoc.latitude to pLoc.longitude
-                        }
-                        val pMarker = Marker(mapView).apply {
-                            position = GeoPoint(pLat, pLon)
-                            icon = MapPinHelper.getActiveMockPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "虚拟定位驻留点"
-                        }
-                        mapView.overlays.add(pMarker)
-                    }
-
-                    // Multi-Tenant Per-App Target Markers (Vibrant Distinct Colors)
-                    multiTargetRules.filter { it.isEnabled }.forEach { rule ->
-                        val (appLat, appLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude)
-                        } else {
-                            rule.latitude to rule.longitude
-                        }
-                        val colorInt = runCatching { android.graphics.Color.parseColor(rule.colorHex) }
-                            .logFailure("MapScreen", "parse rule color (${rule.appName})", Diag.Level.DEBUG)
-                            .getOrDefault(android.graphics.Color.parseColor("#007AFF"))
-                        val appMarker = Marker(mapView).apply {
-                            position = GeoPoint(appLat, appLon)
-                            icon = MapPinHelper.getAppPin(context, colorInt)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "${rule.appName} · 分流定位"
-                            snippet = "坐标: ${"%.5f".format(rule.latitude)}, ${"%.5f".format(rule.longitude)}"
-                            setOnMarkerClickListener { _, _ ->
-                                simulationViewModel.setActiveTargetKey(rule.key)
-                                centerAimingCoord = rule.latitude to rule.longitude
-                                mapView.controller.animateTo(GeoPoint(appLat, appLon))
-                                true
+                            val realLoc = userRealLocation
+                                ?: realPhysicalLocation?.let { it.latitude to it.longitude }
+                            realLoc?.let { (latitude, longitude) ->
+                                val marker = Marker(mapView).apply {
+                                    position = displayPoint(latitude, longitude)
+                                    icon = MapPinHelper.getRealLocationPuck(context)
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                    title = "当前真实物理位置"
+                                    snippet = "硬件 GPS 坐标: ${"%.5f".format(latitude)}, ${"%.5f".format(longitude)}"
+                                    setOnMarkerClickListener { _, _ ->
+                                        locationAimingCoord = latitude to longitude
+                                        simulationViewModel.updateSelectedTarget(latitude, longitude)
+                                        true
+                                    }
+                                }
+                                mapView.overlays.add(marker)
                             }
                         }
-                        mapView.overlays.add(appMarker)
-                    }
-
-
-                    // Real Physical Location Puck (Apple Maps Signature Glowing Blue Puck)
-                    val realLoc = userRealLocation
-                        ?: realPhysicalLocation?.let { it.latitude to it.longitude }
-                        ?: userRealLocation
-                    realLoc?.let { (rLat, rLon) ->
-                        val (dispLat, dispLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(rLat, rLon)
-                        } else {
-                            rLat to rLon
-                        }
-                        val realPuckMarker = Marker(mapView).apply {
-                            position = GeoPoint(dispLat, dispLon)
-                            icon = MapPinHelper.getRealLocationPuck(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            title = "当前真实物理位置"
-                            snippet = "硬件 GPS 坐标: ${"%.5f".format(rLat)}, ${"%.5f".format(rLon)}"
-                            setOnMarkerClickListener { _, _ ->
-                                centerAimingCoord = rLat to rLon
-                                simulationViewModel.updateSelectedTarget(rLat, rLon)
-                                true
-                            }
-                        }
-                        mapView.overlays.add(realPuckMarker)
-                    }
-
-                    // Road Origin Marker (Green Start Pin)
-                    roadOrigin?.let { orig ->
-                        val (dispLat, dispLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(orig.latitude, orig.longitude)
-                        } else {
-                            orig.latitude to orig.longitude
-                        }
-                        val origMarker = Marker(mapView).apply {
-                            position = GeoPoint(dispLat, dispLon)
-                            icon = MapPinHelper.getOriginPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "路线起点"
-                        }
-                        mapView.overlays.add(origMarker)
-                    }
-
-                    // Road Destination Marker (Orange Destination Pin)
-                    roadDestination?.let { dest ->
-                        val (dispLat, dispLon) = if (isGcjMap) {
-                            CoordinateConverter.wgs84ToGcj02(dest.latitude, dest.longitude)
-                        } else {
-                            dest.latitude to dest.longitude
-                        }
-                        val destMarker = Marker(mapView).apply {
-                            position = GeoPoint(dispLat, dispLon)
-                            icon = MapPinHelper.getDestinationPin(context)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "路线终点"
-                        }
-                        mapView.overlays.add(destMarker)
                     }
 
                     mapView.invalidate()
@@ -1217,14 +1055,14 @@ fun MapScreen(
                                 isLiquidGlass = isLiquidGlass,
                                 shape = AppShapes.pill,
                                 containerColor = if (isSelected) {
-                                    MaterialTheme.colorScheme.primaryContainer
+                                    selectionColors.primaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                    selectionColors.unselectedContainer
                                 },
                                 contentColor = if (isSelected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                    selectionColors.onPrimaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface
+                                    selectionColors.unselectedContent
                                 },
                                 elevation = if (isSelected) 8.dp else 3.dp,
                                 modifier = Modifier
@@ -1234,8 +1072,8 @@ fun MapScreen(
                                         val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                                         val targetCoord = pointMockLocation?.let { p -> p.latitude to p.longitude }
                                             ?: selectedTargetLocation?.let { s -> s.latitude to s.longitude }
-                                            ?: centerAimingCoord
-                                        centerAimingCoord = targetCoord
+                                            ?: locationAimingCoord
+                                        locationAimingCoord = targetCoord
                                         val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(targetCoord.first, targetCoord.second) else targetCoord
                                         mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
                                     }
@@ -1252,9 +1090,9 @@ fun MapScreen(
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                            selectionColors.onPrimaryContainer
                                         } else {
-                                            MaterialTheme.colorScheme.onSurface
+                                            selectionColors.unselectedContent
                                         }
                                     )
                                 }
@@ -1277,25 +1115,25 @@ fun MapScreen(
                                 isLiquidGlass = isLiquidGlass,
                                 shape = AppShapes.pill,
                                 containerColor = if (isSelected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
+                                    selectionColors.secondaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                    selectionColors.unselectedContainer
                                 },
                                 contentColor = if (isSelected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                    selectionColors.onSecondaryContainer
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface
+                                    selectionColors.unselectedContent
                                 },
                                 elevation = if (isSelected) 8.dp else 3.dp,
                                 modifier = Modifier
                                     .height(48.dp)
                                     .clickable {
                                         simulationViewModel.setActiveTargetKey(rule.key)
-                                    centerAimingCoord = rule.latitude to rule.longitude
-                                    val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
-                                    val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
-                                    mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
-                                }
+                                        locationAimingCoord = rule.latitude to rule.longitude
+                                        val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
+                                        val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(rule.latitude, rule.longitude) else (rule.latitude to rule.longitude)
+                                        mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))
+                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -1317,9 +1155,9 @@ fun MapScreen(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) {
-                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                            selectionColors.onSecondaryContainer
                                         } else if (rule.isEnabled) {
-                                            MaterialTheme.colorScheme.onSurface
+                                            selectionColors.unselectedContent
                                         } else {
                                             MaterialTheme.colorScheme.onSurfaceVariant
                                         }
@@ -1366,27 +1204,8 @@ fun MapScreen(
                 }
             }
 
-            // 2 + 5. 右侧悬浮控件列（设计稿 .map-fabs —— 缩放与定位同列，去除 bottom 魔法数字）
-            //
-            // 锚点 TopEnd -> BottomEnd。旧实现固定顶锚（top = 164.dp 字面量）且完全不引用
-            // bottomPanelHeightPx，抽屉一长高就被盖住；改为底部锚定后
-            // 控件列底边 = 容器底 − (抽屉实测高度 + 12dp 呼吸)，恒定贴在抽屉顶边上方 12dp。
-            //
-            // 垂直偏移在布局阶段求值：offset {} 的 lambda 在放置时调用，对 bottomPanelHeightPx
-            // 的读取只登记在放置作用域 —— 抽屉逐帧改高度只触发重新放置，不重组、不闪，
-            // 也不会「先按旧高度摆一帧再纠正」。中心 Pin 的让位量同样已改到放置阶段
-            // （原先在组合期用 remember(bottomPanelHeightPx) 算 padding，会让整页每帧重组）。
-            //
-            // 列顶限制线 = 顶部控件簇实测底边 + 呼吸（见 rightColumnTopLimit），
-            // 因此缩放控件不会越进应用分流胶囊行；底部恒胶着在抽屉顶边上方 12dp，
-            // 而抽屉高度又被 panelMaxHeight 限制在地图净空之外 —— 三者的重叠在物理上不可能发生。
-            //
-            // 形态：两个子节点（0 = 缩放胶囊、1 = FAB 块）在 RightFloatingControlsLayout 里按
-            // rightColumnCompactFraction 于「竖排 / 紧凑」之间插值，整列高度因此始终 <= 可用高度，
-            // 列顶不会越过 rightColumnTopLimit；连紧凑形态都放不下时保①（底边依旧胶着在抽屉顶边
-            // 上方 12dp），列顶会越线 —— 该情形只可能出现在极矮屏幕（抽屉已被压到操作下限）。
-            RightFloatingControlsLayout(
-                compactFraction = rightColumnFraction,
+            // 2 + 5. 右侧悬浮控件列。缩放条固定高度，空间不足时淡出，绝不压缩轨道。
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .statusBarsPadding()
@@ -1398,51 +1217,67 @@ fun MapScreen(
                             collapsedPanelFallback.roundToPx()
                         }
                         IntOffset(x = 0, y = -(panelPx + RIGHT_PANEL_GAP.roundToPx()))
-                    }
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(RIGHT_FAB_GAP)
             ) {
-                MapVerticalZoomControl(
-                    capsuleHeight = zoomCapsuleTarget,
-                    capsuleAnimationSpec = DRAWER_SPRING_DP,
-                    currentZoom = currentZoom,
-                    minZoom = 3.0,
-                    maxZoom = 19.0,
-                    onZoomChange = { newZoom ->
-                        currentZoom = newZoom
-                        mapViewRef?.controller?.setZoom(newZoom)
-                    },
-                    onZoomIn = {
-                        val newZoom = (currentZoom + 1.0).coerceAtMost(19.0)
-                        currentZoom = newZoom
-                        mapViewRef?.controller?.setZoom(newZoom)
-                    },
-                    onZoomOut = {
-                        val newZoom = (currentZoom - 1.0).coerceAtLeast(3.0)
-                        currentZoom = newZoom
-                        mapViewRef?.controller?.setZoom(newZoom)
-                    }
-                )
+                AnimatedVisibility(
+                    visible = rightControlsVisibility.zoom,
+                    enter = fadeIn(tween(160)),
+                    exit = fadeOut(tween(120))
+                ) {
+                    MapVerticalZoomControl(
+                        currentZoom = currentZoom,
+                        minZoom = 3.0,
+                        maxZoom = 19.0,
+                        onZoomChange = { newZoom ->
+                            currentZoom = newZoom
+                            mapViewRef?.controller?.setZoom(newZoom)
+                        },
+                        onZoomIn = {
+                            val newZoom = (currentZoom + 1.0).coerceAtMost(19.0)
+                            currentZoom = newZoom
+                            mapViewRef?.controller?.setZoom(newZoom)
+                        },
+                        onZoomOut = {
+                            val newZoom = (currentZoom - 1.0).coerceAtLeast(3.0)
+                            currentZoom = newZoom
+                            mapViewRef?.controller?.setZoom(newZoom)
+                        }
+                    )
+                }
 
-                MapFloatingActions(
-                    context = context,
-                    activeMapTab = activeMapTab,
-                    drawnWaypoints = drawnWaypoints,
-                    currentMapType = currentMapType,
-                    mapViewRef = mapViewRef,
-                    isPointMockActive = isPointMockActive,
-                    isJoystickRunning = isJoystickRunning,
-                    simState = simState,
-                    simulationViewModel = simulationViewModel,
-                    onResetToRealLocation = { real ->
-                        userRealLocation = real
-                        simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
-                        simulationViewModel.updateSelectedTarget(real.first, real.second)
-                        centerAimingCoord = real
-                    }
-                )
+                AnimatedVisibility(
+                    visible = rightControlsVisibility.actions,
+                    enter = fadeIn(tween(160)),
+                    exit = fadeOut(tween(120))
+                ) {
+                    MapFloatingActions(
+                        context = context,
+                        activeMapTab = activeMapTab,
+                        drawnWaypoints = drawnWaypoints,
+                        currentMapType = currentMapType,
+                        mapViewRef = mapViewRef,
+                        isPointMockActive = isPointMockActive,
+                        isJoystickRunning = isJoystickRunning,
+                        simState = simState,
+                        simulationViewModel = simulationViewModel,
+                        onResetToRealLocation = { real ->
+                            userRealLocation = real
+                            simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
+                            simulationViewModel.updateSelectedTarget(real.first, real.second)
+                            locationAimingCoord = real
+                        }
+                    )
+                }
             }
 
             // 3. Dynamic Status Capsule (iOS Dynamic Island style)
-            if (isPointMockActive && pointMockLocation != null) {
+            if (
+                activeMapTab == MapTab.LOCATION &&
+                isPointMockActive &&
+                pointMockLocation != null
+            ) {
                 AtlasSurface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -1534,6 +1369,15 @@ fun MapScreen(
             // =================================================================
             // 4. Center Crosshair Aiming Pin (LocationSpoofer Style)
             // =================================================================
+            val crosshairAlpha by animateFloatAsState(
+                targetValue = crosshairAlphaForDrawer(
+                    containerHeightPx = mapBoxHeightPx,
+                    panelHeightPx = bottomPanelHeightPx,
+                    fadeBandPx = with(density) { CROSSHAIR_FADE_BAND.roundToPx() }
+                ),
+                animationSpec = tween(durationMillis = 120),
+                label = "crosshairDrawerCoverage"
+            )
             AnimatedVisibility(
                 visible = activeMapTab == MapTab.LOCATION || (activeMapTab == MapTab.ROUTE && routeStage == RouteStage.SELECTING),
                 modifier = Modifier.align(Alignment.Center)
@@ -1545,32 +1389,22 @@ fun MapScreen(
                         .getOrNull()
                 } ?: MaterialTheme.colorScheme.primary
 
-                // 设计稿 .pin-wrap / .pin-tip —— 胶囊提示条 + 32×40 水滴 Pin。
-                //
-                // 几何（关键）：Pin 的**尖端**才是瞄准点，因此让位量按尖端算：
-                //   尖端屏幕 y = 容器中心 − 让位量，让位量 = pinTipClearancePx(...)
-                //   ⇒ 块中心需要上移 = PIN_TIP_BELOW_BLOCK_CENTER + 让位量
-                // 旧实现按「块底边」算让位（且带 130dp 下限与 ×2/+24 的推导），尖端因此既不落在
-                // 容器中心、也不随抽屉线性移动：瞄准点恒为容器中心，而尖端在它北面几十到几百米，
-                // 用户"用 Pin 瞄的点"和"真正注入的点"根本不是同一个位置。
-                // 现在两者由同一个让位量驱动：让位量为 0 时尖端正好在中心（瞄准点 = 中心 = 尖端），
-                // 抽屉长高时尖端上移，瞄准点同步上移（见 ScrollEvent 用 projection.fromPixels 取点）。
+                // The tip is always pinned to the geometric screen centre. Only opacity responds to
+                // drawer coverage; the map projection and injected coordinate stay centre-based.
                 IosCenterPin(
                     label = if (currentActiveRule != null) "【${currentActiveRule.appName}】分流选点"
                             else if (activeMapTab == MapTab.ROUTE) "路线航点选点"
                             else "目标定位点",
                     pinColor = currentAimingColor,
                     icon = if (currentActiveRule != null) Icons.AutoMirrored.Filled.AltRoute else Icons.Default.Place,
-                    modifier = Modifier.offset {
-                        val tipOffsetPx = PIN_TIP_BELOW_BLOCK_CENTER.roundToPx()
-                        val clearancePx = pinTipClearancePx(
-                            boxHeightPx = mapBoxHeightPx,
-                            panelHeightPx = bottomPanelHeightPx,
-                            fallbackPanelPx = collapsedPanelFallback.roundToPx(),
-                            gapPx = PIN_TIP_GAP.roundToPx()
-                        )
-                        IntOffset(x = 0, y = -(tipOffsetPx + clearancePx))
-                    }
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = 0,
+                                y = -PIN_TIP_BELOW_BLOCK_CENTER.roundToPx()
+                            )
+                        }
+                        .graphicsLayer { alpha = crosshairAlpha }
                 )
             }
 
@@ -1583,18 +1417,11 @@ fun MapScreen(
             // =================================================================
             if (activeMapTab == MapTab.LOCATION) {
                 LocationControlPanel(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        // 统一可用区约束：抽屉最高只能长到「容器高 − 顶部控件 − 地图净空」，
-                        // 超出部分由面板内部滚动承载（LocationControlPanel 的 verticalScroll），
-                        // 因此应用分流胶囊行永远不会被抽屉盖住。
-                        .heightIn(max = panelMaxHeight)
-                        .onGloballyPositioned { coords ->
-                            bottomPanelHeightPx = coords.size.height
-                            // 抽屉高度变了 ⇒ Pin 尖端在屏幕上的位置变了 ⇒ 瞄准点要跟着重算，
-                            // 否则「存的坐标」与「Pin 指的位置」会再次分叉。
-                            scheduleAimingRecompute()
-                        },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    topChromeHeight = panelTopChromeHeight,
+                    onPanelHeightChanged = { height ->
+                        bottomPanelHeightPx = height
+                    },
                     isMockActive = isPointMockActive || isJoystickRunning,
                     latitude = activeCoord.first,
                     longitude = activeCoord.second,
@@ -1632,7 +1459,7 @@ fun MapScreen(
                             animateTo(GeoPoint(dispLat, dispLon))
                         }
                         simulationViewModel.updateSelectedTarget(item.latitude, item.longitude)
-                        centerAimingCoord = item.latitude to item.longitude
+                        locationAimingCoord = item.latitude to item.longitude
                         mapViewModel.clearSearch()
                     },
                     onClearSearch = { mapViewModel.clearSearch() },
@@ -1663,7 +1490,7 @@ fun MapScreen(
                             userRealLocation = real
                             simulationViewModel.updateRealPhysicalLocation(real.first, real.second)
                             simulationViewModel.updateSelectedTarget(real.first, real.second)
-                            centerAimingCoord = real
+                            locationAimingCoord = real
                             val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                             val (tLat, tLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(real.first, real.second) else real
                             mapViewRef?.controller?.apply {
@@ -1693,10 +1520,10 @@ fun MapScreen(
                         }
                     },
                     onSelectSavedRoute = { route ->
-                        mapViewModel.selectRoute(route)
                         val first = route.waypoints.firstOrNull()
                         if (first != null) {
-                            centerAimingCoord = first.latitude to first.longitude
+                            locationAimingCoord = first.latitude to first.longitude
+                            simulationViewModel.updateSelectedTarget(first.latitude, first.longitude)
                             val isGcj = currentMapType != MapSourceType.OPEN_STREET_MAP
                             val (dispLat, dispLon) = if (isGcj) CoordinateConverter.wgs84ToGcj02(first.latitude, first.longitude) else (first.latitude to first.longitude)
                             mapViewRef?.controller?.animateTo(GeoPoint(dispLat, dispLon))
@@ -1705,16 +1532,11 @@ fun MapScreen(
                 )
             } else if (activeMapTab == MapTab.ROUTE) {
                 RouteBottomPanel(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        // 与定位页同一套可用区约束：路线面板长高时同样不许侵入顶部控件簇。
-                        .heightIn(max = panelMaxHeight)
-                        .onGloballyPositioned { coords ->
-                            bottomPanelHeightPx = coords.size.height
-                            // 抽屉高度变了 ⇒ Pin 尖端在屏幕上的位置变了 ⇒ 瞄准点要跟着重算，
-                            // 否则「存的坐标」与「Pin 指的位置」会再次分叉。
-                            scheduleAimingRecompute()
-                        },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    topChromeHeight = topChromeHeight,
+                    onPanelHeightChanged = { height ->
+                        bottomPanelHeightPx = height
+                    },
                     stage = routeStage,
                     waypoints = drawnWaypoints,
                     simState = simState,
@@ -1730,7 +1552,7 @@ fun MapScreen(
                             setZoom(16.5)
                             animateTo(GeoPoint(dispLat, dispLon))
                         }
-                        centerAimingCoord = item.latitude to item.longitude
+                        routeAimingCoord = item.latitude to item.longitude
                         mapViewModel.clearSearch()
                     },
                     onClearSearch = { mapViewModel.clearSearch() },
@@ -1895,14 +1717,15 @@ fun MapScreen(
                         setZoom(16.5)
                         animateTo(GeoPoint(tLat, tLon))
                     }
-                    centerAimingCoord = target.latitude to target.longitude
                     if (isLocationTab) {
                         // 地点收藏：只把准星与目标点移到该坐标。收藏点是单点，
                         // 不写入 _selectedRoute / _drawnWaypoints，避免污染航线状态。
+                        locationAimingCoord = target.latitude to target.longitude
                         simulationViewModel.updateSelectedTarget(target.latitude, target.longitude)
                         Toast.makeText(context, "已跳转到收藏地点", Toast.LENGTH_SHORT).show()
                     } else {
                         // 航线收藏：载入为当前路线，行为与路线库一致
+                        routeAimingCoord = target.latitude to target.longitude
                         mapViewModel.selectRoute(route)
                         Toast.makeText(context, "已载入航线「${route.name}」", Toast.LENGTH_SHORT).show()
                     }
@@ -1923,7 +1746,7 @@ fun MapScreen(
                     setZoom(16.5)
                     animateTo(GeoPoint(tLat, tLon))
                 }
-                centerAimingCoord = lat to lon
+                setActiveAimingCoord(lat, lon)
                 showSearchDialog = false
                 Toast.makeText(context, "已定位至：$name", Toast.LENGTH_SHORT).show()
             },
@@ -1944,7 +1767,8 @@ fun MapScreen(
                         setZoom(16.5)
                         animateTo(GeoPoint(tLat, tLon))
                     }
-                    centerAimingCoord = lat to lon
+                    locationAimingCoord = lat to lon
+                    simulationViewModel.updateSelectedTarget(lat, lon)
                     showSearchDialog = false
                     Toast.makeText(context, "已开启即时虚拟定位！", Toast.LENGTH_SHORT).show()
                 }
@@ -1957,7 +1781,7 @@ fun MapScreen(
             mapViewModel = mapViewModel,
             simulationViewModel = simulationViewModel,
             realLocation = userRealLocation,
-            selectedTapPoint = centerAimingCoord,
+            selectedTapPoint = routeAimingCoord,
             pointMockLocation = pointMockLocation,
             onDismissRequest = { showRoadRouteDialog = false },
             onNavigateToOrigin = { lat, lon ->
@@ -1975,12 +1799,12 @@ fun MapScreen(
         AppPickerBottomSheet(
             onDismissRequest = { showMapAppPickerSheet = false },
             existingRules = multiTargetRules,
-            initialLatitude = centerAimingCoord.first,
-            initialLongitude = centerAimingCoord.second,
+            initialLatitude = locationAimingCoord.first,
+            initialLongitude = locationAimingCoord.second,
             onAppSelected = { newRule ->
                 simulationViewModel.addOrUpdateMultiTargetRule(newRule)
                 simulationViewModel.setActiveTargetKey(newRule.key)
-                centerAimingCoord = newRule.latitude to newRule.longitude
+                locationAimingCoord = newRule.latitude to newRule.longitude
                 val isGcjMap = currentMapType != MapSourceType.OPEN_STREET_MAP
                 val (tLat, tLon) = if (isGcjMap) CoordinateConverter.wgs84ToGcj02(newRule.latitude, newRule.longitude) else (newRule.latitude to newRule.longitude)
                 mapViewRef?.controller?.animateTo(GeoPoint(tLat, tLon))

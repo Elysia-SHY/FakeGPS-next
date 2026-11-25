@@ -59,6 +59,7 @@ fun RouteSimulationScreen(
     val selectedRoute by mapViewModel.selectedRoute.collectAsState()
     val savedRoutes by mapViewModel.savedRoutes.collectAsState()
     val sensorState by simulationViewModel.sensorState.collectAsState()
+    val filterChipColors = appFilterChipColors()
 
     var selectedSpeed by remember { mutableFloatStateOf(8f) }
     var customSpeedInput by remember { mutableStateOf("8") }
@@ -522,6 +523,7 @@ fun RouteSimulationScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = { applySpeed(speedVal) },
+                            colors = filterChipColors,
                             label = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -749,6 +751,7 @@ fun RouteSimulationScreen(
                                                 selectedSpeed
                                             )
                                         },
+                                        colors = filterChipColors,
                                         label = {
                                             Text(
                                                 text = label,

@@ -36,6 +36,9 @@ import com.mockrun.app.core.designsystem.LocalIsDarkTheme
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
 import com.mockrun.app.core.designsystem.liquidGlass
 
+internal val MapVerticalZoomControlHeight = 176.dp
+private val MapVerticalZoomTrackHeight = 72.dp
+
 /**
  * Material 3 vertical zoom control.
  * - Direct vertical drag tracking with a standard spring settle
@@ -50,31 +53,11 @@ fun MapVerticalZoomControl(
     onZoomChange: (Double) -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
-    modifier: Modifier = Modifier,
-    // 胶囊体目标高度：底部抽屉完全展开时右列会被压进顶部安全区，调用方按「顶边限制线」
-    // 算好这一档的硬预算（几何下限 112dp = 两个 48dp 按钮 + 轨道与内边距 16dp）。
-    // 默认值保持原来写死的 180dp —— 其余调用点与预览不受影响。
-    capsuleHeight: Dp = 180.dp,
-    // 高度过渡曲线：调用方传入与底部抽屉同源的那条 spring（见 MapScreen 的 DRAWER_SPRING_DP）。
-    capsuleAnimationSpec: FiniteAnimationSpec<Dp> = spring(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessMediumLow
-    )
+    modifier: Modifier = Modifier
 ) {
     val isLiquidGlass = LocalLiquidGlassEnabled.current
     var isDragging by remember { mutableStateOf(false) }
     var trackHeightPx by remember { mutableFloatStateOf(1f) }
-
-    // capsuleHeight 是硬预算（由顶边限制线推出），所以只对「变高」方向走 spring：
-    // 收缩方向直接取 min —— 否则动画的滞后会让胶囊（连同整列）顶破限制线，
-    // 而「右列不与抽屉重叠」这条不变量优先级最高，不能被动画破坏。
-    // 曲线与抽屉展开同源：展开时胶囊的收缩节奏 = 抽屉的展开节奏，收起时按同一条 spring 弹回。
-    val animatedCapsuleHeight by animateDpAsState(
-        targetValue = capsuleHeight,
-        animationSpec = capsuleAnimationSpec,
-        label = "zoomCapsuleHeight"
-    )
-    val renderedCapsuleHeight = minOf(animatedCapsuleHeight, capsuleHeight)
 
     val updatedMinZoom by rememberUpdatedState(minZoom)
     val updatedMaxZoom by rememberUpdatedState(maxZoom)
@@ -95,7 +78,7 @@ fun MapVerticalZoomControl(
     AtlasSurface(
         modifier = modifier
             .width(56.dp)
-            .height(renderedCapsuleHeight),
+            .height(MapVerticalZoomControlHeight),
         isLiquidGlass = isLiquidGlass,
         shape = shape,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -126,7 +109,7 @@ fun MapVerticalZoomControl(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(MapVerticalZoomTrackHeight)
                     .padding(horizontal = 6.dp)
                     .onGloballyPositioned { coordinates ->
                         trackHeightPx = coordinates.size.height.toFloat().coerceAtLeast(1f)

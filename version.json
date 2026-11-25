@@ -1,20 +1,20 @@
 {
-  "versionName": "v2.5.0",
-  "versionCode": 66,
-  "releaseDate": "2026-11-24",
+  "versionName": "v2.5.1",
+  "versionCode": 67,
+  "releaseDate": "2026-11-25",
   "minSdk": 29,
-  "releaseNotes": "FakeGPS-next 2.5.0：全新 Liquid Glass 界面、绝对坐标 Dock 手势与自定义强调色。\n\n【界面与交互】\n· 四个主页面、地图浮层、路线库与弹窗统一 Material 3 和双模式配色。\n· Dock 按下即吸附手指绝对坐标，滑动实时跟随，跨 Tab 提供轻触反馈，松手弹簧落槽。\n· 主页面使用原地微景深交叉叠化，消除右侧弹跳留白。\n\n【个性化】\n· 提供原生、海蓝、松绿、珊瑚、鸢尾、石墨六种强调色。\n· 支持 #RRGGBB 自定义、输入校验、即时应用、恢复原生与冷启动持久化。\n\n【性能与稳定性】\n· 页面共享 Backdrop，背景采样降采样至 0.5，Dock 仅捕获底部区域。\n· 胶囊位置与缩放下沉到绘制阶段；纯净模式彻底停用实时采样。\n· 修复纯净模式切换崩溃、功能与关于页底栏模糊丢失。\n· 修复地图搜索旧请求覆盖新结果，加入 250ms 防抖、任务取消与请求失效保护。\n· 保留分流应用、模拟点位、路线、壁纸和外观记忆；启动不会自动开启模拟。\n\n【验证】\n· 178 项单元测试通过；LineageOS / Android 17 真机完成导航、路线库、搜索、弹窗、材质切换、持久化与明暗模式回归。\n· Release 构建、APK 签名及发布产物校验由 GitHub Actions 完成。",
-  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.5.0",
-  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk",
-  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk",
-  "sha256": "820f37414e746a84f01329855e6c4d6ddc9f6ec5df17fedd4e8ab5334429ef8a",
-  "sizeBytes": 4257028,
+  "releaseNotes": "FakeGPS-next 2.5.1：定位页与路线页地图覆盖物和模拟状态彻底解耦，三段式 Liquid Glass 抽屉与地图选点体验全面精修。\n\n【地图与业务边界】\n· 定位页仅绘制真实位置蓝点、目标虚拟定位点和分流点，不再显示路线折线、编号航点或巡航位置。\n· 路线页独立绘制规划折线、编号航点、起终点与实时巡航位置，切回定位页立即清空路线图层。\n· 新增 NONE / SINGLE_POINT / ROUTE / JOYSTICK 明确注入模式；启动单点会同步清理运行中或已暂停的路线状态，两类模拟不再串台。\n\n【三段式抽屉与地图选点】\n· 定位页首屏直接展示搜索框和开启/停止虚拟定位按钮；半展开完整展示地址、WGS-84 坐标与三联操作卡；全展开自然收口收藏列表。\n· 路线页首屏改为状态摘要、搜索入口以及“添加第 N 点 / 完成规划”双主按钮；半展开完整展示搜索、步骤条、起终点卡片和核心操作；全展开保留撤销、清空与完整规划控制。\n· 抽屉按三档实际内容高度测量，最大高度受顶部安全区和 Dock 上方基准线约束，不再出现全屏空底或半张卡裁切。\n· 地图准星绝对固定在屏幕中心，抽屉覆盖中心时仅平滑淡出，不再被抽屉高度推向上方。\n\n【交互、适配与主题】\n· 地图缩放条固定 176dp，剩余空间不足时整组淡出，绝不压缩滑块轨道。\n· 抽屉换档阈值提升至档位间距的 48%，速度阈值提升至 720dp/s，单次手势只切换相邻档位；加入 0.68/320 低阻尼弹簧、上下边界橡皮筋与 nestedScroll 列表联动。\n· 浅色模式下模式芯片与分段控件使用高对比品牌主色选中态，普通模式与液态玻璃模式均清晰可辨；深色模式与底栏手势保持不变。\n\n【验证】\n· 196 项 JVM 单元测试全部通过，签名 Release 构建通过。\n· 真机验证 1080×2400 与 1080×1920 两种屏幕比例，三档内容、拖拽回弹、覆盖物隔离与冷启动恢复均通过。",
+  "releaseUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/tag/v2.5.1",
+  "downloadUrl": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk",
+  "downloadUrlVersioned": "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk",
+  "sha256": "",
+  "sizeBytes": 0,
   "contact": "2224958076@qq.com",
   "homepage": "https://github.com/Elysia-SHY/FakeGPS-next",
   "mirrorUrls": [
-    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk",
-    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk",
-    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk",
-    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.0/FakeGPS-next-v2.5.0-release.apk"
+    "https://gh-proxy.com/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk",
+    "https://ghproxy.net/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk",
+    "https://gh.llkk.cc/https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk",
+    "https://github.com/Elysia-SHY/FakeGPS-next/releases/download/v2.5.1/FakeGPS-next-v2.5.1-release.apk"
   ]
 }

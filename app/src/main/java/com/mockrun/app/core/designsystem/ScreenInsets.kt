@@ -13,19 +13,19 @@ import androidx.compose.ui.unit.dp
  * 实测来源（AndroidFloatingBottomBar.kt:60-72）：
  *     modifier
  *         .navigationBarsPadding()                        // = WindowInsets.navigationBars
- *         .padding(horizontal = 14.dp, vertical = 6.dp)   // 底距 6dp
+ *         .padding(horizontal = 16.dp, vertical = 8.dp)   // 上下各 8dp
  *         .height(72.dp)                                  // 栏体 72dp
  *
- * 注意：AppNavigation.kt:71-73 的注释写「Tab 栏 72dp + 底距 22dp」，与实现里的 6dp 不一致。
- * 本对象以**实现**为准：6dp。旧注释里的 22dp 是历史遗留文案，按 navBar + 94.dp 预留的页面
- * 实际比真实需求多留了 16dp 空白。
+ * 本对象与 AndroidFloatingBottomBar 的实现保持同步。浮空栏的完整占位是
+ * navBar + 8dp(top margin) + 72dp(bar) + 8dp(bottom margin)；因此
+ * [bottomBarHeight] 同时也是「Dock 顶边再向上 8dp」的安全基准线。
  */
 object BottomBarMetrics {
     /** 栏体高度（AndroidFloatingBottomBar.kt:66） */
     val barHeight: Dp = 72.dp
 
-    /** 栏体上下外距，上下各 6dp（AndroidFloatingBottomBar.kt:63） */
-    val barVerticalMargin: Dp = 6.dp
+    /** 栏体上下外距，上下各 8dp。 */
+    val barVerticalMargin: Dp = 8.dp
 
     /** 栏体左右外距（AndroidFloatingBottomBar.kt:63） */
     val barHorizontalMargin: Dp = 14.dp

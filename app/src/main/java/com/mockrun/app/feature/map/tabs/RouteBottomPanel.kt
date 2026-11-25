@@ -9,8 +9,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.domain.model.SimulationStatus
@@ -36,11 +35,12 @@ import com.mockrun.app.domain.model.WayPoint
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
 import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
-import com.mockrun.app.core.designsystem.ScreenInsets
 import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
+import com.mockrun.app.feature.map.MapDrawerStage
+import com.mockrun.app.feature.map.ThreeStageMapDrawer
 
 enum class RouteStage {
     SELECTING,
@@ -131,6 +131,76 @@ private fun RouteStageIndicator(
                                 MaterialTheme.colorScheme.outlineVariant
                             }
                         )
+                )
+            }
+        }
+    }
+}
+
+/** One-line stage strip used by the half-expanded map-selection view. */
+@Composable
+private fun CompactRouteStageIndicator(
+    stage: RouteStage,
+    modifier: Modifier = Modifier
+) {
+    val steps = listOf(
+        RouteStage.SELECTING to "选点",
+        RouteStage.READY to "就绪",
+        RouteStage.RUNNING to "巡航"
+    )
+    val currentIndex = steps.indexOfFirst { it.first == stage }.coerceAtLeast(0)
+    Row(
+        modifier = modifier.semantics {
+            contentDescription = "路线阶段：${steps[currentIndex].second}"
+        },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        steps.forEachIndexed { index, (_, label) ->
+            val isCurrent = index == currentIndex
+            val isReached = index <= currentIndex
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(AppShapes.pill)
+                    .background(
+                        when {
+                            isCurrent -> MaterialTheme.colorScheme.primary
+                            isReached -> MaterialTheme.colorScheme.primaryContainer
+                            else -> Color.Transparent
+                        }
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        isCurrent -> MaterialTheme.colorScheme.onPrimary
+                        isReached -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    color = when {
+                        isCurrent -> MaterialTheme.colorScheme.onPrimary
+                        isReached -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1
+                )
+            }
+            if (index != steps.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .width(12.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
                 )
             }
         }
@@ -243,7 +313,7 @@ private fun WaypointWorkspace(
                 }
             }
         }
-    }
+        }
 }
 
 @Composable
@@ -462,8 +532,233 @@ private fun RouteResultCard(
 }
 
 @Composable
+private fun RouteCompactDrawerSummary(
+    stage: RouteStage,
+    waypoints: List<WayPoint>,
+    simState: SimulationState,
+    isPaused: Boolean,
+    collapsed: Boolean,
+    showExpand: Boolean,
+    onExpand: () -> Unit,
+    onAddWaypoint: (() -> Unit)? = null,
+    onFinishSelecting: (() -> Unit)? = null,
+    onSearchShortcut: (() -> Unit)? = null
+) {
+    val title = when (stage) {
+        RouteStage.SELECTING -> if (waypoints.isEmpty()) "尚未添加航点" else "${waypoints.size} 个航点"
+        RouteStage.READY -> "路线已就绪"
+        RouteStage.RUNNING -> if (isPaused) "巡航已暂停" else "巡航中"
+    }
+    val detail = when (stage) {
+        RouteStage.SELECTING -> if (waypoints.isEmpty()) {
+            "点击地图放置起点"
+        } else {
+            "起点与终点已选 · 上拉查看完整规划"
+        }
+        RouteStage.READY -> "上拉查看路线详情并开启模拟"
+        RouteStage.RUNNING -> "${(simState.progressPercent.coerceIn(0f, 1f) * 100).toInt()}% · " +
+            "${"%.2f".format(simState.distanceTraveledMeters / 1000.0)} km"
+    }
+    val accent = if (stage == RouteStage.RUNNING && isPaused) {
+        AppSemanticColors.current.warning
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
+    if (collapsed) {
+        if (stage == RouteStage.SELECTING && onAddWaypoint != null && onFinishSelecting != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .clickable(onClick = onExpand),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Route,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "$title · $detail",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (onSearchShortcut != null) {
+                        IconButton(
+                            onClick = onSearchShortcut,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "搜索航点",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "展开路线规划面板",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onAddWaypoint,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = AppShapes.button,
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.AddLocation, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = if (waypoints.isEmpty()) "添加起点" else "添加第 ${waypoints.size + 1} 点",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                    Button(
+                        onClick = onFinishSelecting,
+                        enabled = waypoints.size >= 2,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = AppShapes.button,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppSemanticColors.current.success,
+                            contentColor = AppSemanticColors.current.onSuccess,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = "完成规划",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clickable(onClick = onExpand)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Route,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "$title · $detail",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowUp,
+                    contentDescription = "展开路线规划面板",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    } else {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = showExpand, onClick = onExpand),
+            shape = AppShapes.card,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(AppShapes.icon)
+                        .background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = when (stage) {
+                            RouteStage.RUNNING -> Icons.Default.Navigation
+                            else -> Icons.Default.Route
+                        },
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (showExpand) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "展开路线规划面板",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun RouteBottomPanel(
     modifier: Modifier = Modifier,
+    topChromeHeight: Dp = 0.dp,
+    onPanelHeightChanged: (Int) -> Unit = {},
     stage: RouteStage,
     waypoints: List<WayPoint>,
     simState: SimulationState,
@@ -490,33 +785,57 @@ fun RouteBottomPanel(
     val isLiquidGlass = LocalLiquidGlassEnabled.current
     val configuration = LocalConfiguration.current
     val stackActions = configuration.fontScale >= 1.3f || configuration.screenWidthDp < 380
-    // 底部安全区统一由 ScreenInsets 推导（系统导航栏 + 底栏 72 + 上下外距 12 + 呼吸 8）。
-    // 不再依赖调用方传入的 navBar + 94 硬编码值。
-    val bottomInset = ScreenInsets.bottomInset(extra = 8.dp)
+    // The first screen is directly actionable: search, add-point and finish-planning stay visible
+    // without opening the middle or expanded editor.
+    var drawerStage by remember { mutableStateOf(MapDrawerStage.COLLAPSED) }
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && drawerStage == MapDrawerStage.COLLAPSED) {
+            drawerStage = MapDrawerStage.HALF_EXPANDED
+        }
+    }
 
-    Column(
-        modifier = modifier
-            .widthIn(max = 560.dp)
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp)
-            .padding(bottom = bottomInset.coerceAtLeast(0.dp))
-            // 与定位页抽屉同一套「地图可用区」约束：调用方的 heightIn(max = …) 把面板压在
-            // 地图净空以内后，超出的内容在这里滚动查看，而不是把面板顶到顶部控件上或裁掉内容。
-            .verticalScroll(rememberScrollState())
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    ThreeStageMapDrawer(
+        modifier = modifier,
+        stage = drawerStage,
+        onStageChange = { drawerStage = it },
+        topChromeHeight = topChromeHeight,
+        horizontalMargin = 14.dp,
+        onHeightChanged = onPanelHeightChanged
+    ) { anchorStage ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = when (anchorStage) {
+                        MapDrawerStage.COLLAPSED -> 0.dp
+                        MapDrawerStage.HALF_EXPANDED -> 4.dp
+                        MapDrawerStage.EXPANDED -> 8.dp
+                    },
+                    bottom = when (anchorStage) {
+                        MapDrawerStage.COLLAPSED -> 4.dp
+                        MapDrawerStage.HALF_EXPANDED -> 8.dp
+                        MapDrawerStage.EXPANDED -> 16.dp
+                    }
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(
+                when (anchorStage) {
+                    MapDrawerStage.COLLAPSED -> 0.dp
+                    MapDrawerStage.HALF_EXPANDED -> 8.dp
+                    MapDrawerStage.EXPANDED -> 10.dp
+                }
+            )
+        ) {
         // =====================================================================
         // 0. 完成 / 异常结果卡（终态不属于三阶段之一，独立于 stage 渲染）
         // =====================================================================
         val terminalStatus = simState.status
-        if (terminalStatus is SimulationStatus.Completed || terminalStatus is SimulationStatus.Error) {
+        if (
+            anchorStage != MapDrawerStage.COLLAPSED &&
+            (terminalStatus is SimulationStatus.Completed || terminalStatus is SimulationStatus.Error)
+        ) {
             RouteResultCard(
                 status = terminalStatus,
                 simState = simState,
@@ -528,7 +847,7 @@ fun RouteBottomPanel(
         // =====================================================================
         // 1. Search Bar & Search Results (Only in SELECTING stage)
         // =====================================================================
-        if (stage == RouteStage.SELECTING) {
+        if (stage == RouteStage.SELECTING && anchorStage != MapDrawerStage.COLLAPSED) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 MapSearchField(
                     value = searchQuery,
@@ -608,9 +927,80 @@ fun RouteBottomPanel(
             }
         }
 
+        if (anchorStage == MapDrawerStage.COLLAPSED) {
+            RouteCompactDrawerSummary(
+                stage = stage,
+                waypoints = waypoints,
+                simState = simState,
+                isPaused = isPaused,
+                collapsed = true,
+                showExpand = true,
+                onExpand = { drawerStage = MapDrawerStage.HALF_EXPANDED },
+                onAddWaypoint = if (stage == RouteStage.SELECTING) {
+                    onAddWaypoint
+                } else {
+                    null
+                },
+                onFinishSelecting = if (stage == RouteStage.SELECTING) {
+                    onFinishSelecting
+                } else {
+                    null
+                },
+                onSearchShortcut = if (stage == RouteStage.SELECTING) {
+                    { drawerStage = MapDrawerStage.HALF_EXPANDED }
+                } else {
+                    null
+                }
+            )
+        } else if (anchorStage == MapDrawerStage.HALF_EXPANDED) {
+            if (stage == RouteStage.SELECTING) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CompactRouteStageIndicator(stage = stage, modifier = Modifier.weight(1f))
+                    Surface(
+                        shape = AppShapes.pill,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Text(
+                            text = "${waypoints.size} 个航点",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+                WaypointWorkspace(waypoints = waypoints)
+                RouteSelectionActions(
+                    waypointCount = waypoints.size,
+                    stacked = stackActions,
+                    onAddWaypoint = onAddWaypoint,
+                    onFinishSelecting = onFinishSelecting
+                )
+            } else {
+                RouteCompactDrawerSummary(
+                    stage = stage,
+                    waypoints = waypoints,
+                    simState = simState,
+                    isPaused = isPaused,
+                    collapsed = false,
+                    showExpand = true,
+                    onExpand = { drawerStage = MapDrawerStage.EXPANDED }
+                )
+            }
+        }
+
         // =====================================================================
         // 2. Main Route Control Surface
         // =====================================================================
+        AnimatedVisibility(
+            visible = anchorStage == MapDrawerStage.EXPANDED,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(120))
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1026,5 +1416,7 @@ fun RouteBottomPanel(
                 }
             }
         }
+        }
     }
+}
 }

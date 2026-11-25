@@ -10,6 +10,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -192,11 +193,51 @@ val LocalDynamicColorEnabled = compositionLocalOf { false }
 val LocalSetDynamicColor = compositionLocalOf<(Boolean) -> Unit> { {} }
 val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
+/**
+ * Selection colors are intentionally separate from general containers.
+ *
+ * Light mode uses an opaque brand fill so option cards, chips and segmented controls remain
+ * readable on translucent glass. Dark mode resolves to the existing M3 container values.
+ */
+@Immutable
+data class AppSelectionPalette(
+    val primaryContainer: Color,
+    val onPrimaryContainer: Color,
+    val secondaryContainer: Color,
+    val onSecondaryContainer: Color,
+    val unselectedContainer: Color,
+    val unselectedContent: Color,
+    val unselectedOutline: Color,
+    val selectedOutline: Color,
+    val selectedBorderWidth: Dp
+)
+
+private val DefaultLightSelectionPalette = AppSelectionPalette(
+    primaryContainer = LightColorScheme.primary,
+    onPrimaryContainer = LightColorScheme.onPrimary,
+    secondaryContainer = LightColorScheme.primary,
+    onSecondaryContainer = LightColorScheme.onPrimary,
+    unselectedContainer = LightColorScheme.surfaceContainerLowest,
+    unselectedContent = LightColorScheme.onSurface,
+    unselectedOutline = LightColorScheme.outlineVariant,
+    selectedOutline = LightColorScheme.primary,
+    selectedBorderWidth = 2.dp
+)
+
+val LocalAppSelectionColors = staticCompositionLocalOf { DefaultLightSelectionPalette }
+
 object AppSemanticColors {
     val current: AppSemanticPalette
         @Composable
         @ReadOnlyComposable
         get() = LocalAppSemanticColors.current
+}
+
+object AppSelectionColors {
+    val current: AppSelectionPalette
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalAppSelectionColors.current
 }
 
 val IosShapes = Shapes(
@@ -296,11 +337,39 @@ fun MockRunTheme(
             )
         }
     }
+    val selectionColors = remember(darkTheme, colorScheme) {
+        if (darkTheme) {
+            AppSelectionPalette(
+                primaryContainer = colorScheme.primaryContainer,
+                onPrimaryContainer = colorScheme.onPrimaryContainer,
+                secondaryContainer = colorScheme.secondaryContainer,
+                onSecondaryContainer = colorScheme.onSecondaryContainer,
+                unselectedContainer = colorScheme.surfaceContainerHigh,
+                unselectedContent = colorScheme.onSurface,
+                unselectedOutline = Color.Transparent,
+                selectedOutline = Color.Transparent,
+                selectedBorderWidth = 0.dp
+            )
+        } else {
+            AppSelectionPalette(
+                primaryContainer = colorScheme.primary,
+                onPrimaryContainer = colorScheme.onPrimary,
+                secondaryContainer = colorScheme.primary,
+                onSecondaryContainer = colorScheme.onPrimary,
+                unselectedContainer = colorScheme.surfaceContainerLowest,
+                unselectedContent = colorScheme.onSurface,
+                unselectedOutline = colorScheme.outlineVariant,
+                selectedOutline = colorScheme.primary,
+                selectedBorderWidth = 2.dp
+            )
+        }
+    }
     val iosPalette = colorScheme.toIosColorPalette(darkTheme)
 
     CompositionLocalProvider(
         LocalIosColors provides iosPalette,
         LocalAppSemanticColors provides semanticColors,
+        LocalAppSelectionColors provides selectionColors,
         LocalDynamicColorEnabled provides false,
         LocalIsDarkTheme provides darkTheme
     ) {

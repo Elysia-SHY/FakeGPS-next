@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mockrun.app.domain.model.Route
+import com.mockrun.app.domain.model.MockSimulationMode
 import com.mockrun.app.domain.model.SimulationState
 import com.mockrun.app.core.location.CadenceMode
 import com.mockrun.app.core.location.MockLocationService
@@ -42,6 +43,7 @@ class SimulationViewModel @Inject constructor(
 ) : ViewModel() {
 
     val state: StateFlow<SimulationState> = stateRepo.state
+    val activeMode: StateFlow<MockSimulationMode> = stateRepo.activeMode
     val isJoystickActive: StateFlow<Boolean> = stateRepo.isJoystickActive
     val joystickLocation: StateFlow<com.mockrun.app.domain.model.WayPoint?> = stateRepo.joystickLocation
     val isPointMockActive: StateFlow<Boolean> = stateRepo.isPointMockActive
@@ -178,8 +180,14 @@ class SimulationViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // Mutual Exclusion: Stop Route Simulation if running
-            if (stateRepo.state.value.status is com.mockrun.app.domain.model.SimulationStatus.Running) {
+            // Mutual exclusion must include paused/completed route state as well as Running.
+            val routeStatus = stateRepo.state.value.status
+            if (
+                stateRepo.activeMode.value == MockSimulationMode.ROUTE ||
+                stateRepo.state.value.route != null ||
+                routeStatus is com.mockrun.app.domain.model.SimulationStatus.Running ||
+                routeStatus is com.mockrun.app.domain.model.SimulationStatus.Paused
+            ) {
                 stopSimulation(context)
             }
 

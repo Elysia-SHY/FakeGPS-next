@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -152,6 +153,70 @@ object MapPinHelper {
         )
         cachedDestinationPin = d
         return d
+    }
+
+    private val cachedWaypointPins = mutableMapOf<String, BitmapDrawable>()
+
+    /**
+     * Compact route-only waypoint marker. The first/last points use the existing origin/destination
+     * colours; intermediate points use the app brand teal so the whole sequence stays legible on
+     * both light and dark map tiles.
+     */
+    fun getWaypointPin(
+        context: Context,
+        number: Int,
+        isTerminal: Boolean
+    ): BitmapDrawable {
+        val isFirst = number == 1
+        val cacheKey = when {
+            isFirst -> "first"
+            isTerminal -> "last-$number"
+            else -> "middle-$number"
+        }
+        cachedWaypointPins[cacheKey]?.let { return it }
+
+        val density = context.resources.displayMetrics.density
+        val size = (34 * density).toInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val center = size / 2f
+        val color = when {
+            isFirst -> android.graphics.Color.parseColor("#34C759")
+            isTerminal -> android.graphics.Color.parseColor("#FF9500")
+            else -> android.graphics.Color.parseColor("#0F6C6D")
+        }
+
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = android.graphics.Color.argb(62, 0, 0, 0)
+        }
+        canvas.drawCircle(center, center + 1.5f * density, center - 1.5f * density, shadowPaint)
+
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+        }
+        canvas.drawCircle(center, center, center - 3f * density, fillPaint)
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * density
+        }
+        canvas.drawCircle(center, center, center - 3.5f * density, borderPaint)
+
+        val text = number.coerceAtLeast(1).toString()
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = android.graphics.Color.WHITE
+            textSize = (if (text.length > 2) 10f else 12f) * density
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        val metrics = textPaint.fontMetrics
+        val baseline = center - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(text, center, baseline, textPaint)
+
+        return BitmapDrawable(context.resources, bitmap).also {
+            cachedWaypointPins[cacheKey] = it
+        }
     }
 
     private val cachedAppPins = mutableMapOf<Int, BitmapDrawable>()

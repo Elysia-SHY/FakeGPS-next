@@ -8,20 +8,13 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -30,35 +23,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mockrun.app.domain.model.MultiTargetRule
 import com.mockrun.app.domain.model.Route
 import com.mockrun.app.core.location.SearchResultItem
 import com.mockrun.app.core.designsystem.AppShapes
-import com.mockrun.app.core.designsystem.LocalLiquidGlassEnabled
-import com.mockrun.app.core.designsystem.ScreenInsets
-import com.mockrun.app.core.designsystem.liquidGlass
 import com.mockrun.app.core.designsystem.minTouchTarget
 import com.mockrun.app.feature.map.MapSearchField
 import com.mockrun.app.feature.map.MapSearchState
+import com.mockrun.app.feature.map.MapDrawerStage
+import com.mockrun.app.feature.map.ThreeStageMapDrawer
 import com.mockrun.app.util.Diag
 import com.mockrun.app.util.logFailure
-
-enum class LocationPanelState {
-    COLLAPSED,
-    DEFAULT,
-    EXPANDED
-}
 
 @Composable
 fun LocationControlPanel(
     modifier: Modifier = Modifier,
+    topChromeHeight: Dp = 0.dp,
+    onPanelHeightChanged: (Int) -> Unit = {},
     isMockActive: Boolean,
     latitude: Double,
     longitude: Double,
@@ -82,47 +70,13 @@ fun LocationControlPanel(
     onSelectSavedRoute: (Route) -> Unit
 ) {
     val context = LocalContext.current
-    val isLiquidGlass = LocalLiquidGlassEnabled.current
-    // 初始状态恒为「完全收起」—— 不读任何持久化存储、也不沿用上一次的选择。
-    // 于是「首次安装 / 冷启动 / 从其它页面切回定位页」三条路径都从收起开始，先给用户一张完整地图。
-    // 旧实现把用户选择写进 SharedPreferences 并在每次进入页面时读回来当初始值：
-    // 用户只要曾经把抽屉拖开过一次，之后每次打开应用进定位页抽屉都是展开的、直接压住地图。
-    // 状态是页面级的（remember 随页面离开组合而销毁）：只有用户本次停留在定位页时的
-    // 拖拽 / 点击手柄才会改变它，切走再回来即回到默认收起。
-    var panelState by remember { mutableStateOf(LocationPanelState.COLLAPSED) }
-    val setPanelState: (LocationPanelState) -> Unit = { newState ->
-        panelState = newState
-    }
-    var dragAccumulator by remember { mutableFloatStateOf(0f) }
-
-    // 底部安全区统一由 ScreenInsets 推导（系统导航栏 + 底栏 72 + 上下外距 12 + 呼吸 12）。
-    // 旧实现由调用方传入 navBar + 94 的硬编码值，设备安全区变化时不会跟随。
-    val bottomInset = ScreenInsets.bottomInset(extra = 12.dp)
-
-    val dragGestureModifier = Modifier.pointerInput(panelState) {
-        detectVerticalDragGestures(
-            onDragStart = { dragAccumulator = 0f },
-            onVerticalDrag = { _, dragAmount ->
-                dragAccumulator += dragAmount
-            },
-            onDragEnd = {
-                if (dragAccumulator > 30f) {
-                    when (panelState) {
-                        LocationPanelState.EXPANDED -> setPanelState(LocationPanelState.DEFAULT)
-                        LocationPanelState.DEFAULT -> setPanelState(LocationPanelState.COLLAPSED)
-                        LocationPanelState.COLLAPSED -> {}
-                    }
-                } else if (dragAccumulator < -30f) {
-                    when (panelState) {
-                        LocationPanelState.COLLAPSED -> setPanelState(LocationPanelState.DEFAULT)
-                        LocationPanelState.DEFAULT -> setPanelState(LocationPanelState.EXPANDED)
-                        LocationPanelState.EXPANDED -> {}
-                    }
-                }
-                dragAccumulator = 0f
-            },
-            onDragCancel = { dragAccumulator = 0f }
-        )
+    // Page-local state: every entry starts collapsed, while an active search opens the middle
+    // anchor so results are not stranded below the fold.
+    var panelState by remember { mutableStateOf(MapDrawerStage.COLLAPSED) }
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && panelState == MapDrawerStage.COLLAPSED) {
+            panelState = MapDrawerStage.HALF_EXPANDED
+        }
     }
 
     // 长地址可达性：折叠时 2 行 + 省略号，点击整行切换展开/收起；
@@ -130,79 +84,27 @@ fun LocationControlPanel(
     val fullAddress = address.ifBlank { "已选定目标坐标" }
     var addressExpanded by remember(fullAddress) { mutableStateOf(false) }
 
-    Box(
-        modifier = modifier
-            .widthIn(max = 560.dp)
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = bottomInset.coerceAtLeast(0.dp))
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-            .liquidGlass(
-                isLiquidGlass = isLiquidGlass,
-                shape = AppShapes.sheet,
-                elevation = if (isLiquidGlass) 20.dp else 8.dp,
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-    ) {
-        Column {
-        // 1. Drag Handle Pill (支持点击快速在 COLLAPSED / DEFAULT / EXPANDED 间循环切换)
-        //    触区用 minTouchTarget 抬到 48dp —— 原实现只有 5dp 高的胶囊本身可点。
-        //    位置固定在抽屉顶部、不随内容滚动：抽屉被高度上限压住后内容会滚动，
-        //    若手柄也参与滚动就会被卷出视野，用户找不到收起/展开入口。
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 14.dp, end = 14.dp, top = 14.dp)
-                .minTouchTarget(minHeight = 48.dp)
-                .then(dragGestureModifier)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    setPanelState(
-                        when (panelState) {
-                            LocationPanelState.COLLAPSED -> LocationPanelState.DEFAULT
-                            LocationPanelState.DEFAULT -> LocationPanelState.EXPANDED
-                            LocationPanelState.EXPANDED -> LocationPanelState.DEFAULT
-                        }
-                    )
-                }
-                .semantics {
-                    contentDescription = when (panelState) {
-                        LocationPanelState.COLLAPSED -> "展开定位面板"
-                        LocationPanelState.DEFAULT -> "展开更多设置"
-                        LocationPanelState.EXPANDED -> "收起定位面板"
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(42.dp)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-            )
-        }
-
-        // 2..5 其余内容：抽屉被调用方的 heightIn(max = …) 压在地图净空以内时，多出来的部分在这里
-        //    滚动查看 —— 既不把抽屉顶到顶部控件（应用分流胶囊行）上，也不把内容裁掉。
-        //    weight(1f, fill = false)：内容不足时按内容高（抽屉不撑高），超出时吃满剩余高度再滚动。
-        //    搜索行 / 状态卡等自带竖直拖拽手势的子节点在 Main 阶段先消费事件，
-        //    所以「拖手柄改抽屉档位」与「拖内容滚动」互不干扰。
+    ThreeStageMapDrawer(
+        modifier = modifier,
+        stage = panelState,
+        onStageChange = { panelState = it },
+        topChromeHeight = topChromeHeight,
+        horizontalMargin = 12.dp,
+        onHeightChanged = onPanelHeightChanged
+    ) { drawerStage ->
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
+                .padding(
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = if (drawerStage == MapDrawerStage.COLLAPSED) 0.dp else 8.dp,
+                    bottom = if (drawerStage == MapDrawerStage.COLLAPSED) 4.dp else 14.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(
+                if (drawerStage == MapDrawerStage.COLLAPSED) 8.dp else 10.dp
+            )
         ) {
 
             // 2. Master Action & Search Rows
@@ -215,7 +117,7 @@ fun LocationControlPanel(
                 }
 
                 // A. Search Box (Full Width)
-                Box(modifier = Modifier.fillMaxWidth().then(dragGestureModifier)) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     MapSearchField(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
@@ -225,8 +127,36 @@ fun LocationControlPanel(
                     )
                 }
 
-                // B. App Diversion Status Card with Inline Switch
-                Surface(
+                if (drawerStage == MapDrawerStage.COLLAPSED) {
+                    Button(
+                        onClick = { onSetTargetLocation?.invoke(activeRule) },
+                        enabled = onSetTargetLocation != null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(19.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (activeRule.isEnabled) "更新分流定位点" else "开启分流定位",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                } else {
+                    // B. App Diversion Status Card with Inline Switch
+                    Surface(
                     shape = AppShapes.card,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -239,7 +169,7 @@ fun LocationControlPanel(
                             MaterialTheme.colorScheme.outlineVariant
                         }
                     ),
-                    modifier = Modifier.fillMaxWidth().then(dragGestureModifier)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
@@ -318,7 +248,7 @@ fun LocationControlPanel(
 
                 // C. Main Action Row: [ 设为该应用分流定位点 ] & [ 切回全局 ]
                 Row(
-                    modifier = Modifier.fillMaxWidth().then(dragGestureModifier),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -369,12 +299,11 @@ fun LocationControlPanel(
                         )
                     }
                 }
+                }
             } else {
                 // Global Mode: Search Bar + Master Action Capsule Pill
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(dragGestureModifier),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     MapSearchField(
@@ -494,7 +423,7 @@ fun LocationControlPanel(
             }
 
             // 3. Search Results Overlay —— 有结果 / 搜索中 / 无匹配 三态
-            if (searchResults.isNotEmpty()) {
+            if (drawerStage != MapDrawerStage.COLLAPSED && searchResults.isNotEmpty()) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -547,7 +476,7 @@ fun LocationControlPanel(
                         }
                     }
                 }
-            } else {
+            } else if (drawerStage != MapDrawerStage.COLLAPSED) {
                 // 旧实现只在数组非空时渲染 —— 搜索中与「无匹配结果」两种状态没有任何反馈
                 MapSearchState(
                     isSearching = isSearching,
@@ -560,7 +489,7 @@ fun LocationControlPanel(
 
             // 4. Coordinates & Address Card (visible in DEFAULT and EXPANDED)
             AnimatedVisibility(
-                visible = panelState != LocationPanelState.COLLAPSED,
+                visible = drawerStage != MapDrawerStage.COLLAPSED,
                 enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                 exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
             ) {
@@ -718,7 +647,7 @@ fun LocationControlPanel(
             //    收藏地点（单点）与收藏路线（≥2 航点）分两组展示：
             //    数据源是 MapViewModel 自己的两条派生流，不做静默合并。
             AnimatedVisibility(
-                visible = panelState == LocationPanelState.EXPANDED,
+                visible = drawerStage == MapDrawerStage.EXPANDED,
                 enter = fadeIn(tween(180)) + expandVertically(tween(180)),
                 exit = fadeOut(tween(140)) + shrinkVertically(tween(140))
             ) {
@@ -821,7 +750,6 @@ fun LocationControlPanel(
                     }
                 }
             }
-        }
         }
     }
 }
